@@ -27,6 +27,7 @@ import {
 
 const visibilityOptions = [
   { id: "videoTall", label: "Tall media tile" },
+  { id: "videoSmall", label: "Small media tile" },
   { id: "search", label: "Search box" },
   { id: "weather", label: "Weather" },
   { id: "featurePanel", label: "Feature panel" },
@@ -195,6 +196,16 @@ function SettingsButton() {
       ...prevSettings,
       timer: {
         ...prevSettings.timer,
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleDecorativeVideoChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      decorativeVideo: {
+        ...prevSettings.decorativeVideo,
         [key]: value,
       },
     }));
@@ -702,6 +713,67 @@ function SettingsButton() {
                         }
                       />
                     </SettingField>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Decorative Video</CardTitle>
+                    <CardDescription>
+                      Use one shared looping MP4 scene for both video tiles. The frontend treats the tiles like two windows into the same moved and scaled video.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <SettingField label="Video URL">
+                      <Input
+                        value={settingsState.decorativeVideo?.url ?? ""}
+                        placeholder="https://pixabay.com/videos/download/video-338904_medium.mp4"
+                        onChange={(event) =>
+                          handleDecorativeVideoChange("url", event.target.value || null)
+                        }
+                      />
+                    </SettingField>
+                    <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Move and scale the underlying shared video. The box positions stay fixed, but what you see through them changes together.
+                      </p>
+                      <RangeControl
+                        label="Zoom"
+                        value={
+                          settingsState.decorativeVideo?.zoom ??
+                          settingsState.decorativeVideo?.tall?.zoom ??
+                          1.6
+                        }
+                        min={1}
+                        max={3}
+                        step={0.05}
+                        onChange={(value) => handleDecorativeVideoChange("zoom", value)}
+                      />
+                      <RangeControl
+                        label="Horizontal Offset"
+                        value={
+                          settingsState.decorativeVideo?.offsetX ??
+                          settingsState.decorativeVideo?.tall?.offsetX ??
+                          0
+                        }
+                        min={-180}
+                        max={180}
+                        step={1}
+                        onChange={(value) => handleDecorativeVideoChange("offsetX", value)}
+                      />
+                      <RangeControl
+                        label="Vertical Offset"
+                        value={
+                          settingsState.decorativeVideo?.offsetY ??
+                          settingsState.decorativeVideo?.tall?.offsetY ??
+                          0
+                        }
+                        min={-180}
+                        max={180}
+                        step={1}
+                        onChange={(value) => handleDecorativeVideoChange("offsetY", value)}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 

@@ -191,6 +191,12 @@
   "featurePanel": {
     "mode": "headlines"
   },
+  "decorativeVideo": {
+    "url": null,
+    "zoom": 1.6,
+    "offsetX": 0,
+    "offsetY": 0
+  },
   "news": {
     "subreddit": "worldnews",
     "rotationSeconds": 8
