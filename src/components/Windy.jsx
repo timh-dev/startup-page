@@ -39,7 +39,7 @@ class Windy extends React.Component {
     return (
       <div className={this.props.cardClass || "sticky rounded-xl overflow-hidden h-80"}>
         <iframe
-          className="h-full w-full overflow-hidden rounded-inherit bg-card"
+          className="h-full w-full overflow-hidden rounded-[inherit] bg-card"
           width="505"
           height="320"
           loading="lazy"

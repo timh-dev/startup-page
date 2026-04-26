@@ -25,10 +25,9 @@ import {
 
 const visibilityOptions = [
   { id: "videoTall", label: "Tall media tile" },
-  { id: "videoWide", label: "Wide media tile" },
   { id: "search", label: "Search box" },
   { id: "weather", label: "Weather" },
-  { id: "windy", label: "Windy map" },
+  { id: "featurePanel", label: "Feature panel" },
   { id: "solarGraph", label: "Solar graph" },
   { id: "clock", label: "Clock" },
   { id: "themeTools", label: "Theme and settings tile" },
@@ -41,7 +40,8 @@ const visibilityOptions = [
   { id: "unsplash2", label: "Photo tile 2" },
   { id: "unsplash3", label: "Photo tile 3" },
   { id: "unsplash4", label: "Photo tile 4" },
-  { id: "unsplash5", label: "Photo tile 5" }
+  { id: "unsplash5", label: "Photo tile 5" },
+  { id: "unsplash6", label: "Photo tile 6" }
 ];
 
 const paletteOptions = [
@@ -163,6 +163,26 @@ function SettingsButton() {
         ...prevSettings.ui,
         [key]: value
       }
+    }));
+  };
+
+  const handleNewsChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      news: {
+        ...prevSettings.news,
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleTimerChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      timer: {
+        ...prevSettings.timer,
+        [key]: value,
+      },
     }));
   };
 
@@ -636,6 +656,43 @@ function SettingsButton() {
                       <Input
                         value={settingsState.unsplashCredential ?? ""}
                         onChange={(event) => handleTopLevelChange("unsplashCredential", event.target.value || null)}
+                      />
+                    </SettingField>
+                    <SettingField label="ListenBrainz Username">
+                      <Input
+                        value={settingsState.listenBrainzUsername ?? ""}
+                        onChange={(event) => handleTopLevelChange("listenBrainzUsername", event.target.value || null)}
+                      />
+                    </SettingField>
+                    <SettingField label="Default Timer Minutes">
+                      <Input
+                        value={settingsState.timer?.focusMinutes ?? 25}
+                        onChange={(event) =>
+                          handleTimerChange("focusMinutes", event.target.value === "" ? 25 : Number(event.target.value))
+                        }
+                      />
+                    </SettingField>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Headline Source</CardTitle>
+                    <CardDescription>Controls the rotating hero headlines in the large feature panel.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-2">
+                    <SettingField label="Subreddit">
+                      <Input
+                        value={settingsState.news?.subreddit ?? "worldnews"}
+                        onChange={(event) => handleNewsChange("subreddit", event.target.value || "worldnews")}
+                      />
+                    </SettingField>
+                    <SettingField label="Rotation Seconds">
+                      <Input
+                        value={settingsState.news?.rotationSeconds ?? 8}
+                        onChange={(event) =>
+                          handleNewsChange("rotationSeconds", event.target.value === "" ? 8 : Number(event.target.value))
+                        }
                       />
                     </SettingField>
                   </CardContent>

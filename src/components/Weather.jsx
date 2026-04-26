@@ -268,7 +268,7 @@ class WeatherBox extends React.Component {
 
     return (
       <a
-        className="group flex h-full w-full flex-col justify-between overflow-hidden rounded-inherit bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,var(--color-primary)_16%,transparent),transparent_35%),linear-gradient(160deg,color-mix(in_oklab,var(--color-card)_94%,black_6%),color-mix(in_oklab,var(--color-accent)_28%,var(--color-card)))] p-3 text-card-foreground"
+        className="group flex h-full w-full flex-col justify-between overflow-hidden rounded-[inherit] bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,var(--color-primary)_16%,transparent),transparent_35%),linear-gradient(160deg,color-mix(in_oklab,var(--color-card)_94%,black_6%),color-mix(in_oklab,var(--color-accent)_28%,var(--color-card)))] p-3 text-card-foreground"
         href={interactive ? link : undefined}
         target={interactive ? "_blank" : undefined}
         rel={interactive ? "noreferrer" : undefined}

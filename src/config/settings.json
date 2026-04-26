@@ -4,6 +4,7 @@
   "units": "imperial",
   "unsplashCredential": null,
   "openWeatherCredential": null,
+  "listenBrainzUsername": null,
   "ui": {
     "themeMode": "system",
     "themePalette": "zen",
@@ -186,6 +187,16 @@
   },
   "layout": {
     "hiddenBoxes": {}
+  },
+  "featurePanel": {
+    "mode": "headlines"
+  },
+  "news": {
+    "subreddit": "worldnews",
+    "rotationSeconds": 8
+  },
+  "timer": {
+    "focusMinutes": 25
   },
   "unsplash": {
     "unsplashBox1": ["chicago", "miami", "new york", "seattle", "austin"],

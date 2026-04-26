@@ -365,3 +365,13 @@
     background: color-mix(in oklab, var(--primary) 22%, white);
   }
 }
+
+@keyframes headline-progress {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}
