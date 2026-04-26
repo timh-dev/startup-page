@@ -1,13 +1,14 @@
-import { gaussianDistribution } from './solarMath';
+import { sunElevation } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
 // Render the sun with multi-layered glow
-export function renderSun(ctx, width, lst, amplitudeScale, sunrise, horizonY) {
-  const elevation = gaussianDistribution(lst);
-  const horizonElevation = gaussianDistribution(sunrise);
-  const { x: sunX, y: sunY } = solarToCanvas(lst, elevation, width, amplitudeScale, horizonY);
+export function renderSun(ctx, width, height, lst, solar, horizonY) {
+  const elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
+  const { x: sunX, y: sunY } = solarToCanvas(
+    lst, elev, width, height, solar, horizonY
+  );
 
-  const isBelowHorizon = elevation < horizonElevation;
+  const isBelowHorizon = elev < 0;
 
   // Atmosphere color: blue during day, golden during sunrise/sunset
   let atmosR, atmosG, atmosB;
@@ -42,11 +43,8 @@ export function renderSun(ctx, width, lst, amplitudeScale, sunrise, horizonY) {
     return;
   }
 
-  // Scale glow based on elevation above horizon
-  const maxEl = gaussianDistribution(12);
-  const elAboveHorizon = elevation - horizonElevation;
-  const elRange = maxEl - horizonElevation;
-  const elFactor = Math.min(1, elAboveHorizon / elRange);
+  // Scale glow based on elevation (0 at horizon, 1 at peak)
+  const elFactor = Math.min(1, elev / solar.maxElevation);
 
   // Layer 1: Outer glow (large, soft)
   const outerRadius = 30 + elFactor * 50;

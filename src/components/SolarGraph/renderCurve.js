@@ -1,22 +1,39 @@
-import { gaussianDistribution, linspace } from './solarMath';
-
 const CURVE_COLOR = '#f0ebd8';
 const HORIZON_COLOR = '#f0ebd8';
-const NUM_POINTS = 500;
 
-// Convert solar hour + elevation to canvas coordinates
-function solarToCanvas(hour, elevation, width, amplitudeScale, horizonY) {
+// Map elevation (degrees) to canvas Y
+function elevToCanvasY(elevation, maxEl, minEl, horizonY, canvasHeight) {
+  if (elevation >= 0) {
+    return horizonY * (1 - elevation / maxEl);
+  }
+  const below = canvasHeight - horizonY;
+  return horizonY + (Math.abs(elevation) / Math.abs(minEl)) * below;
+}
+
+// Convert solar hour + elevation (degrees) to canvas coordinates
+export function solarToCanvas(hour, elevation, width, height, solar, horizonY) {
   const x = (hour / 24) * width;
-  const y = horizonY - elevation * amplitudeScale;
+  const y = elevToCanvasY(
+    elevation,
+    solar.maxElevation,
+    solar.minElevation,
+    horizonY,
+    height
+  );
   return { x, y };
 }
 
-// Render the solar elevation curve
-export function renderCurve(ctx, width, height, amplitudeScale, sunrise) {
-  // Position horizon line at ~65% down the canvas
-  const horizonY = height * 0.65;
+// Render the solar elevation curve and horizon line
+export function renderCurve(ctx, width, height, solar) {
+  // Position horizon proportional to annual elevation range
+  const horizonFrac =
+    solar.maxElevation / (solar.maxElevation - solar.minElevation);
+  const horizonY = Math.max(
+    height * 0.2,
+    Math.min(height * 0.85, height * horizonFrac)
+  );
 
-  const hours = linspace(0, 24, NUM_POINTS);
+  const { curveHours, curveElevations } = solar;
 
   // Draw the curve
   ctx.beginPath();
@@ -25,33 +42,30 @@ export function renderCurve(ctx, width, height, amplitudeScale, sunrise) {
   ctx.shadowBlur = 4;
   ctx.shadowColor = 'rgba(240, 235, 216, 0.3)';
 
-  for (let i = 0; i < hours.length; i++) {
-    const elevation = gaussianDistribution(hours[i]);
-    const { x, y } = solarToCanvas(hours[i], elevation, width, amplitudeScale, horizonY);
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
+  for (let i = 0; i < curveHours.length; i++) {
+    const { x, y } = solarToCanvas(
+      curveHours[i],
+      curveElevations[i],
+      width,
+      height,
+      solar,
+      horizonY
+    );
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
   }
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Draw horizon line
-  const sunriseEl = gaussianDistribution(sunrise);
-  const { y: hLineY } = solarToCanvas(0, sunriseEl, width, amplitudeScale, horizonY);
-
+  // Horizon line at elevation 0°
   ctx.beginPath();
   ctx.strokeStyle = HORIZON_COLOR;
   ctx.lineWidth = 1;
   ctx.globalAlpha = 0.6;
-  ctx.moveTo(0, hLineY);
-  ctx.lineTo(width, hLineY);
+  ctx.moveTo(0, horizonY);
+  ctx.lineTo(width, horizonY);
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Return horizonY for other renderers to use
-  return { horizonY, horizonElevation: sunriseEl };
+  return { horizonY };
 }
-
-export { solarToCanvas };

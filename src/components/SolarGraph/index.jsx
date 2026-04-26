@@ -1,18 +1,12 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { readSettings } from '../readSettings';
-import {
-  deg2rad,
-  gaussianDistribution,
-  calculateSolarSettings,
-  getCurrentLst,
-} from './solarMath';
+import { calculateSolarContext, getCurrentLst } from './solarMath';
 import { renderSky } from './renderSky';
 import { createStarField, renderStars } from './renderStars';
 import { renderCurve } from './renderCurve';
 import { renderSun } from './renderSun';
 import { renderHorizonGlow } from './renderHorizonGlow';
 
-const AMPLITUDE_SCALE = 80;
 const SWEEP_SPEED = 0.1;
 const SWEEP_INTERVAL = 22; // ms per sweep step
 
@@ -37,12 +31,10 @@ export default function SolarGraph() {
 
     // Resolve location
     const settings = readSettings();
-    let latitude, longitude;
 
     function initSolar(lat, lng) {
-      latitude = deg2rad(lat);
-      longitude = deg2rad(lng);
-      state.solar = calculateSolarSettings(latitude, longitude);
+      // lat/lng in degrees — no conversion needed
+      state.solar = calculateSolarContext(lat, lng);
       state.stars = createStarField(400);
       state.lst = 0;
       state.sweeping = true;
@@ -125,25 +117,24 @@ export default function SolarGraph() {
       const dpr = window.devicePixelRatio || 1;
       const w = canvas.width / dpr;
       const h = canvas.height / dpr;
-
-      const { sunrise } = state.solar;
+      const solar = state.solar;
 
       ctx.clearRect(0, 0, w, h);
 
       // 1. Sky background
-      renderSky(ctx, w, h, state.lst, sunrise);
+      renderSky(ctx, w, h, state.lst, solar);
 
       // 2. Stars
-      renderStars(ctx, w, h, state.stars, state.animationTime, state.lst, sunrise);
+      renderStars(ctx, w, h, state.stars, state.animationTime, state.lst, solar);
 
-      // 3. Solar curve + horizon line (returns horizonY for other layers)
-      const { horizonY } = renderCurve(ctx, w, h, AMPLITUDE_SCALE, sunrise);
+      // 3. Solar curve + horizon line
+      const { horizonY } = renderCurve(ctx, w, h, solar);
 
       // 4. Horizon glow (sunrise/sunset effects)
-      renderHorizonGlow(ctx, w, state.lst, AMPLITUDE_SCALE, sunrise, horizonY);
+      renderHorizonGlow(ctx, w, h, state.lst, solar, horizonY);
 
       // 5. Sun
-      renderSun(ctx, w, state.lst, AMPLITUDE_SCALE, sunrise, horizonY);
+      renderSun(ctx, w, h, state.lst, solar, horizonY);
     }
 
     return () => {
