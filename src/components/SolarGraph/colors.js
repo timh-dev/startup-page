@@ -38,21 +38,21 @@ export function interpolateColorStops(stops, t) {
 
 // Sky color stops based on sun elevation (normalized 0-1 where 0=deepest night, 1=noon)
 const SKY_TOP_STOPS = [
-  { pos: 0.0, color: '#0a0a1a' },  // deep night
-  { pos: 0.15, color: '#0d1b2a' }, // late night
-  { pos: 0.3, color: '#1b0a2e' },  // pre-dawn purple
-  { pos: 0.45, color: '#2c3e6b' }, // dawn blue
-  { pos: 0.6, color: '#4a90d9' },  // morning blue
-  { pos: 1.0, color: '#2c5f8a' },  // midday deep blue
+  { pos: 0.0, color: '#040410' },  // deep space black
+  { pos: 0.15, color: '#06091a' }, // dark void
+  { pos: 0.3, color: '#10061e' },  // pre-dawn deep purple
+  { pos: 0.45, color: '#152040' }, // dawn navy
+  { pos: 0.6, color: '#1a3a5c' },  // morning dark blue
+  { pos: 1.0, color: '#142a4a' },  // midday deep blue
 ];
 
 const SKY_BOTTOM_STOPS = [
-  { pos: 0.0, color: '#0d1b2a' },  // deep night
-  { pos: 0.15, color: '#1a1a2e' }, // late night
-  { pos: 0.3, color: '#ff6b35' },  // dawn orange
-  { pos: 0.45, color: '#ffd166' }, // dawn gold
-  { pos: 0.6, color: '#87CEEB' },  // morning sky
-  { pos: 1.0, color: '#87CEEB' },  // midday sky
+  { pos: 0.0, color: '#060912' },  // deep space
+  { pos: 0.15, color: '#0e0e1e' }, // dark void
+  { pos: 0.3, color: '#8a3010' },  // dawn muted orange
+  { pos: 0.45, color: '#a07828' }, // dawn dark gold
+  { pos: 0.6, color: '#3a6080' },  // morning muted sky
+  { pos: 1.0, color: '#2a4a68' },  // midday muted sky
 ];
 
 // Get sky gradient colors based on sun elevation factor (0=night, 1=noon)

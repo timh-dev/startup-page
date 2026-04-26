@@ -72,6 +72,53 @@ export function getCurrentLst() {
   return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
 }
 
+// Format decimal hour (e.g. 5.683) to "5:41 AM"
+export function formatHour(decimalHour) {
+  const h = ((decimalHour % 24) + 24) % 24; // wrap to 0–24
+  const hours12 = Math.floor(h) % 12 || 12;
+  const minutes = Math.round((h - Math.floor(h)) * 60);
+  const suffix = Math.floor(h) < 12 || Math.floor(h) === 24 ? 'AM' : 'PM';
+  return `${hours12}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+// Scan the pre-computed curve for elevation crossings at specific thresholds
+// Returns sorted array of { label, hour, elevation, type }
+export function computeTwilightEvents(solar) {
+  const { curveHours, curveElevations } = solar;
+  const thresholds = [
+    { elevation: 0, rising: 'Sunrise', setting: 'Sunset', type: 'horizon' },
+    { elevation: -6, rising: 'Civil dawn', setting: 'Civil dusk', type: 'civil' },
+    { elevation: -12, rising: 'Nautical dawn', setting: 'Nautical dusk', type: 'nautical' },
+    { elevation: -18, rising: 'Astro dawn', setting: 'Astro dusk', type: 'astronomical' },
+  ];
+
+  const events = [];
+
+  for (const { elevation: thresh, rising, setting, type } of thresholds) {
+    for (let i = 0; i < curveHours.length - 1; i++) {
+      const e0 = curveElevations[i] - thresh;
+      const e1 = curveElevations[i + 1] - thresh;
+
+      // Detect zero crossing
+      if (e0 * e1 < 0) {
+        // Linear interpolation for precise crossing time
+        const t = e0 / (e0 - e1);
+        const hour = curveHours[i] + t * (curveHours[i + 1] - curveHours[i]);
+        const isRising = e1 > e0;
+        events.push({
+          label: isRising ? rising : setting,
+          hour,
+          elevation: thresh,
+          type,
+        });
+      }
+    }
+  }
+
+  events.sort((a, b) => a.hour - b.hour);
+  return events;
+}
+
 // Compute full solar context for today (called once on mount)
 // lat/lng in degrees
 export function calculateSolarContext(lat, lng) {
@@ -99,7 +146,7 @@ export function calculateSolarContext(lat, lng) {
   const curveHours = linspace(0, 24, 500);
   const curveElevations = curveHours.map((h) => sunElevation(lat, lng, h, doy));
 
-  return {
+  const context = {
     lat,
     lng,
     doy,
@@ -111,4 +158,7 @@ export function calculateSolarContext(lat, lng) {
     curveHours,
     curveElevations,
   };
+
+  context.events = computeTwilightEvents(context);
+  return context;
 }
