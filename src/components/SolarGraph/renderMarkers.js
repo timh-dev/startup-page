@@ -73,15 +73,15 @@ export function renderMarkers(ctx, w, h, hoverHour, solar, horizonY, realLst) {
     ctx.fillStyle = colors.fill;
     ctx.fill();
 
-    // Label only when hovering near this event's time
+    // Label at bottom of chart when hovering near this event's time
     const dist = Math.abs(hoverHour - hour);
     if (dist < LABEL_PROXIMITY) {
-      const labelAlpha = 1 - dist / LABEL_PROXIMITY; // fade in as cursor approaches
+      const labelAlpha = 1 - dist / LABEL_PROXIMITY;
       ctx.globalAlpha = labelAlpha;
       const timeStr = formatHour(hour);
       const labelText = `${label} ${timeStr}`;
-      const labelOffsetY = elevation >= 0 ? -(radius + 12) : (radius + 12);
-      const labelY = Math.max(12, Math.min(h - 12, y + labelOffsetY));
+      // Place at the very bottom, centered on the event's X position
+      const labelY = h - 10;
       drawPill(ctx, x, labelY, labelText, 10);
       ctx.globalAlpha = 1;
     }
