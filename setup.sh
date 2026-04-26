@@ -9,12 +9,12 @@ fi
 
 # install requierments
 echo " --- installing requierments --- "
-npm install
+pnpm install
 
 # build package
 echo " --- building site --- "
-npm run build
+pnpm run build
 
 # run
 echo " --- running site --- "
-serve -s dist -p 8000
+pnpm run serve

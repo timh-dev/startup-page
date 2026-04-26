@@ -8,37 +8,46 @@ class Windy extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      link: this.props.link,
+      link: "",
     }
   }
 
   setLink(lat, long) {
-    var link = `https://embed.windy.com/embed.html?type=map&lat=${String(lat)}&lon=${String(long)}`;
-    this.setState({ link: link })
+    const link = `https://embed.windy.com/embed.html?type=map&lat=${String(lat)}&lon=${String(long)}`;
+    this.setState({ link });
   }
 
   componentDidMount() {
     if (settings.latitude) {
-      console.log(settings.latitude)
-      this.setLink(settings.latitude, settings.longitude)
-    } else if(navigator.geolocation) { // get location
+      this.setLink(settings.latitude, settings.longitude);
+    } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
-        this.setLink(position.coords.latitude, position.coords.longitude)
-      })
+        this.setLink(position.coords.latitude, position.coords.longitude);
+      }, () => {
+        this.setState({
+          link: "https://embed.windy.com/embed.html?type=map",
+        });
+      });
     } else {
-      console.log('Geolocation is not supported by this browser.');
+      this.setState({
+        link: "https://embed.windy.com/embed.html?type=map",
+      });
     }
   }
 
   render() {
-    return(
-      <>
-        <div class="sticky rounded-xl overflow-hidden h-80 border-0 dark:border-4 dark:border-off-white2"> 
-            <iframe class="overflow-hidden flex bg-blue5 xs:hidden rounded-xl" width="505" height="320"
-              src={this.state.link}>
-            </iframe>
-        </div>
-      </>
+    return (
+      <div className={this.props.cardClass || "sticky rounded-xl overflow-hidden h-80"}>
+        <iframe
+          className="h-full w-full overflow-hidden rounded-[inherit] bg-card"
+          width="505"
+          height="320"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          src={this.state.link}
+          title="Windy map"
+        />
+      </div>
     );
   }
 }

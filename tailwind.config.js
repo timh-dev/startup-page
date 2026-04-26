@@ -2,21 +2,11 @@
 //const colors = require("tailwindcss/colors");
 
 module.exports = {
-  mode: 'jit',
   darkMode: 'class',
   content: [
-    "./public/**/*.html",
-    "./public/*.html",
+    "./index.html",
     "./src/**/*.jsx",
-    "./src/*.jsx",
-    "./src/**/*.html",
-    "./src/*.html",
-    "./public/**/*.js",
-    "./public/*.js",
   ],
-  variants: {
-    opacity: ({ after }) => after(['disabled']),
-  },
   theme: {
     colors: {
       'off-white1': '#f0ebd8',

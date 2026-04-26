@@ -31,13 +31,13 @@ class News extends React.Component {
     if (this.state.isLoaded) {
       return (
         <>
-        <div class="rounded-xl overflow-y-auto overflow-hidden h-80 w-[30.5rem] space-y-0">
+        <div className="rounded-xl overflow-y-auto overflow-hidden h-80 w-[30.5rem] space-y-0">
             {this.state.posts.map((category) =>(
-              <div class="rounded-xl h-24 w-full">
-                  <div class="overflow-hidden h-full w-48 float-left">
-                    <img class="w-full max-h-full" src={category.urlToImage}></img>
+              <div className="rounded-xl h-24 w-full" key={category.url}>
+                  <div className="overflow-hidden h-full w-48 float-left">
+                    <img className="w-full max-h-full" src={category.urlToImage} />
                   </div>
-                  <div class="pl-4 text-white overflow-hidden h-full w-72 float-left">
+                  <div className="pl-4 text-white overflow-hidden h-full w-72 float-left">
                     <a className="text-blue-600 hover:text-blue-800 visited:text-purple-600 pt-1 float-right text-[14px]" href={category.url}>{category.title}</a>
                   </div>
               </div>
@@ -49,7 +49,7 @@ class News extends React.Component {
     else {
       return (
         <>
-        <div class="text-center items-center justify-center translate-x-0 translate-y-0">
+        <div className="text-center items-center justify-center translate-x-0 translate-y-0">
           <h1>No news.</h1>
         </div>
         </>

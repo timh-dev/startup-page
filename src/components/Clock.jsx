@@ -12,7 +12,11 @@ class Clock extends React.Component {
       date: new Date().toLocaleTimeString(),
       day: this.days[new Date().getDay()],
       month: this.months[new Date().getMonth()]
-    }
+    };
+    this.interval = null;
+  }
+
+  componentDidMount() {
     this.interval = setInterval(this.updateDate, 1000);
   }
     
@@ -31,8 +35,8 @@ class Clock extends React.Component {
   render() {
     return(
       <>
-        <div class="text-center pt-14 font-black text-off-white1">{this.state.date}</div>
-        <div class="text-center font-black text-off-white1">{this.state.day}</div>
+        <div className="text-center pt-14 font-black text-foreground">{this.state.date}</div>
+        <div className="text-center font-black text-foreground/80">{this.state.day}</div>
       </>
     );
   }

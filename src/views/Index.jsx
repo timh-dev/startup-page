@@ -1,71 +1,220 @@
 /*eslint-disable*/
 import React from "react";
+import { KBarProvider } from "kbar";
 
 import { readSettings } from '../components/readSettings';
-const settings = readSettings();
+import { isBuiltInPalette } from '../lib/theme-palettes';
+import {
+  DASHBOARD_LARGE_TILE,
+  DASHBOARD_TALL_TILE,
+  DASHBOARD_TALL_TILE_HEIGHT_PX,
+  DASHBOARD_TILE,
+  DASHBOARD_TILE_HEIGHT_PX,
+  DASHBOARD_TILE_WIDTH_PX,
+  DASHBOARD_WIDE_TILE,
+  GRID_FEATURE,
+  GRID_SINGLE,
+  GRID_SOLAR,
+  GRID_TALL,
+  GRID_WIDE,
+} from "../lib/dashboard-dimensions";
 
 // components
 import Clock from "../components/Clock";
+import FeaturePanel from "../components/FeaturePanel";
 import Unsplash from "../components/Unsplash";
 import SearchBox from "../components/Search";
-import SolarGraph from "../components/SolarGraph";
+import SolarGraph from "../components/SolarGraph/index";
 import WeatherBox from "../components/Weather";
 import Toggle from "../components/ThemeToggle";
 import ThemeProvider from "../components/ThemeContext";
-import News from "../components/News";
-import Windy from "../components/Windy";
 import Bookmark from "../components/Bookmark";
 import SettingsButton from "../components/SettingsButton";
+import CommandPalette from "../components/CommandPalette";
+import useKBarActions from "../components/useKBarActions";
 
 // assets
 import desert from "../assets/img/desert.mp4"
 
-export default function Index() {
+function DecorativeVideoTile({
+  className,
+  src,
+  fallbackSrc,
+  width,
+  height,
+  left,
+  top,
+}) {
+  const [activeSrc, setActiveSrc] = React.useState(src || fallbackSrc);
+
+  React.useEffect(() => {
+    setActiveSrc(src || fallbackSrc);
+  }, [src, fallbackSrc]);
+
+  return (
+    <div className={`${className} relative overflow-hidden`}>
+      <video
+        key={activeSrc}
+        className="absolute max-w-none object-cover"
+        style={{
+          width,
+          height,
+          left,
+          top,
+        }}
+        src={activeSrc}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        referrerPolicy="no-referrer"
+        onError={() => {
+          if (activeSrc !== fallbackSrc) {
+            setActiveSrc(fallbackSrc);
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+function KBarWrapper({ children }) {
+  useKBarActions();
   return (
     <>
-      <section className={`bg-off-white1 dark:bg-blue5 min-h-screen flex items-center justify-center pt-10 pb-10 font-helvetica`}>
-        <div class="grid xl:grid-cols-7 md:grid-cols-5 sm:grid-cols-3 xs:grid-cols-2 gap-y-6 gap-x-6 grid-flow-row-dense content-center">
+      <CommandPalette />
+      {children}
+    </>
+  );
+}
+
+export default function Index() {
+  const settings = readSettings();
+  const hiddenBoxes = settings.layout?.hiddenBoxes || {};
+  const showBox = (id) => !hiddenBoxes[id];
+  const ui = settings.ui || {};
+  const decorativeVideo = settings.decorativeVideo || {};
+  const gapClass = ui.gridDensity === "compact" ? "gap-y-4 gap-x-4" : "gap-y-6 gap-x-6";
+  const decorativeGap = ui.gridDensity === "compact" ? 16 : 24;
+  const gridColumnsClass = "xl:grid-cols-[repeat(7,9rem)] md:grid-cols-[repeat(5,9rem)] sm:grid-cols-[repeat(3,9rem)] xs:grid-cols-[repeat(2,9rem)]";
+  const gridRowsClass = "auto-rows-[9rem]";
+  const radiusClass = ui.cardStyle === "soft" ? "rounded-[2rem]" : ui.cardStyle === "sharp" ? "rounded-md" : "rounded-xl";
+  const showDecorativeMedia = ui.showDecorativeMedia !== false;
+  const decorativeVideoUrls = Array.isArray(decorativeVideo.urls)
+    ? decorativeVideo.urls.filter((value) => typeof value === "string" && value.trim() !== "")
+    : [];
+  const [decorativeVideoUrl] = React.useState(() => {
+    if (!decorativeVideoUrls.length) {
+      return desert;
+    }
+
+    const randomIndex = Math.floor(Math.random() * decorativeVideoUrls.length);
+    return decorativeVideoUrls[randomIndex] || desert;
+  });
+
+  const panel = (extra = "") => `${radiusClass} ${extra}`;
+  const surface = "bg-card text-card-foreground border border-border/60 shadow-lg";
+  const mutedSurface = "bg-muted/50 text-foreground border border-border/60 shadow-lg";
+  const strongSurface = "bg-primary text-primary-foreground border border-border/40 shadow-lg";
+
+  const renderDecorativeVideo = (variant, className) => {
+    const sceneWidth = DASHBOARD_TILE_WIDTH_PX + decorativeGap + DASHBOARD_TILE_WIDTH_PX;
+    const sceneHeight = DASHBOARD_TALL_TILE_HEIGHT_PX;
+    const viewports = {
+      tall: { x: 0, y: 0, width: DASHBOARD_TILE_WIDTH_PX, height: DASHBOARD_TALL_TILE_HEIGHT_PX },
+      small: {
+        x: DASHBOARD_TILE_WIDTH_PX + decorativeGap,
+        y: 0,
+        width: DASHBOARD_TILE_WIDTH_PX,
+        height: DASHBOARD_TILE_HEIGHT_PX,
+      },
+    };
+    const viewport = viewports[variant];
+    const zoom = Number(
+      decorativeVideo.zoom ??
+      decorativeVideo.tall?.zoom ??
+      1.6
+    );
+    const offsetX = Number(
+      decorativeVideo.offsetX ??
+      decorativeVideo.tall?.offsetX ??
+      0
+    );
+    const offsetY = Number(
+      decorativeVideo.offsetY ??
+      decorativeVideo.tall?.offsetY ??
+      0
+    );
+    const scaledSceneWidth = sceneWidth * zoom;
+    const scaledSceneHeight = sceneHeight * zoom;
+    const left = offsetX - (viewport.x * zoom);
+    const top = offsetY - (viewport.y * zoom);
+
+    return (
+      <DecorativeVideoTile
+        className={className}
+        src={decorativeVideoUrl}
+        fallbackSrc={desert}
+        width={`${scaledSceneWidth}px`}
+        height={`${scaledSceneHeight}px`}
+        left={`${left}px`}
+        top={`${top}px`}
+      />
+    );
+  };
+
+  const customThemes = settings.customThemes || [];
+  const activeCustomTheme = !isBuiltInPalette(ui.themePalette)
+    ? customThemes.find((ct) => ct.id === ui.themePalette)
+    : null;
+  const initialCustomThemeVars = activeCustomTheme
+    ? { light: activeCustomTheme.light, dark: activeCustomTheme.dark }
+    : null;
+
+  return (
+    <ThemeProvider initialThemeMode={ui.themeMode} initialThemePalette={ui.themePalette} initialCustomThemeVars={initialCustomThemeVars}>
+      <KBarProvider>
+        <KBarWrapper>
+      <section className="min-h-screen bg-background text-foreground flex items-center justify-center px-4 pt-10 pb-10 transition-colors">
+        <div className={`grid w-fit ${gridColumnsClass} ${gridRowsClass} ${gapClass} grid-flow-row-dense content-center justify-center`}>
 
           {/* row 1 */}
-          <div class="overflow-hidden rounded-xl col-span-1 row-span-2 h-80 w-36 shadow-4xl dark:shadow-none">
-            <div class="sticky rounded-xl overflow-hidden h-80 w-36 border-0 dark:border-4 dark:border-off-white2"> 
-              <video class="relative object-cover min-h-full max-w-xl -left-12" src={ desert } type="video/mp4" autoPlay muted loop/>
-            </div>
-          </div>
-          <div class="rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none">
-            <div class="sticky rounded-xl overflow-hidden h-36 w-36 border-0 dark:border-4 dark:border-off-white2"> 
-              <video class="relative object-cover min-h-full max-w-sm right-48" src={ desert } type="video/mp4" autoPlay muted loop/>
-            </div>
-          </div>
-          <div class="bg-blue5 text-black rounded-xl col-span-2 h-36 w-80 shadow-4xl dark:shadow-none border-0 dark:border-4 dark:border-off-white2"><SearchBox /></div>
-          <Bookmark title={ settings.bookmark[0].title } content={ settings.bookmark[0].content } />
-          <div class="bg-off-white1 text-black rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none"><Unsplash search={ settings.unsplash.unsplashBox1 }/></div>
-          <div class="bg-green2 dark:bg-green1 text-black rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none border-0 dark:border-4 dark:border-off-white2"><WeatherBox /></div>
+          {showDecorativeMedia && showBox("videoTall") && <div className={panel(`overflow-hidden ${GRID_TALL} ${DASHBOARD_TALL_TILE} ${surface}`)}>
+            {renderDecorativeVideo("tall", `sticky h-full w-full rounded-xl overflow-hidden`)}
+          </div>}
+          {showDecorativeMedia && showBox("videoSmall") && <div className={panel(`overflow-hidden ${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}>
+            {renderDecorativeVideo("small", `sticky h-full w-full rounded-xl overflow-hidden`)}
+          </div>}
+          {showBox("search") && <div className={panel(`${GRID_WIDE} ${DASHBOARD_WIDE_TILE} ${strongSurface}`)}><SearchBox /></div>}
+          {showBox("bookmark1") && <Bookmark title={ settings.bookmark[0].title } content={ settings.bookmark[0].content } cardClass={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} overflow-y-auto ${strongSurface}`)} />}
+          {showBox("unsplash1") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}><Unsplash search={ settings.unsplash.unsplashBox1 } cardClass={panel("relative overflow-hidden h-full w-full bg-center bg-no-repeat")} /></div>}
+          {showBox("weather") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${mutedSurface}`)}><WeatherBox /></div>}
           
           {/* row 2 */}
-          <div class="bg-off-white1 text-black rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none"><Unsplash search={ settings.unsplash.unsplashBox2 }/></div>
-          <Bookmark title={ settings.bookmark[1].title } content={ settings.bookmark[1].content } />
-          <div class="overflow-hidden rounded-xl col-span-3 row-span-2 h-80 shadow-4xl dark:shadow-none "><Windy /></div>
-          <div class="bg-off-white1 text-black rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none"><Unsplash search={ settings.unsplash.unsplashBox3 }/></div>
+          {showBox("unsplash2") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}><Unsplash search={ settings.unsplash.unsplashBox2 } cardClass={panel("relative overflow-hidden h-full w-full bg-center bg-no-repeat")} /></div>}
+          {showBox("bookmark2") && <Bookmark title={ settings.bookmark[1].title } content={ settings.bookmark[1].content } cardClass={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} overflow-y-auto ${strongSurface}`)} />}
+          {showBox("featurePanel") && <div className={panel(`h-full w-full overflow-visible ${GRID_FEATURE} ${DASHBOARD_LARGE_TILE} ${surface}`)}><FeaturePanel /></div>}
+          {showBox("unsplash3") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}><Unsplash search={ settings.unsplash.unsplashBox3 } cardClass={panel("relative overflow-hidden h-full w-full bg-center bg-no-repeat")} /></div>}
 
           {/* row 3 */}
-          <Bookmark title={ settings.bookmark[2].title } content={ settings.bookmark[2].content } />
-          <div class="bg-[#000000] rounded-xl col-span-2 row-span-2 shadow-4xl dark:shadow-none border-0 dark:border-4 dark:border-off-white2"><SolarGraph /></div>
-          <Bookmark title={ settings.bookmark[3].title } content={ settings.bookmark[3].content } />
+          {showBox("bookmark3") && <Bookmark title={ settings.bookmark[2].title } content={ settings.bookmark[2].content } cardClass={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} overflow-y-auto ${strongSurface}`)} />}
+          {showBox("solarGraph") && <div className={panel(`h-full w-full bg-black ${GRID_SOLAR} ${DASHBOARD_LARGE_TILE} border border-border/60 shadow-lg`)}><SolarGraph /></div>}
 
           {/* row 4 */}
-          <Bookmark title={ settings.bookmark[4].title } content={ settings.bookmark[4].content } />
-          <div class="bg-off-white1 text-black rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none"><Unsplash search={ settings.unsplash.unsplashBox4 }/></div>
-          <div class="flex items-center justify-center bg-blue5 text-white rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none border-0 dark:border-4 dark:border-off-white2">
-            <ThemeProvider>
+          {showBox("bookmark4") && <Bookmark title={ settings.bookmark[3].title } content={ settings.bookmark[3].content } cardClass={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} overflow-y-auto ${strongSurface}`)} />}
+          {showBox("bookmark5") && <Bookmark title={ settings.bookmark[4].title } content={ settings.bookmark[4].content } cardClass={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} overflow-y-auto ${strongSurface}`)} />}
+          {showBox("unsplash4") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}><Unsplash search={ settings.unsplash.unsplashBox4 } cardClass={panel("relative overflow-hidden h-full w-full bg-center bg-no-repeat")} /></div>}
+          {showBox("themeTools") && <div className={panel(`h-full w-full flex items-center justify-center ${GRID_SINGLE} ${DASHBOARD_TILE} ${strongSurface}`)}>
               <Toggle />
-            </ThemeProvider>
             <SettingsButton />
-          </div>
-          <div class="text-black rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none"><Unsplash search={ settings.unsplash.unsplashBox5 }/></div>
-          <div class="bg-red2 dark:bg-red1 text-black rounded-xl col-span-1 h-36 w-36 shadow-4xl dark:shadow-none border-0 dark:border-4 dark:border-off-white2"><Clock /></div>
+          </div>}
+          {showBox("unsplash5") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}><Unsplash search={ settings.unsplash.unsplashBox5 } cardClass={panel("relative overflow-hidden h-full w-full bg-center bg-no-repeat")} /></div>}
+          {showBox("clock") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${mutedSurface}`)}><Clock /></div>}
         </div>
       </section>
-    </>
+        </KBarWrapper>
+      </KBarProvider>
+    </ThemeProvider>
   );
 }

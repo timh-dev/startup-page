@@ -1,166 +1,1131 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog } from '@headlessui/react';
-import Cookies from 'js-cookie';
-import settings from '../config/settings.json';
-import { HiOutlineCog } from "react-icons/hi";
+import React, { useContext, useMemo, useState } from "react";
+import { HiOutlineCog, HiOutlineSparkles, HiOutlineSquares2X2, HiOutlineSwatch } from "react-icons/hi2";
+
+import { ThemeContext } from "@/components/ThemeContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  IMAGE_FILTER_DEFAULTS,
+  IMAGE_FILTER_DEFINITIONS,
+} from "@/lib/image-filters";
+import {
+  BUILT_IN_PALETTES,
+  getSwatchesFromCustomTheme,
+  parseCustomThemeCSS,
+} from "@/lib/theme-palettes";
+import { cn } from "@/lib/utils";
+import {
+  createSettingsExportFilename,
+  exportSettingsBlob,
+  getStorageDiagnostics,
+  importSettingsFromFile,
+  readSettings,
+  resetSettings,
+  writeSettings,
+} from "./readSettings";
+
+const visibilityOptions = [
+  { id: "videoTall", label: "Tall media tile" },
+  { id: "videoSmall", label: "Small media tile" },
+  { id: "search", label: "Search box" },
+  { id: "weather", label: "Weather" },
+  { id: "featurePanel", label: "Feature panel" },
+  { id: "solarGraph", label: "Solar graph" },
+  { id: "clock", label: "Clock" },
+  { id: "themeTools", label: "Theme and settings tile" },
+  { id: "bookmark1", label: "Bookmark box 1" },
+  { id: "bookmark2", label: "Bookmark box 2" },
+  { id: "bookmark3", label: "Bookmark box 3" },
+  { id: "bookmark4", label: "Bookmark box 4" },
+  { id: "bookmark5", label: "Bookmark box 5" },
+  { id: "unsplash1", label: "Photo tile 1" },
+  { id: "unsplash2", label: "Photo tile 2" },
+  { id: "unsplash3", label: "Photo tile 3" },
+  { id: "unsplash4", label: "Photo tile 4" },
+  { id: "unsplash5", label: "Photo tile 5" },
+  { id: "unsplash6", label: "Photo tile 6" }
+];
+
+function PaletteSwatchPreview({ swatches, mode }) {
+  const modeSwatches = mode === "dark" ? swatches.dark : swatches.light;
+  const keys = ["background", "card", "primary", "accent", "muted"];
+  return (
+    <div className="mb-4 flex h-20 items-center justify-center gap-2 rounded-lg border border-border/40 bg-muted/30">
+      {keys.map((key) => (
+        <div
+          key={key}
+          className="size-8 rounded-full border border-border/60 shadow-sm"
+          style={{ backgroundColor: modeSwatches[key] }}
+          title={key}
+        />
+      ))}
+    </div>
+  );
+}
+
+const navItems = [
+  { value: "appearance", label: "Appearance", icon: HiOutlineSwatch },
+  { value: "layout", label: "Layout", icon: HiOutlineSquares2X2 },
+  { value: "content", label: "Content", icon: HiOutlineSparkles }
+];
+
+function SettingField({ label, description, children }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-foreground">{label}</Label>
+      {children}
+      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+    </div>
+  );
+}
+
+function RangeControl({ label, value, min, max, step, onChange }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs text-foreground">{label}</Label>
+        <span className="text-xs font-medium text-muted-foreground">{Number(value).toFixed(step >= 1 ? 0 : 2)}</span>
+      </div>
+      <Slider
+        value={[Number(value)]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={(nextValue) => onChange(nextValue[0])}
+      />
+    </div>
+  );
+}
+
+function ChoiceButton({ selected, title, description, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-lg border p-3 text-left text-sm transition",
+        selected
+          ? "border-primary bg-accent text-accent-foreground shadow-sm"
+          : "border-border bg-card hover:bg-accent/50"
+      )}
+    >
+      <div className="font-medium">{title}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{description}</div>
+    </button>
+  );
+}
 
 function SettingsButton() {
+  const savedSettings = useMemo(() => readSettings(), []);
+  const { theme, themeMode, setThemeMode, themePalette, setThemePalette, setCustomThemeVars } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
-  const [settingsState, setSettingsState] = useState(() => {
-    const savedSettings = Cookies.get('settings');
-    return savedSettings ? JSON.parse(savedSettings) : settings;
-  });
+  const [settingsState, setSettingsState] = useState(savedSettings);
+  const [storageState, setStorageState] = useState(null);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [customThemeName, setCustomThemeName] = useState("");
+  const [customThemeCSS, setCustomThemeCSS] = useState("");
+  const [customThemeError, setCustomThemeError] = useState("");
+  const fileInputRef = React.useRef(null);
 
-  const handleSave = () => {
-    Cookies.set('settings', JSON.stringify(settingsState));
+  const refreshStorageDiagnostics = React.useCallback(async () => {
+    const nextDiagnostics = await getStorageDiagnostics();
+    setStorageState(nextDiagnostics);
+  }, []);
+
+  React.useEffect(() => {
+    void refreshStorageDiagnostics();
+  }, [refreshStorageDiagnostics]);
+
+  const openModal = () => {
+    const freshSettings = readSettings();
+    setSettingsState(freshSettings);
+    setThemeMode(freshSettings.ui.themeMode);
+    setThemePalette(freshSettings.ui.themePalette || "zen");
+    void refreshStorageDiagnostics();
+    setOpen(true);
+  };
+
+  const closeModal = (nextOpen) => {
+    if (nextOpen) {
+      setOpen(true);
+      return;
+    }
+
+    const freshSettings = readSettings();
+    setSettingsState(freshSettings);
+    setThemeMode(freshSettings.ui.themeMode);
+    setThemePalette(freshSettings.ui.themePalette || "zen");
+    setOpen(false);
+  };
+
+  const updateSettings = (updater) => {
+    setSettingsState((prevSettings) => updater(prevSettings));
+  };
+
+  const handleTopLevelChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      [key]: value
+    }));
+  };
+
+  const handleUiChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      ui: {
+        ...prevSettings.ui,
+        [key]: value
+      }
+    }));
+  };
+
+  const handleNewsChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      news: {
+        ...prevSettings.news,
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleTimerChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      timer: {
+        ...prevSettings.timer,
+        [key]: value,
+      },
+    }));
+  };
+
+  const getDecorativeVideoUrlsForEdit = (decorativeVideo) =>
+    decorativeVideo?.urls?.length ? decorativeVideo.urls : [""];
+
+  const handleDecorativeVideoUrlChange = (index, value) => {
+    setSettingsState((prev) => {
+      const decorativeVideo = prev.decorativeVideo || {};
+      const urls = [...getDecorativeVideoUrlsForEdit(decorativeVideo)];
+
+      urls[index] = value;
+
+      return {
+        ...prev,
+        decorativeVideo: {
+          ...decorativeVideo,
+          urls: urls.slice(0, 10),
+          zoom: decorativeVideo.zoom ?? decorativeVideo.tall?.zoom ?? 1.6,
+          offsetX: decorativeVideo.offsetX ?? decorativeVideo.tall?.offsetX ?? 0,
+          offsetY: decorativeVideo.offsetY ?? decorativeVideo.tall?.offsetY ?? 0,
+        },
+      };
+    });
+  };
+
+  const handleAddDecorativeVideoUrl = () => {
+    setSettingsState((prev) => {
+      const decorativeVideo = prev.decorativeVideo || {};
+      const urls = getDecorativeVideoUrlsForEdit(decorativeVideo);
+
+      return {
+        ...prev,
+        decorativeVideo: {
+          ...decorativeVideo,
+          urls: [...urls, ""].slice(0, 10),
+        },
+      };
+    });
+  };
+
+  const handleRemoveDecorativeVideoUrl = (index) => {
+    setSettingsState((prev) => {
+      const decorativeVideo = prev.decorativeVideo || {};
+      const urls = getDecorativeVideoUrlsForEdit(decorativeVideo).filter(
+        (_, currentIndex) => currentIndex !== index
+      );
+
+      return {
+        ...prev,
+        decorativeVideo: {
+          ...decorativeVideo,
+          urls: urls.length ? urls : [""],
+        },
+      };
+    });
+  };
+
+  const handleDecorativeVideoChange = (key, value) => {
+    setSettingsState((prev) => {
+      const decorativeVideo = prev.decorativeVideo || {};
+
+      return {
+        ...prev,
+        decorativeVideo: {
+          ...decorativeVideo,
+          urls: getDecorativeVideoUrlsForEdit(decorativeVideo).slice(0, 10),
+          zoom: decorativeVideo.zoom ?? decorativeVideo.tall?.zoom ?? 1.6,
+          offsetX: decorativeVideo.offsetX ?? decorativeVideo.tall?.offsetX ?? 0,
+          offsetY: decorativeVideo.offsetY ?? decorativeVideo.tall?.offsetY ?? 0,
+          [key]: value,
+        },
+      };
+    });
+  };
+
+  const handleThemeModeChange = (value) => {
+    handleUiChange("themeMode", value);
+    setThemeMode(value);
+  };
+
+  const handleThemePaletteChange = (value, customVars) => {
+    handleUiChange("themePalette", value);
+    setThemePalette(value);
+    setCustomThemeVars(customVars || null);
+  };
+
+  const handleAddCustomTheme = () => {
+    setCustomThemeError("");
+    const name = customThemeName.trim();
+    if (!name) {
+      setCustomThemeError("Please enter a theme name.");
+      return;
+    }
+
+    try {
+      const parsed = parseCustomThemeCSS(customThemeCSS);
+      const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const newTheme = { id, name, light: parsed.light, dark: parsed.dark };
+
+      updateSettings((prev) => ({
+        ...prev,
+        customThemes: [...(prev.customThemes || []), newTheme],
+      }));
+
+      setCustomThemeName("");
+      setCustomThemeCSS("");
+    } catch (err) {
+      setCustomThemeError(err.message);
+    }
+  };
+
+  const handleRemoveCustomTheme = (themeId) => {
+    updateSettings((prev) => ({
+      ...prev,
+      customThemes: (prev.customThemes || []).filter((ct) => ct.id !== themeId),
+    }));
+
+    if (settingsState.ui?.themePalette === themeId) {
+      handleThemePaletteChange("zen", null);
+    }
+  };
+
+  const handleImageFilterToggle = (filterKey, checked) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      ui: {
+        ...prevSettings.ui,
+        imageEffects: {
+          enabledFilters: {
+            ...IMAGE_FILTER_DEFAULTS.enabledFilters,
+            ...prevSettings.ui?.imageEffects?.enabledFilters,
+            [filterKey]: checked,
+          },
+          filterSettings: {
+            ...IMAGE_FILTER_DEFAULTS.filterSettings,
+            ...prevSettings.ui?.imageEffects?.filterSettings,
+          },
+        },
+      },
+    }));
+  };
+
+  const handleImageFilterSettingChange = (filterKey, settingKey, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      ui: {
+        ...prevSettings.ui,
+        imageEffects: {
+          enabledFilters: {
+            ...IMAGE_FILTER_DEFAULTS.enabledFilters,
+            ...prevSettings.ui?.imageEffects?.enabledFilters,
+          },
+          filterSettings: {
+            ...IMAGE_FILTER_DEFAULTS.filterSettings,
+            ...prevSettings.ui?.imageEffects?.filterSettings,
+            [filterKey]: {
+              ...IMAGE_FILTER_DEFAULTS.filterSettings[filterKey],
+              ...prevSettings.ui?.imageEffects?.filterSettings?.[filterKey],
+              [settingKey]: value,
+            },
+          },
+        },
+      },
+    }));
+  };
+
+  const handleImageFilterPreset = (filterKey, preset) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      ui: {
+        ...prevSettings.ui,
+        imageEffects: {
+          enabledFilters: {
+            ...IMAGE_FILTER_DEFAULTS.enabledFilters,
+            ...prevSettings.ui?.imageEffects?.enabledFilters,
+          },
+          filterSettings: {
+            ...IMAGE_FILTER_DEFAULTS.filterSettings,
+            ...prevSettings.ui?.imageEffects?.filterSettings,
+            [filterKey]: { ...preset.params },
+          },
+        },
+      },
+    }));
+  };
+
+  const handleHiddenBoxChange = (boxId, checked) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      layout: {
+        ...prevSettings.layout,
+        hiddenBoxes: {
+          ...prevSettings.layout.hiddenBoxes,
+          [boxId]: !checked
+        }
+      }
+    }));
+  };
+
+  const handleUnsplashTopicsChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      unsplash: {
+        ...prevSettings.unsplash,
+        [key]: value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      }
+    }));
+  };
+
+  const handleBookmarkTitleChange = (index, value) => {
+    updateSettings((prevSettings) => {
+      const bookmark = [...prevSettings.bookmark];
+      bookmark[index] = { ...bookmark[index], title: value };
+      return { ...prevSettings, bookmark };
+    });
+  };
+
+  const handleBookmarkItemChange = (index, subIndex, subKey, value) => {
+    updateSettings((prevSettings) => {
+      const bookmark = [...prevSettings.bookmark];
+      const content = [...bookmark[index].content];
+      content[subIndex] = { ...content[subIndex], [subKey]: value };
+      bookmark[index] = { ...bookmark[index], content };
+      return { ...prevSettings, bookmark };
+    });
+  };
+
+  const handleAddBookmarkItem = (index) => {
+    updateSettings((prevSettings) => {
+      const bookmark = [...prevSettings.bookmark];
+      bookmark[index] = {
+        ...bookmark[index],
+        content: [...bookmark[index].content, { name: "", url: "" }]
+      };
+      return { ...prevSettings, bookmark };
+    });
+  };
+
+  const handleRemoveBookmarkItem = (index, subIndex) => {
+    updateSettings((prevSettings) => {
+      const bookmark = [...prevSettings.bookmark];
+      bookmark[index] = {
+        ...bookmark[index],
+        content: bookmark[index].content.filter((_, currentSubIndex) => currentSubIndex !== subIndex)
+      };
+      return { ...prevSettings, bookmark };
+    });
+  };
+
+  const handleReset = async () => {
+    const resetResult = await resetSettings();
+    setSettingsState(resetResult.settings);
+    setThemeMode(resetResult.settings.ui.themeMode);
+    setThemePalette(resetResult.settings.ui.themePalette || "zen");
+    setCustomThemeVars(null);
+    setStatusMessage("Settings reset and backup history refreshed.");
+    await refreshStorageDiagnostics();
+  };
+
+  const handleSave = async () => {
+    const saveResult = await writeSettings(settingsState);
+    setThemeMode(settingsState.ui.themeMode);
+    setThemePalette(settingsState.ui.themePalette || "zen");
+    setStatusMessage(`Saved to IndexedDB at ${new Date(saveResult.updatedAt).toLocaleString()}.`);
+    await refreshStorageDiagnostics();
     setOpen(false);
     window.location.reload();
   };
 
-  const handleReset = () => {
-    Cookies.remove('settings');
-    setSettingsState(settings);
+  const handleExport = () => {
+    const blob = exportSettingsBlob(settingsState);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = createSettingsExportFilename();
+    link.click();
+    URL.revokeObjectURL(url);
+    setStatusMessage("Backup exported with metadata and schema version.");
   };
 
-  const handleTopLevelChange = (event, key) => {
-    const newValue = event.target.value;
-    setSettingsState(prevSettings => ({
-      ...prevSettings,
-      [key]: newValue
-    }));
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
   };
 
-  const handleTitleChange = (event, key, index) => {
-    const newSettingsState = { ...settingsState };
-    newSettingsState[key][index].title = event.target.value;
-    setSettingsState(newSettingsState);
-  };
-
-  const handleContentChange = (event, key, index, subIndex, subKey) => {
-    const newKeyArray = [...settingsState[key]];
-    newKeyArray[index].content[subIndex][subKey] = event.target.value;
-    setSettingsState({ ...settingsState, [key]: newKeyArray });
-  };
-
-  const handleNestedObjectChange = (event, subKey, subValue) => {
-    setSettingsState(prevSettings => {
-      const updatedSubSettings = { ...prevSettings[subKey] };
-      updatedSubSettings[subValue] = event.target.value;
-      return {
-        ...prevSettings,
-        [subKey]: updatedSubSettings
-      };
-    });
-  };
-  
-  const handleAdd = (key, index) => {
-    const newSettingsState = { ...settingsState };
-    newSettingsState[key][index].content.push({ name: '', url: '' });
-    setSettingsState(newSettingsState);
-  };
-
-  const handleRemove = (key, index) => {
-    const newSettingsState = { ...settingsState };
-    const contentArray = newSettingsState[key][index].content;
-    if (contentArray.length > 0) {
-      contentArray.pop();
-    }
-    setSettingsState(newSettingsState);
-  };
-
-  const renderInput = (key, value, handleChange) => (
-    <div key={key} className="space-y-1">
-      <label className="block text-sm font-medium text-black dark:text-white">{key}</label>
-      <input
-        name={key}
-        value={value}
-        onChange={handleChange}
-        className="py-2 px-5 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm m-auto"
-        placeholder={`Enter ${key}`}
-      />
-    </div>
-  );
-  
-  const renderSection = (key, value) => {
-    if (!value) {
-      const newSettingsState = { ...settingsState };
-      newSettingsState[key] = "";
+  const handleImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
     }
 
-    if (value === undefined || value === null){
-      value="";
-    }
-  
-    if (Array.isArray(value)) {
-      if (typeof value[0] === 'string') { // Check for array of strings
-        return renderInput(key, value.join(', '), (event) => handleTopLevelChange(event, key));
-      } else {
-        return value.map((item, i) => (
-          <div key={i} className="space-y-1">
-            {renderInput('title', item.title, (event) => handleTitleChange(event, key, i))}
-            {item.content && Array.isArray(item.content) ? item.content.map((content, j) => (
-              <div key={j} className="space-x-4 flex justify-center">
-                {Object.keys(content).map((subKey) => renderInput(subKey, content[subKey], (event) => handleContentChange(event, key, i, j, subKey)))}
-              </div>
-            )) : console.warn(`Content is undefined for item: ${JSON.stringify(item)}`)}
-            <button
-              className="mt-4 mr-2 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md dark:white-text"
-              onClick={() => handleAdd(key, i)}
-            >
-              + Add
-            </button>
-            <button
-              className="mt-4 ml-2 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md dark:white-text"
-              onClick={() => handleRemove(key, i)}
-            >
-              - Remove
-            </button>
-          </div>
-        ));
-      }
-    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      return (
-        <div key={key} className="space-y-1">
-          {Object.keys(value).map((subKey) => (
-            <div key={subKey}>
-              {renderInput(subKey, value[subKey], (event) => handleNestedObjectChange(event, key, subKey))}
-            </div>
-          ))}
-        </div>
+    try {
+      const importedResult = await importSettingsFromFile(file);
+      setSettingsState(importedResult.settings);
+      setThemeMode(importedResult.settings.ui.themeMode);
+      setThemePalette(importedResult.settings.ui.themePalette || "zen");
+      setStatusMessage(
+        importedResult.metadata.exportedAt
+          ? `Backup imported successfully. Original export: ${new Date(importedResult.metadata.exportedAt).toLocaleString()}.`
+          : "Backup imported successfully."
       );
-      } else {
-      return renderInput(key, value, (event) => handleTopLevelChange(event, key));
+      await refreshStorageDiagnostics();
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Backup import failed.");
     }
+
+    event.target.value = "";
   };
-  
+
+  const selectedThemeMode = settingsState.ui?.themeMode || themeMode;
+  const selectedThemePalette = settingsState.ui?.themePalette || themePalette;
+  const selectedGridDensity = settingsState.ui?.gridDensity || "comfortable";
+  const selectedCardStyle = settingsState.ui?.cardStyle || "rounded";
+  const imageEffects = settingsState.ui?.imageEffects || IMAGE_FILTER_DEFAULTS;
+
   return (
-    <>
-      <button
-        className="text-off-white2 text-5xl cursor-pointer"
-        onClick={() => setOpen(true)}
-      >
-        <HiOutlineCog />
-      </button>
-      <Dialog open={open} onClose={() => setOpen(false)} className="items-center justify-center z-10">
-        <Dialog.Overlay className="" />
-        <div className="items-center justify-center bg-off-white1 dark:bg-blue5 dark:text-white w-full h-full p-4 md:p-6 space-y-6 text-center overflow-auto max-h-96">
-          <Dialog.Title className="text-lg font-medium leading-6 dark:text-white">Settings</Dialog.Title>
-          {Object.keys(settingsState).map((key) => renderSection(key, settingsState[key]))}
-          <button
-            className="mt-4 mr-4 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md dark:text-white"
-            onClick={handleSave}
-          >
-            Save
-          </button>
-          <button
-            className="mt-4 ml-4 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md dark:text-white"
-            onClick={handleReset}
-          >
-            Reset
-          </button>
-        </div>
-      </Dialog>
-    </>
+    <Dialog open={open} onOpenChange={closeModal}>
+      <DialogTrigger asChild>
+        <button className="text-primary-foreground text-5xl cursor-pointer" onClick={openModal}>
+          <HiOutlineCog />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="border-border/60 bg-background/98 p-0 text-sm [&_[data-slot=card-header]]:p-4 [&_[data-slot=card-content]]:p-4 [&_[data-slot=card-content]]:pt-0 [&_[data-slot=card-title]]:text-base [&_[data-slot=tabs-trigger]]:px-2.5 [&_[data-slot=tabs-trigger]]:py-2 [&_[data-slot=tabs-trigger]]:text-xs [&_[data-slot=input]]:h-9 [&_[data-slot=input]]:text-xs [&_[data-slot=button]]:h-8 [&_[data-slot=button]]:px-3 [&_[data-slot=button]]:text-xs">
+        <Tabs defaultValue="appearance" orientation="vertical" className="grid min-h-[72vh] lg:grid-cols-[220px_1fr] gap-0">
+          <div className="border-b border-border bg-sidebar text-sidebar-foreground lg:border-r lg:border-b-0">
+            <div className="p-4">
+              <DialogHeader>
+                <DialogTitle className="font-serif text-xl">Workspace Settings</DialogTitle>
+                <DialogDescription>
+                  Built on the new shadcn-style UI layer with live theme and palette preview.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+            <TabsList className="mx-3 mb-3 bg-transparent p-0">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <TabsTrigger key={item.value} value={item.value} className="w-full justify-start">
+                    <Icon className="size-4" />
+                    {item.label}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
+
+          <div className="flex flex-col">
+            <div className="max-h-[72vh] overflow-y-auto p-4 md:p-5">
+              <TabsContent value="appearance" className="mt-0 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Theme Mode</CardTitle>
+                    <CardDescription>Choose how light and dark mode should be resolved.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 md:grid-cols-3">
+                    {[
+                      { value: "system", title: "System", description: "Follow the OS preference." },
+                      { value: "light", title: "Light", description: "Force the brighter variant." },
+                      { value: "dark", title: "Dark", description: "Force the darker variant." }
+                    ].map((option) => (
+                      <ChoiceButton
+                        key={option.value}
+                        selected={selectedThemeMode === option.value}
+                        title={option.title}
+                        description={option.description}
+                        onClick={() => handleThemeModeChange(option.value)}
+                      />
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Theme Palette</CardTitle>
+                    <CardDescription>Switch the base visual language of the interface.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 lg:grid-cols-3">
+                    {BUILT_IN_PALETTES.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleThemePaletteChange(option.value)}
+                        className={cn(
+                          "rounded-xl border p-4 text-left transition",
+                          selectedThemePalette === option.value
+                            ? "border-primary bg-accent shadow-sm"
+                            : "border-border bg-card hover:bg-accent/50"
+                        )}
+                      >
+                        <PaletteSwatchPreview swatches={option.swatches} mode={theme} />
+                        <div className="font-medium">{option.title}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">{option.description}</div>
+                      </button>
+                    ))}
+                    {(settingsState.customThemes || []).map((ct) => {
+                      const swatches = {
+                        light: getSwatchesFromCustomTheme(ct, "light"),
+                        dark: getSwatchesFromCustomTheme(ct, "dark"),
+                      };
+                      return (
+                        <button
+                          key={ct.id}
+                          type="button"
+                          onClick={() => handleThemePaletteChange(ct.id, { light: ct.light, dark: ct.dark })}
+                          className={cn(
+                            "rounded-xl border p-4 text-left transition",
+                            selectedThemePalette === ct.id
+                              ? "border-primary bg-accent shadow-sm"
+                              : "border-border bg-card hover:bg-accent/50"
+                          )}
+                        >
+                          <PaletteSwatchPreview swatches={swatches} mode={theme} />
+                          <div className="font-medium">{ct.name}</div>
+                          <div className="mt-1 text-sm text-muted-foreground">Custom theme</div>
+                        </button>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Custom Theme</CardTitle>
+                    <CardDescription>
+                      Paste CSS from a shadcn theme generator. Use <code>:root</code> for light and <code>.dark</code> for dark mode variables.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <SettingField label="Theme Name">
+                      <Input
+                        value={customThemeName}
+                        onChange={(e) => setCustomThemeName(e.target.value)}
+                        placeholder="My Custom Theme"
+                      />
+                    </SettingField>
+                    <SettingField label="CSS Variables">
+                      <textarea
+                        className="w-full rounded-lg border border-border bg-card p-3 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        rows={8}
+                        value={customThemeCSS}
+                        onChange={(e) => setCustomThemeCSS(e.target.value)}
+                        placeholder={`:root {\n  --background: oklch(0.98 0.01 250);\n  --primary: oklch(0.55 0.2 260);\n  /* ... */\n}\n.dark {\n  --background: oklch(0.2 0.02 260);\n  /* ... */\n}`}
+                      />
+                    </SettingField>
+                    {customThemeError ? (
+                      <p className="text-xs text-destructive">{customThemeError}</p>
+                    ) : null}
+                    <Button type="button" onClick={handleAddCustomTheme}>
+                      Add Theme
+                    </Button>
+
+                    {(settingsState.customThemes || []).length > 0 ? (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-xs font-medium text-foreground">Saved Custom Themes</p>
+                        {(settingsState.customThemes || []).map((ct) => (
+                          <div key={ct.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                            <span className="text-sm">{ct.name}</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRemoveCustomTheme(ct.id)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Grid Density</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-3">
+                      {["comfortable", "compact"].map((value) => (
+                        <ChoiceButton
+                          key={value}
+                          selected={selectedGridDensity === value}
+                          title={value.charAt(0).toUpperCase() + value.slice(1)}
+                          description={value === "comfortable" ? "More air between modules." : "Tighter dashboard packing."}
+                          onClick={() => handleUiChange("gridDensity", value)}
+                        />
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Card Shape</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-3">
+                      {["soft", "rounded", "sharp"].map((value) => (
+                        <ChoiceButton
+                          key={value}
+                          selected={selectedCardStyle === value}
+                          title={value.charAt(0).toUpperCase() + value.slice(1)}
+                          description={value === "soft" ? "Large rounded corners." : value === "sharp" ? "Crisper corners." : "Balanced default radius."}
+                          onClick={() => handleUiChange("cardStyle", value)}
+                        />
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Atmosphere</CardTitle>
+                    <CardDescription>Decorative tiles can be disabled without affecting the data modules.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-medium">Decorative media tiles</p>
+                      <p className="text-sm text-muted-foreground">Show or hide the looping desert video modules.</p>
+                    </div>
+                    <Switch
+                      checked={settingsState.ui?.showDecorativeMedia ?? true}
+                      onCheckedChange={(checked) => handleUiChange("showDecorativeMedia", checked)}
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Image Effects</CardTitle>
+                    <CardDescription>
+                      Enable one or more filters for photo tiles. When multiple filters are enabled, each image tile picks one at random.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {IMAGE_FILTER_DEFINITIONS.map((filter) => {
+                      const enabled = imageEffects.enabledFilters?.[filter.key] || false;
+                      const filterSettings = imageEffects.filterSettings?.[filter.key] || IMAGE_FILTER_DEFAULTS.filterSettings[filter.key];
+
+                      return (
+                        <div key={filter.key} className="rounded-xl border border-border p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="font-medium">{filter.label}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {enabled ? "Active and eligible for random image selection." : "Disabled."}
+                              </p>
+                            </div>
+                            <Switch
+                              checked={enabled}
+                              onCheckedChange={(checked) => handleImageFilterToggle(filter.key, checked)}
+                            />
+                          </div>
+
+                          {enabled ? (
+                            <div className="mt-4 space-y-4">
+                              <div className="flex flex-wrap gap-2">
+                                {filter.presets.map((preset) => (
+                                  <Button
+                                    key={preset.name}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleImageFilterPreset(filter.key, preset)}
+                                  >
+                                    {preset.name}
+                                  </Button>
+                                ))}
+                              </div>
+                              <div className="grid gap-4 md:grid-cols-2">
+                                {filter.controls.map((control) => {
+                                  const controlValue = filterSettings[control.key];
+                                  if (control.type === "boolean") {
+                                    return (
+                                      <div key={control.key} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                                        <Label className="text-sm text-foreground">{control.label}</Label>
+                                        <Switch
+                                          checked={Boolean(controlValue)}
+                                          onCheckedChange={(checked) =>
+                                            handleImageFilterSettingChange(filter.key, control.key, checked)
+                                          }
+                                        />
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <RangeControl
+                                      key={control.key}
+                                      label={control.label}
+                                      value={Number(controlValue)}
+                                      min={control.min}
+                                      max={control.max}
+                                      step={control.step}
+                                      onChange={(value) =>
+                                        handleImageFilterSettingChange(filter.key, control.key, value)
+                                      }
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="layout" className="mt-0 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Visible Modules</CardTitle>
+                    <CardDescription>Turn tiles on or off while keeping the current grid structure intact.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 md:grid-cols-2">
+                    {visibilityOptions.map((option) => {
+                      const isVisible = !settingsState.layout?.hiddenBoxes?.[option.id];
+                      return (
+                        <div key={option.id} className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+                          <div>
+                            <p className="font-medium">{option.label}</p>
+                            <p className="text-sm text-muted-foreground">{isVisible ? "Currently visible" : "Currently hidden"}</p>
+                          </div>
+                          <Switch checked={isVisible} onCheckedChange={(checked) => handleHiddenBoxChange(option.id, checked)} />
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle>Next Layout Phase</CardTitle>
+                    <CardDescription>
+                      The settings model now has a dedicated `layout` section. Dragging, resizing, add/remove, and custom box composition can sit here next without another data migration.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="content" className="mt-0 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Location and API Settings</CardTitle>
+                    <CardDescription>Core values used by weather and photo modules.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-2">
+                    <SettingField label="Latitude">
+                      <Input
+                        value={settingsState.latitude ?? ""}
+                        onChange={(event) => handleTopLevelChange("latitude", event.target.value === "" ? null : Number(event.target.value))}
+                      />
+                    </SettingField>
+                    <SettingField label="Longitude">
+                      <Input
+                        value={settingsState.longitude ?? ""}
+                        onChange={(event) => handleTopLevelChange("longitude", event.target.value === "" ? null : Number(event.target.value))}
+                      />
+                    </SettingField>
+                    <SettingField label="Units">
+                      <Input value={settingsState.units ?? ""} onChange={(event) => handleTopLevelChange("units", event.target.value)} />
+                    </SettingField>
+                    <SettingField label="OpenWeather Key">
+                      <Input
+                        value={settingsState.openWeatherCredential ?? ""}
+                        onChange={(event) => handleTopLevelChange("openWeatherCredential", event.target.value || null)}
+                      />
+                    </SettingField>
+                    <SettingField label="Unsplash Key" className="md:col-span-2">
+                      <Input
+                        value={settingsState.unsplashCredential ?? ""}
+                        onChange={(event) => handleTopLevelChange("unsplashCredential", event.target.value || null)}
+                      />
+                    </SettingField>
+                    <SettingField label="ListenBrainz Username">
+                      <Input
+                        value={settingsState.listenBrainzUsername ?? ""}
+                        onChange={(event) => handleTopLevelChange("listenBrainzUsername", event.target.value || null)}
+                      />
+                    </SettingField>
+                    <SettingField label="Default Timer Minutes">
+                      <Input
+                        value={settingsState.timer?.focusMinutes ?? 25}
+                        onChange={(event) =>
+                          handleTimerChange("focusMinutes", event.target.value === "" ? 25 : Number(event.target.value))
+                        }
+                      />
+                    </SettingField>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Decorative Video</CardTitle>
+                    <CardDescription>
+                      Add up to 10 looping MP4 links. One is chosen at random on load, and both tiles look into the same shared scene.
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="space-y-5">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-foreground">Video URLs</p>
+                          <p className="text-xs text-muted-foreground">
+                            Leave blanks empty. The saved list is capped at 10.
+                          </p>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleAddDecorativeVideoUrl}
+                          disabled={(settingsState.decorativeVideo?.urls ?? []).length >= 10}
+                        >
+                          Add link
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {(settingsState.decorativeVideo?.urls?.length
+                          ? settingsState.decorativeVideo.urls
+                          : [""]
+                        ).map((url, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Input
+                              value={url}
+                              placeholder="https://example.com/video.mp4"
+                              onChange={(event) =>
+                                handleDecorativeVideoUrlChange(index, event.target.value)
+                              }
+                            />
+
+                            {(settingsState.decorativeVideo?.urls?.length || 0) > 1 ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleRemoveDecorativeVideoUrl(index)}
+                              >
+                                Remove
+                              </Button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Move and scale the underlying shared video. The box positions stay fixed, but what you see through them changes together.
+                      </p>
+
+                      <RangeControl
+                        label="Zoom"
+                        value={
+                          settingsState.decorativeVideo?.zoom ??
+                          settingsState.decorativeVideo?.tall?.zoom ??
+                          1.6
+                        }
+                        min={1}
+                        max={3}
+                        step={0.05}
+                        onChange={(value) => handleDecorativeVideoChange("zoom", value)}
+                      />
+
+                      <RangeControl
+                        label="Horizontal Offset"
+                        value={
+                          settingsState.decorativeVideo?.offsetX ??
+                          settingsState.decorativeVideo?.tall?.offsetX ??
+                          0
+                        }
+                        min={-180}
+                        max={180}
+                        step={1}
+                        onChange={(value) => handleDecorativeVideoChange("offsetX", value)}
+                      />
+
+                      <RangeControl
+                        label="Vertical Offset"
+                        value={
+                          settingsState.decorativeVideo?.offsetY ??
+                          settingsState.decorativeVideo?.tall?.offsetY ??
+                          0
+                        }
+                        min={-180}
+                        max={180}
+                        step={1}
+                        onChange={(value) => handleDecorativeVideoChange("offsetY", value)}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Headline Source</CardTitle>
+                    <CardDescription>Controls the rotating hero headlines in the large feature panel.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-2">
+                    <SettingField label="Subreddit">
+                      <Input
+                        value={settingsState.news?.subreddit ?? "worldnews"}
+                        onChange={(event) => handleNewsChange("subreddit", event.target.value || "worldnews")}
+                      />
+                    </SettingField>
+                    <SettingField label="Rotation Seconds">
+                      <Input
+                        value={settingsState.news?.rotationSeconds ?? 8}
+                        onChange={(event) =>
+                          handleNewsChange("rotationSeconds", event.target.value === "" ? 8 : Number(event.target.value))
+                        }
+                      />
+                    </SettingField>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Unsplash Topics</CardTitle>
+                    <CardDescription>Comma-separated keywords for each rotating image tile.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-2">
+                    {Object.keys(settingsState.unsplash).map((key) => (
+                      <SettingField key={key} label={key}>
+                        <Input value={settingsState.unsplash[key].join(", ")} onChange={(event) => handleUnsplashTopicsChange(key, event.target.value)} />
+                      </SettingField>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Bookmarks</CardTitle>
+                    <CardDescription>Edit titles and links for each bookmark tile.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {settingsState.bookmark.map((item, index) => (
+                      <div key={index} className="rounded-xl border border-border bg-muted/25 p-4">
+                        <SettingField label={`Bookmark Box ${index + 1} Title`}>
+                          <Input value={item.title} onChange={(event) => handleBookmarkTitleChange(index, event.target.value)} />
+                        </SettingField>
+                        <div className="mt-4 space-y-3">
+                          {item.content.map((content, subIndex) => (
+                            <div key={subIndex} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                              <SettingField label="Name">
+                                <Input
+                                  value={content.name}
+                                  onChange={(event) => handleBookmarkItemChange(index, subIndex, "name", event.target.value)}
+                                />
+                              </SettingField>
+                              <SettingField label="URL">
+                                <Input
+                                  value={content.url}
+                                  onChange={(event) => handleBookmarkItemChange(index, subIndex, "url", event.target.value)}
+                                />
+                              </SettingField>
+                              <div className="flex items-end">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRemoveBookmarkItem(index, subIndex)}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 flex gap-3">
+                          <Button type="button" size="sm" onClick={() => handleAddBookmarkItem(index)}>
+                            Add link
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </div>
+
+            <div className="border-t border-border bg-card/60 px-6 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>
+                    Active preview: <span className="font-medium text-foreground">{selectedThemePalette}</span> in <span className="font-medium text-foreground">{selectedThemeMode}</span> mode
+                  </p>
+                  <p>
+                    Storage: {storageState?.indexedDbAvailable ? "IndexedDB" : "Local mirror only"} · backups: {storageState?.backupCount ?? 0}
+                    {storageState?.lastSavedAt ? ` · last saved ${new Date(storageState.lastSavedAt).toLocaleString()}` : ""}
+                  </p>
+                  {statusMessage ? <p className="text-foreground">{statusMessage}</p> : null}
+                </div>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" onClick={handleExport}>
+                    Export backup
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleImportClick}>
+                    Import backup
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleReset}>
+                    Reset
+                  </Button>
+                  <Button type="button" onClick={handleSave}>
+                    Save and reload
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={handleImport}
+            />
+          </div>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }
 

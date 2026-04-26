@@ -1,18 +1,17 @@
+import path from "node:path"
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import vitePluginString from 'vite-plugin-string'
-import postcss from './postcss.config.js'
-
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: "https://timothypholmes.github.io/startup-page/",
   plugins: [
-    react(), 
-    vitePluginString()
+    react(),
   ],
-  css: {
-    postcss,
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
   build: {
     chunkSizeWarningLimit: 1600,

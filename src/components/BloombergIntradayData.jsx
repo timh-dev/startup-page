@@ -38,7 +38,7 @@ export default class TDMarketData extends Component {
   }
   
   getChartData() {
-    const consumerKey = process.env.REACT_APP_TD_CONSUMER_KEY; 
+    const consumerKey = import.meta.env.VITE_TD_CONSUMER_KEY;
     const symbol = 'AAPL';
     const periodType = 'day';
     const period = '1';

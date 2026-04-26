@@ -1,17 +1,20 @@
-import React from "react";
-import ReactDOM from 'react-dom';
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 import { HashRouter, Route, Routes} from "react-router-dom";
+import "./assets/styles/index.css";
+import { hydrateSettingsFromIndexedDb } from "./components/readSettings";
 
 // views without layouts
 import IndexPage from "./views/Index.jsx";
 
-ReactDOM.render(
-  <HashRouter>
-    <Routes>
-      {/* add routes without layouts */}
-      <Route path="/" exact element={ <IndexPage/> } />
-      {/* add redirect for first page */}
-    </Routes>
-  </HashRouter>,
-  document.getElementById("root")
-);
+void hydrateSettingsFromIndexedDb().finally(() => {
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<IndexPage />} />
+        </Routes>
+      </HashRouter>
+    </StrictMode>
+  );
+});
