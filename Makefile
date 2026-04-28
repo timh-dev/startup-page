@@ -39,14 +39,9 @@ all-install: install server-install
 # Initial project setup
 setup:
 	@echo "Running project setup..."
-	@echo "Copying config file..."
-	@if [ ! -f "src/config/index.js" ]; then \
-		cp src/config/index.example.js src/config/index.js 2>/dev/null || echo "Config example not found, skipping..."; \
-	else \
-		echo "Config file already exists."; \
-	fi
 	@$(MAKE) install
 	@$(MAKE) build
+	@echo "Setup complete. Run 'make dev' to start the development server."
 
 # Start development server
 start:
