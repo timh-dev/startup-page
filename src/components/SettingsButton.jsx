@@ -1,5 +1,6 @@
 import React, { useContext, useMemo, useState } from "react";
 import { HiOutlineCog, HiOutlineSparkles, HiOutlineSquares2X2, HiOutlineSwatch } from "react-icons/hi2";
+import { ALL_MODES as ALL_FEATURE_MODES } from "./FeaturePanel";
 
 import { ThemeContext } from "@/components/ThemeContext";
 import { Button } from "@/components/ui/button";
@@ -424,6 +425,27 @@ function SettingsButton() {
         [key]: prevSettings.unsplash[key].filter((_, i) => i !== index),
       },
     }));
+  };
+
+  const handleFeaturePanelChange = (key, value) => {
+    updateSettings((prevSettings) => ({
+      ...prevSettings,
+      featurePanel: {
+        ...prevSettings.featurePanel,
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleFeaturePanelModeToggle = (modeKey, checked) => {
+    updateSettings((prevSettings) => {
+      const current = prevSettings.featurePanel?.enabledModes ?? ALL_FEATURE_MODES.map((m) => m.key);
+      const next = checked ? [...current, modeKey] : current.filter((k) => k !== modeKey);
+      return {
+        ...prevSettings,
+        featurePanel: { ...prevSettings.featurePanel, enabledModes: next },
+      };
+    });
   };
 
   const handleBookmarkTitleChange = (index, value) => {
@@ -1015,6 +1037,54 @@ function SettingsButton() {
                         step={1}
                         onChange={(value) => handleDecorativeVideoChange("offsetY", value)}
                       />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Feature Panel</CardTitle>
+                    <CardDescription>Choose which modes appear in the rotating feature panel and provide credentials for services that need them.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-foreground">Enabled Modes</p>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {ALL_FEATURE_MODES.map((mode) => {
+                          const enabledModes = settingsState.featurePanel?.enabledModes ?? ALL_FEATURE_MODES.map((m) => m.key);
+                          const enabled = enabledModes.includes(mode.key);
+                          return (
+                            <div key={mode.key} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+                              <p className="text-sm font-medium">{mode.label}</p>
+                              <Switch checked={enabled} onCheckedChange={(checked) => handleFeaturePanelModeToggle(mode.key, checked)} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <p className="text-xs font-medium text-foreground">Credentials &amp; Config</p>
+                      <SettingField label="GitHub Username" description="Used by the GitHub Activity mode.">
+                        <Input
+                          value={settingsState.featurePanel?.githubUsername ?? ""}
+                          placeholder="e.g. torvalds"
+                          onChange={(e) => handleFeaturePanelChange("githubUsername", e.target.value || null)}
+                        />
+                      </SettingField>
+                      <SettingField label="RSS Feed URL" description="Any valid RSS or Atom feed URL.">
+                        <Input
+                          value={settingsState.featurePanel?.rssFeedUrl ?? ""}
+                          placeholder="https://example.com/feed.xml"
+                          onChange={(e) => handleFeaturePanelChange("rssFeedUrl", e.target.value || null)}
+                        />
+                      </SettingField>
+                      <SettingField label="Spotify App Client ID" description="Create an app at developer.spotify.com and add this page's URL as a redirect URI.">
+                        <Input
+                          value={settingsState.featurePanel?.spotifyClientId ?? ""}
+                          placeholder="e.g. 1a2b3c4d5e6f7890..."
+                          onChange={(e) => handleFeaturePanelChange("spotifyClientId", e.target.value || null)}
+                        />
+                      </SettingField>
                     </div>
                   </CardContent>
                 </Card>

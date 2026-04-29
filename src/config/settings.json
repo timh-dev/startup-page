@@ -189,7 +189,11 @@
     "hiddenBoxes": {}
   },
   "featurePanel": {
-    "mode": "headlines"
+    "mode": "headlines",
+    "enabledModes": ["headlines", "forecast", "airQuality", "timer", "windy", "wikipedia", "rss", "github", "spotify", "unsplash"],
+    "githubUsername": null,
+    "rssFeedUrl": null,
+    "spotifyClientId": null
   },
   "decorativeVideo": {
     "urls": ["https://media.istockphoto.com/id/1255754954/video/school-of-fish-sharks-swim-in-a-circle.mp4?s=mp4-640x640-is&k=20&c=YqOEIjdlfaofiSnAwTszq021DXQvTb2p-hNia4dZtxA="],
