@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import React from "react";
 import { KBarProvider } from "kbar";
-import { HiArrowLeft, HiArrowTopRightOnSquare, HiBookmark, HiChevronLeft, HiChevronRight, HiMinus, HiPencil, HiPlus } from "react-icons/hi2";
+import { HiArrowLeft, HiArrowTopRightOnSquare, HiBookmark, HiChevronLeft, HiChevronRight, HiMinus, HiPencil, HiPlus, HiTrash } from "react-icons/hi2";
 
 import { readSettings, writeSettings } from '../lib/settings';
 import { isBuiltInPalette } from '../lib/theme-palettes';
@@ -98,15 +98,22 @@ function BookmarkView({
   onRemoveBookmark,
   onUpdateBookmark,
   onAddCategory,
+  onRenameCategory,
+  onDeleteCategory,
   onMoveCategory,
   onMoveBookmark,
+  onReorderCategory,
+  onReorderBookmark,
   pillSize = 3.25,
 }) {
   const [addOpen, setAddOpen] = React.useState(false);
   const [categoryOpen, setCategoryOpen] = React.useState(false);
   const [editingBookmark, setEditingBookmark] = React.useState(null);
+  const [editingCategory, setEditingCategory] = React.useState(null);
   const [categoryDraft, setCategoryDraft] = React.useState("");
   const [collapsedCategories, setCollapsedCategories] = React.useState(() => new Set());
+  const [draggedItem, setDraggedItem] = React.useState(null);
+  const [dragOverItem, setDragOverItem] = React.useState(null);
   const [draft, setDraft] = React.useState({
     categoryIndex: activeCategoryIndex ?? 0,
     name: "",
@@ -165,6 +172,29 @@ function BookmarkView({
     setAddOpen(true);
   };
 
+  const handleEditCategory = (categoryIndex, title) => {
+    setEditingCategory({ categoryIndex, previousTitle: title });
+    setCategoryDraft(title || "");
+    setAddOpen(false);
+    setEditingBookmark(null);
+    setCategoryOpen(true);
+  };
+
+  const handleDeleteCategory = async (categoryIndex, title) => {
+    await onDeleteCategory(categoryIndex);
+    setCollapsedCategories((current) => {
+      const next = new Set(current);
+      next.delete(title);
+      return next;
+    });
+
+    if (editingCategory?.categoryIndex === categoryIndex) {
+      setEditingCategory(null);
+      setCategoryDraft("");
+      setCategoryOpen(false);
+    }
+  };
+
   const toggleCategoryCollapsed = (categoryTitle) => {
     setCollapsedCategories((current) => {
       const next = new Set(current);
@@ -177,6 +207,52 @@ function BookmarkView({
 
       return next;
     });
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverItem(null);
+  };
+
+  const handleCategoryDrop = async (event, targetCategoryIndex) => {
+    event.preventDefault();
+
+    if (!draggedItem) {
+      return;
+    }
+
+    if (draggedItem.type === "category" && draggedItem.categoryIndex !== targetCategoryIndex) {
+      await onReorderCategory(draggedItem.categoryIndex, targetCategoryIndex);
+    }
+
+    if (draggedItem.type === "bookmark") {
+      const targetContent = bookmarks[targetCategoryIndex]?.content || [];
+      await onReorderBookmark(
+        draggedItem.categoryIndex,
+        draggedItem.bookmarkIndex,
+        targetCategoryIndex,
+        targetContent.length
+      );
+    }
+
+    handleDragEnd();
+  };
+
+  const handleBookmarkDrop = async (event, targetCategoryIndex, targetBookmarkIndex) => {
+    event.preventDefault();
+
+    if (draggedItem?.type !== "bookmark") {
+      handleDragEnd();
+      return;
+    }
+
+    await onReorderBookmark(
+      draggedItem.categoryIndex,
+      draggedItem.bookmarkIndex,
+      targetCategoryIndex,
+      targetBookmarkIndex
+    );
+    handleDragEnd();
   };
 
   const handleAddToggle = () => {
@@ -199,12 +275,28 @@ function BookmarkView({
       return;
     }
 
-    await onAddCategory(title);
-    setCollapsedCategories((current) => {
-      const next = new Set(current);
-      next.delete(title);
-      return next;
-    });
+    if (editingCategory) {
+      await onRenameCategory(editingCategory.categoryIndex, title);
+      setCollapsedCategories((current) => {
+        const next = new Set(current);
+
+        if (next.has(editingCategory.previousTitle)) {
+          next.delete(editingCategory.previousTitle);
+          next.add(title);
+        }
+
+        return next;
+      });
+      setEditingCategory(null);
+    } else {
+      await onAddCategory(title);
+      setCollapsedCategories((current) => {
+        const next = new Set(current);
+        next.delete(title);
+        return next;
+      });
+    }
+
     setCategoryDraft("");
     setCategoryOpen(false);
   };
@@ -260,14 +352,33 @@ function BookmarkView({
 
           return (
             <React.Fragment key={`${group.title}-${group.originalIndex}`}>
-              <span className="group/category relative inline-flex">
+              <span
+                className="group/category relative inline-flex"
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = "move";
+                  setDraggedItem({ type: "category", categoryIndex: group.originalIndex });
+                }}
+                onDragOver={(event) => {
+                  if (draggedItem) {
+                    event.preventDefault();
+                    setDragOverItem({ type: "category", categoryIndex: group.originalIndex });
+                  }
+                }}
+                onDrop={(event) => handleCategoryDrop(event, group.originalIndex)}
+                onDragEnd={handleDragEnd}
+              >
                 <button
                   type="button"
                   onClick={() => {
                     setDraft((prev) => ({ ...prev, categoryIndex: group.originalIndex }));
                     toggleCategoryCollapsed(group.title);
                   }}
-                  className="inline-flex items-center justify-between gap-2 rounded-full bg-primary font-medium text-primary-foreground shadow-lg transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+                  className={`inline-flex cursor-grab items-center justify-between gap-2 rounded-full bg-primary font-medium text-primary-foreground shadow-lg transition active:cursor-grabbing hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring ${
+                    dragOverItem?.type === "category" && dragOverItem.categoryIndex === group.originalIndex
+                      ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                      : ""
+                  }`}
                   style={pillStyle}
                   title={`${isCollapsed ? "Expand" : "Collapse"} ${group.title}`}
                   aria-expanded={!isCollapsed}
@@ -316,6 +427,32 @@ function BookmarkView({
                 >
                   <HiChevronRight className="size-3.5" />
                 </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleEditCategory(group.originalIndex, group.title);
+                  }}
+                  className="absolute -bottom-1.5 right-2 inline-flex items-center justify-center rounded-full border border-border/60 bg-card text-card-foreground opacity-0 shadow-md transition hover:bg-accent hover:text-accent-foreground focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring group-hover/category:opacity-100"
+                  style={controlButtonStyle}
+                  title={`Rename ${group.title}`}
+                >
+                  <HiPencil className="size-3.5" />
+                </button>
+                {bookmarks.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDeleteCategory(group.originalIndex, group.title);
+                    }}
+                    className="absolute -bottom-1.5 left-2 inline-flex items-center justify-center rounded-full border border-border/60 bg-card text-card-foreground opacity-0 shadow-md transition hover:bg-destructive hover:text-destructive-foreground focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring group-hover/category:opacity-100"
+                    style={controlButtonStyle}
+                    title={`Delete ${group.title}`}
+                  >
+                    <HiTrash className="size-3.5" />
+                  </button>
+                ) : null}
               </span>
 
               {!isCollapsed && content.map(({ name, url }, index) => {
@@ -327,10 +464,38 @@ function BookmarkView({
                   <span
                     key={`${url}-${index}`}
                     className="group relative inline-flex"
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      setDraggedItem({
+                        type: "bookmark",
+                        categoryIndex: group.originalIndex,
+                        bookmarkIndex: index,
+                      });
+                    }}
+                    onDragOver={(event) => {
+                      if (draggedItem?.type === "bookmark") {
+                        event.preventDefault();
+                        setDragOverItem({
+                          type: "bookmark",
+                          categoryIndex: group.originalIndex,
+                          bookmarkIndex: index,
+                        });
+                      }
+                    }}
+                    onDrop={(event) => handleBookmarkDrop(event, group.originalIndex, index)}
+                    onDragEnd={handleDragEnd}
                   >
                     <a
                       href={url}
-                      className="inline-flex items-center rounded-full bg-card text-card-foreground shadow-lg transition hover:bg-accent hover:text-accent-foreground"
+                      draggable={false}
+                      className={`inline-flex cursor-grab items-center rounded-full bg-card text-card-foreground shadow-lg transition active:cursor-grabbing hover:bg-accent hover:text-accent-foreground ${
+                        dragOverItem?.type === "bookmark" &&
+                        dragOverItem.categoryIndex === group.originalIndex &&
+                        dragOverItem.bookmarkIndex === index
+                          ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                          : ""
+                      }`}
                       style={bookmarkPillStyle}
                       title={url}
                     >
@@ -411,6 +576,8 @@ function BookmarkView({
           onClick={() => {
             setAddOpen(false);
             setEditingBookmark(null);
+            setEditingCategory(null);
+            setCategoryDraft("");
             setCategoryOpen((open) => !open);
           }}
           className="inline-flex items-center justify-center rounded-full bg-card px-5 font-medium text-card-foreground shadow-lg transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
@@ -427,7 +594,7 @@ function BookmarkView({
           className="mt-7 flex max-w-xl flex-wrap items-end gap-3 rounded-3xl border border-border/60 bg-card p-4 shadow-lg"
         >
           <label className="grid min-w-64 flex-1 gap-1 text-xs text-muted-foreground">
-            Category Name
+            {editingCategory ? "Rename Category" : "Category Name"}
             <input
               value={categoryDraft}
               onChange={(event) => setCategoryDraft(event.target.value)}
@@ -439,7 +606,7 @@ function BookmarkView({
             type="submit"
             className="h-11 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90"
           >
-            Add
+            {editingCategory ? "Save" : "Add"}
           </button>
         </form>
       ) : null}
@@ -573,6 +740,16 @@ export default function Index() {
     window.localStorage?.setItem(STARTUP_PAGE_VIEW_KEY, "dashboard");
   };
 
+  const updateActiveBookmarkCategory = (categoryIndex) => {
+    setActiveBookmarkCategory(categoryIndex);
+
+    if (categoryIndex === null) {
+      window.localStorage?.removeItem(STARTUP_PAGE_BOOKMARK_CATEGORY_KEY);
+    } else {
+      window.localStorage?.setItem(STARTUP_PAGE_BOOKMARK_CATEGORY_KEY, String(categoryIndex));
+    }
+  };
+
   React.useEffect(() => {
     latestSettingsRef.current = settingsState;
   }, [settingsState]);
@@ -667,8 +844,65 @@ export default function Index() {
       ],
     };
 
-    setActiveBookmarkCategory(currentBookmarkGroups.length);
+    updateActiveBookmarkCategory(currentBookmarkGroups.length);
     await persistSettings(nextSettings);
+  };
+
+  const handleRenameBookmarkCategory = async (categoryIndex, title) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentBookmarkGroups = Array.isArray(currentSettings.bookmark) ? currentSettings.bookmark : [];
+
+    if (!currentBookmarkGroups[categoryIndex]) {
+      return;
+    }
+
+    await persistSettings({
+      ...currentSettings,
+      bookmark: currentBookmarkGroups.map((group, index) =>
+        index === categoryIndex
+          ? { ...group, title }
+          : group
+      ),
+    });
+  };
+
+  const handleDeleteBookmarkCategory = async (categoryIndex) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentBookmarkGroups = Array.isArray(currentSettings.bookmark) ? currentSettings.bookmark : [];
+    const currentMapping = currentSettings.layout?.bookmarkBoxCategories || [0, 1, 2, 3, 4];
+
+    if (currentBookmarkGroups.length <= 1 || !currentBookmarkGroups[categoryIndex]) {
+      return;
+    }
+
+    const bookmark = currentBookmarkGroups.filter((_group, index) => index !== categoryIndex);
+    const fallbackIndex = Math.min(categoryIndex, bookmark.length - 1);
+    const bookmarkBoxCategoriesNext = currentMapping.map((mappedIndex, boxIndex) => {
+      if (mappedIndex === categoryIndex) {
+        return Math.min(boxIndex, bookmark.length - 1);
+      }
+
+      if (mappedIndex > categoryIndex) {
+        return mappedIndex - 1;
+      }
+
+      return Math.min(mappedIndex, bookmark.length - 1);
+    });
+
+    if (activeBookmarkCategory === categoryIndex) {
+      updateActiveBookmarkCategory(fallbackIndex);
+    } else if (activeBookmarkCategory > categoryIndex) {
+      updateActiveBookmarkCategory(activeBookmarkCategory - 1);
+    }
+
+    await persistSettings({
+      ...currentSettings,
+      bookmark,
+      layout: {
+        ...currentSettings.layout,
+        bookmarkBoxCategories: bookmarkBoxCategoriesNext,
+      },
+    });
   };
 
   const handleMoveBookmarkCategory = async (categoryIndex, direction) => {
@@ -697,9 +931,48 @@ export default function Index() {
     });
 
     if (activeBookmarkCategory === categoryIndex) {
-      setActiveBookmarkCategory(nextIndex);
+      updateActiveBookmarkCategory(nextIndex);
     } else if (activeBookmarkCategory === nextIndex) {
-      setActiveBookmarkCategory(categoryIndex);
+      updateActiveBookmarkCategory(categoryIndex);
+    }
+
+    await persistSettings({
+      ...currentSettings,
+      bookmark,
+      layout: {
+        ...currentSettings.layout,
+        bookmarkBoxCategories: bookmarkBoxCategoriesNext,
+      },
+    });
+  };
+
+  const handleReorderBookmarkCategory = async (fromIndex, toIndex) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentBookmarkGroups = Array.isArray(currentSettings.bookmark) ? currentSettings.bookmark : [];
+    const currentMapping = currentSettings.layout?.bookmarkBoxCategories || [0, 1, 2, 3, 4];
+
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= currentBookmarkGroups.length ||
+      toIndex >= currentBookmarkGroups.length
+    ) {
+      return;
+    }
+
+    const orderedIndexes = currentBookmarkGroups.map((_, index) => index);
+    const [movedIndex] = orderedIndexes.splice(fromIndex, 1);
+    orderedIndexes.splice(toIndex, 0, movedIndex);
+
+    const oldToNewIndex = new Map(orderedIndexes.map((oldIndex, newIndex) => [oldIndex, newIndex]));
+    const bookmark = orderedIndexes.map((oldIndex) => currentBookmarkGroups[oldIndex]);
+    const bookmarkBoxCategoriesNext = currentMapping.map((mappedIndex) =>
+      oldToNewIndex.has(mappedIndex) ? oldToNewIndex.get(mappedIndex) : mappedIndex
+    );
+
+    if (oldToNewIndex.has(activeBookmarkCategory)) {
+      updateActiveBookmarkCategory(oldToNewIndex.get(activeBookmarkCategory));
     }
 
     await persistSettings({
@@ -730,6 +1003,59 @@ export default function Index() {
         ? { ...currentGroup, content }
         : currentGroup
     );
+
+    await persistSettings({
+      ...currentSettings,
+      bookmark,
+    });
+  };
+
+  const handleReorderBookmark = async (fromCategoryIndex, fromBookmarkIndex, toCategoryIndex, toBookmarkIndex) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentBookmarkGroups = Array.isArray(currentSettings.bookmark) ? currentSettings.bookmark : [];
+    const fromGroup = currentBookmarkGroups[fromCategoryIndex];
+    const toGroup = currentBookmarkGroups[toCategoryIndex];
+    const fromContent = Array.isArray(fromGroup?.content) ? [...fromGroup.content] : [];
+    const toContent = fromCategoryIndex === toCategoryIndex
+      ? fromContent
+      : Array.isArray(toGroup?.content)
+        ? [...toGroup.content]
+        : [];
+
+    if (
+      !fromGroup ||
+      !toGroup ||
+      fromBookmarkIndex < 0 ||
+      fromBookmarkIndex >= fromContent.length
+    ) {
+      return;
+    }
+
+    if (
+      fromCategoryIndex === toCategoryIndex &&
+      (fromBookmarkIndex === toBookmarkIndex || fromBookmarkIndex + 1 === toBookmarkIndex)
+    ) {
+      return;
+    }
+
+    const [movedBookmark] = fromContent.splice(fromBookmarkIndex, 1);
+    const adjustedTargetIndex = fromCategoryIndex === toCategoryIndex && toBookmarkIndex > fromBookmarkIndex
+      ? toBookmarkIndex - 1
+      : toBookmarkIndex;
+    const boundedTargetIndex = Math.max(0, Math.min(adjustedTargetIndex, toContent.length));
+    toContent.splice(boundedTargetIndex, 0, movedBookmark);
+
+    const bookmark = currentBookmarkGroups.map((group, index) => {
+      if (index === fromCategoryIndex) {
+        return { ...group, content: fromContent };
+      }
+
+      if (index === toCategoryIndex) {
+        return { ...group, content: toContent };
+      }
+
+      return group;
+    });
 
     await persistSettings({
       ...currentSettings,
@@ -851,8 +1177,12 @@ export default function Index() {
             onRemoveBookmark={handleRemoveBookmark}
             onUpdateBookmark={handleUpdateBookmark}
             onAddCategory={handleAddBookmarkCategory}
+            onRenameCategory={handleRenameBookmarkCategory}
+            onDeleteCategory={handleDeleteBookmarkCategory}
             onMoveCategory={handleMoveBookmarkCategory}
             onMoveBookmark={handleMoveBookmark}
+            onReorderCategory={handleReorderBookmarkCategory}
+            onReorderBookmark={handleReorderBookmark}
             pillSize={ui.bookmarkPillSize}
           />
         </div>
