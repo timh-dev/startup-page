@@ -17,3 +17,5 @@ node_modules
 # compiled
 dist/
 build/
+.vercel
+.env*.local

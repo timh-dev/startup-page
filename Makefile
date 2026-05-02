@@ -1,7 +1,7 @@
 # Start Page Makefile
 # Simplifies common development tasks
 
-.PHONY: help install setup start build build-local build-vercel preview serve deploy clean dev server-install server-start all-install
+.PHONY: help install setup start build build-local build-vercel preview serve deploy deploy-vercel clean dev server-install server-start all-install
 
 # Default target
 help:
@@ -20,6 +20,7 @@ help:
 	@echo "  preview        - Preview production build"
 	@echo "  serve          - Build and serve locally on port 8000"
 	@echo "  deploy         - Deploy to GitHub Pages"
+	@echo "  deploy-vercel  - Deploy to Vercel from this machine"
 	@echo "  clean          - Clean build artifacts"
 	@echo "  css            - No-op; Vite builds CSS automatically"
 
@@ -89,6 +90,11 @@ serve: build-local
 deploy:
 	@echo "Deploying to GitHub Pages..."
 	pnpm run deploy
+
+# Deploy to Vercel from the local machine
+deploy-vercel:
+	@echo "Deploying to Vercel..."
+	npx vercel@latest --prod
 
 # Clean build artifacts
 clean:
