@@ -994,22 +994,241 @@
 
 .clock-widget {
   container-type: size;
-  gap: clamp(0.05rem, 1.2cqh, 0.25rem);
-  padding: clamp(0.35rem, 4cqh, 0.75rem);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: color-mix(in oklab, var(--muted) 78%, var(--card));
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  clip-path: inset(0 round inherit);
 }
 
-.clock-time {
-  max-width: 100%;
-  font-size: clamp(0.95rem, 14cqw, 1.85rem);
-  line-height: 1;
-  white-space: nowrap;
+.clock-hole-field,
+.clock-perforated-mask,
+.clock-underlay {
+  position: absolute;
+  inset: var(--clock-grid-inset);
+  overflow: hidden;
+  border-radius: inherit;
+  clip-path: inset(0 round inherit);
 }
 
-.clock-day {
-  max-width: 100%;
-  font-size: clamp(0.65rem, 8cqw, 1.1rem);
-  line-height: 1;
-  white-space: nowrap;
+.clock-hole-field {
+  z-index: 1;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklab, currentColor 20%, transparent) 0 var(--clock-hole-radius),
+    transparent calc(var(--clock-hole-radius) + 0.03rem)
+  );
+  background-size: var(--clock-grid-step) var(--clock-grid-step);
+  background-position: center;
+  opacity: 1;
+}
+
+.clock-perforated-mask {
+  z-index: 3;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--muted) 82%, var(--card));
+  -webkit-mask-image: radial-gradient(
+    circle,
+    transparent 0 var(--clock-hole-radius),
+    #000 calc(var(--clock-hole-radius) + 0.035rem)
+  );
+  mask-image: radial-gradient(
+    circle,
+    transparent 0 var(--clock-hole-radius),
+    #000 calc(var(--clock-hole-radius) + 0.035rem)
+  );
+  -webkit-mask-size: var(--clock-grid-step) var(--clock-grid-step);
+  mask-size: var(--clock-grid-step) var(--clock-grid-step);
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.clock-widget:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--ring) 62%, transparent);
+}
+
+.clock-underlay {
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.clock-widget {
+  --clock-grid-inset: clamp(0.35rem, 3.2cqw, 0.62rem);
+  --clock-hole-radius: clamp(0.095rem, min(1.42cqw, 2.08cqh), 0.17rem);
+  --clock-grid-step: clamp(0.36rem, min(5.25cqw, 6.9cqh), 0.62rem);
+  --clock-lit-dot-size: calc(var(--clock-hole-radius) * 2);
+  --clock-lit-dot-gap: calc(var(--clock-grid-step) - var(--clock-lit-dot-size));
+  --clock-digit-height: min(54cqh, 6.6rem);
+  --clock-digit-width: calc(var(--clock-digit-height) * 0.58);
+  --clock-segment-thickness: calc(var(--clock-grid-step) * 1.38);
+  --clock-segment-radius: calc(var(--clock-segment-thickness) * 0.18);
+}
+
+.clock-digital-grid {
+  position: absolute;
+  inset: var(--clock-grid-inset);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(21, var(--clock-grid-step));
+  grid-auto-rows: var(--clock-grid-step);
+  place-content: center;
+  border-radius: inherit;
+  overflow: hidden;
+  clip-path: inset(0 round inherit);
+}
+
+.clock-digital-grid span {
+  width: var(--clock-lit-dot-size);
+  height: var(--clock-lit-dot-size);
+  border-radius: 9999px;
+  place-self: center;
+  background: color-mix(in oklab, currentColor 20%, transparent);
+}
+
+.clock-digital-grid .clock-lit-dot {
+  background: color-mix(in oklab, currentColor 94%, white);
+  box-shadow: none;
+}
+
+.clock-digital-grid .clock-colon-dot {
+  animation: clock-colon-blink 1s steps(1, end) infinite;
+}
+
+@keyframes clock-colon-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+
+  50%, 100% {
+    opacity: 0.18;
+  }
+}
+
+.clock-digital-underlay {
+  color: color-mix(in oklab, currentColor 100%, black);
+  gap: clamp(0.28rem, 3.2cqw, 0.55rem);
+  transform: translateY(-1%);
+}
+
+.clock-segment-digit {
+  position: relative;
+  display: block;
+  width: var(--clock-digit-width);
+  height: var(--clock-digit-height);
+}
+
+.clock-segment {
+  position: absolute;
+  display: none;
+  border-radius: var(--clock-segment-radius);
+  background: currentColor;
+}
+
+.clock-segment-on {
+  display: block;
+}
+
+.clock-segment-a,
+.clock-segment-d,
+.clock-segment-g {
+  left: var(--clock-segment-thickness);
+  width: calc(100% - var(--clock-segment-thickness) * 2);
+  height: var(--clock-segment-thickness);
+}
+
+.clock-segment-a {
+  top: 0;
+}
+
+.clock-segment-g {
+  top: calc(50% - var(--clock-segment-thickness) / 2);
+}
+
+.clock-segment-d {
+  bottom: 0;
+}
+
+.clock-segment-b,
+.clock-segment-c,
+.clock-segment-e,
+.clock-segment-f {
+  width: var(--clock-segment-thickness);
+  height: calc(50% - var(--clock-segment-thickness) * 1.45);
+}
+
+.clock-segment-b,
+.clock-segment-c {
+  right: 0;
+}
+
+.clock-segment-e,
+.clock-segment-f {
+  left: 0;
+}
+
+.clock-segment-b,
+.clock-segment-f {
+  top: calc(var(--clock-segment-thickness) * 0.72);
+}
+
+.clock-segment-c,
+.clock-segment-e {
+  bottom: calc(var(--clock-segment-thickness) * 0.72);
+}
+
+.clock-segment-colon {
+  display: grid;
+  align-content: center;
+  gap: calc(var(--clock-segment-thickness) * 1.55);
+  width: calc(var(--clock-segment-thickness) * 1.35);
+  height: var(--clock-digit-height);
+}
+
+.clock-segment-colon span {
+  display: block;
+  width: calc(var(--clock-segment-thickness) * 0.95);
+  height: calc(var(--clock-segment-thickness) * 0.95);
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.clock-hand {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  z-index: 2;
+  width: clamp(0.48rem, 7cqw, 0.92rem);
+  border-radius: 9999px;
+  background: color-mix(in oklab, currentColor 96%, black);
+  transform: translateX(-50%) rotate(var(--clock-hand-angle));
+  transform-origin: 50% 100%;
+}
+
+.clock-hour-hand {
+  height: 29%;
+}
+
+.clock-minute-hand {
+  height: 42%;
+  width: clamp(0.38rem, 5.8cqw, 0.78rem);
+}
+
+.clock-second-hand {
+  height: 46%;
+  width: clamp(0.18rem, 2.4cqw, 0.32rem);
+  background: var(--destructive);
 }
 
 .headlines-hero,
