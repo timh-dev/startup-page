@@ -32,15 +32,19 @@ export function renderCurve(ctx, width, height, solar) {
     height * 0.2,
     Math.min(height * 0.85, height * horizonFrac)
   );
+  const crispHorizonY = Math.round(horizonY) + 0.5;
 
   const { curveHours, curveElevations } = solar;
 
   // Draw the curve
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.strokeStyle = CURVE_COLOR;
-  ctx.lineWidth = 1.5;
-  ctx.shadowBlur = 4;
-  ctx.shadowColor = 'rgba(240, 235, 216, 0.3)';
+  ctx.strokeStyle = 'rgba(240, 235, 216, 0.18)';
+  ctx.lineWidth = 5;
+  ctx.shadowBlur = 14;
+  ctx.shadowColor = 'rgba(255, 231, 176, 0.26)';
 
   for (let i = 0; i < curveHours.length; i++) {
     const { x, y } = solarToCanvas(
@@ -55,17 +59,46 @@ export function renderCurve(ctx, width, height, solar) {
     else ctx.lineTo(x, y);
   }
   ctx.stroke();
-  ctx.shadowBlur = 0;
+
+  ctx.beginPath();
+  ctx.strokeStyle = CURVE_COLOR;
+  ctx.lineWidth = 1.6;
+  ctx.shadowBlur = 5;
+  ctx.shadowColor = 'rgba(255, 248, 218, 0.55)';
+  for (let i = 0; i < curveHours.length; i++) {
+    const { x, y } = solarToCanvas(
+      curveHours[i],
+      curveElevations[i],
+      width,
+      height,
+      solar,
+      horizonY
+    );
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.restore();
 
   // Horizon line at elevation 0°
+  ctx.save();
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(240, 235, 216, 0.18)';
+  ctx.lineWidth = 4;
+  ctx.shadowBlur = 16;
+  ctx.shadowColor = 'rgba(255, 213, 133, 0.28)';
+  ctx.moveTo(0, crispHorizonY);
+  ctx.lineTo(width, crispHorizonY);
+  ctx.stroke();
+
   ctx.beginPath();
   ctx.strokeStyle = HORIZON_COLOR;
   ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.6;
-  ctx.moveTo(0, horizonY);
-  ctx.lineTo(width, horizonY);
+  ctx.globalAlpha = 0.58;
+  ctx.moveTo(0, crispHorizonY);
+  ctx.lineTo(width, crispHorizonY);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.restore();
 
-  return { horizonY };
+  return { horizonY: crispHorizonY };
 }

@@ -9,7 +9,7 @@ const POLE_Y = -0.15;
 // Real sky: overwhelming majority of stars are dim sub-pixel pinpoints,
 // a few are moderately bright, very rare ones are prominent.
 // Uses a power-law magnitude distribution to mimic this.
-export function createStarField(count = 500) {
+export function createStarField(count = 900) {
   const stars = [];
   const maxDist = 1.5;
   for (let i = 0; i < count; i++) {
@@ -20,8 +20,8 @@ export function createStarField(count = 500) {
     // magnitude ~ random^3 pushes most values near 0
     const mag = Math.pow(Math.random(), 3);
 
-    // Size: dim stars are sub-pixel, bright stars up to ~1.8px
-    const size = 0.2 + mag * 1.6;
+    // Size: most stars are tiny pinpoints; rare bright stars remain prominent.
+    const size = 0.12 + mag * 1.35;
 
     // Brightness follows magnitude
     const baseBrightness = 0.1 + mag * 0.7;
@@ -171,9 +171,26 @@ export function renderStars(ctx, width, height, stars, time, lst, solar, elev) {
     const g = Math.round(195 + star.warmth * 40);
     const b = Math.round(220 - star.warmth * 50);
 
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    if (star.size < 0.55) {
+      const microSize = Math.max(0.18, star.size);
+      ctx.fillRect(x - microSize / 2, y - microSize / 2, microSize, microSize);
+      continue;
+    }
+
+    if (star.size > 1.1 && alpha > 0.22) {
+      ctx.save();
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = `rgba(${r},${g},${b},${alpha * 0.55})`;
+      ctx.beginPath();
+      ctx.arc(x, y, star.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+
     ctx.beginPath();
     ctx.arc(x, y, star.size, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
     ctx.fill();
   }
 }

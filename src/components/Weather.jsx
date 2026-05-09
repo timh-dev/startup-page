@@ -87,8 +87,7 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getTimePhase(data) {
-  const currentTime = data.current?.time ? new Date(data.current.time).getTime() : Date.now();
+function getTimePhase(data, currentTime = Date.now()) {
   const sunrise = data.daily?.sunrise?.[0] ? new Date(data.daily.sunrise[0]).getTime() : null;
   const sunset = data.daily?.sunset?.[0] ? new Date(data.daily.sunset[0]).getTime() : null;
   const sunriseWindow = 90 * 60 * 1000;
@@ -113,6 +112,10 @@ function getTimePhase(data) {
 
   if (sunset && currentTime < sunset + sunsetTrailWindow) {
     return 1 + clamp((currentTime - sunset) / sunsetTrailWindow, 0, 1);
+  }
+
+  if (sunrise && sunset) {
+    return currentTime < sunrise || currentTime >= sunset ? 2 : 0;
   }
 
   return data.current?.is_day === 0 ? 2 : 0;
@@ -254,6 +257,7 @@ function WeatherBox() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [location, setLocation] = useState("Weather");
+  const [clockTime, setClockTime] = useState(() => Date.now());
 
   useEffect(() => {
     const settings = readSettings();
@@ -328,6 +332,11 @@ function WeatherBox() {
     }
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTime(Date.now()), 10 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   if (error) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center rounded-[inherit] bg-muted/50 p-4 text-center text-muted-foreground">
@@ -349,9 +358,9 @@ function WeatherBox() {
   const openWeather = data.openWeather;
   const mapped = openWeather || OPEN_METEO_CODES[weatherCode] || { weather: "Clouds", description: "Current conditions" };
   const condition = getConditionCategory(mapped.weather);
-  const dayTime = data.current?.is_day === 1 || (data.current?.is_day === undefined);
+  const timePhase = getTimePhase(data, clockTime);
+  const dayTime = timePhase < 1.5;
   const timeKey = dayTime ? "day" : "night";
-  const timePhase = getTimePhase(data);
   const cloudCoverage = openWeather
     ? getOpenWeatherCloudCoverage(openWeather.id, condition)
     : getCloudCoverage(weatherCode, condition);

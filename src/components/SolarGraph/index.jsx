@@ -24,6 +24,9 @@ export default function SolarGraph() {
     lastTimestamp: 0,
     hovering: false,
     hoverHour: null,
+    pixelRatio: 1,
+    renderWidth: 0,
+    renderHeight: 0,
   });
 
   useEffect(() => {
@@ -49,14 +52,23 @@ export default function SolarGraph() {
     // Resize handler
     function resize() {
       const container = canvas.parentElement;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(4, Math.max(3, window.devicePixelRatio || 1));
       const w = container.clientWidth;
       const h = container.clientHeight;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
+      const nextWidth = Math.max(1, Math.round(w * dpr));
+      const nextHeight = Math.max(1, Math.round(h * dpr));
+      if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+      }
       canvas.style.width = w + 'px';
       canvas.style.height = h + 'px';
+      state.pixelRatio = dpr;
+      state.renderWidth = w;
+      state.renderHeight = h;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
     }
 
     const resizeObserver = new ResizeObserver(resize);
@@ -120,9 +132,8 @@ export default function SolarGraph() {
     function draw(ctx, canvas, state) {
       if (!state.solar || !state.stars) return;
 
-      const dpr = window.devicePixelRatio || 1;
-      const w = canvas.width / dpr;
-      const h = canvas.height / dpr;
+      const w = state.renderWidth || canvas.clientWidth;
+      const h = state.renderHeight || canvas.clientHeight;
       const solar = state.solar;
 
       // Use hovered time when hovering, otherwise real time
@@ -182,10 +193,10 @@ export default function SolarGraph() {
   }, []);
 
   return (
-    <div id="container" className="w-full h-full rounded-xl">
+    <div id="container" className="w-full h-full rounded-[inherit] overflow-hidden">
       <canvas
         ref={canvasRef}
-        className="w-full h-full rounded-xl"
+        className="w-full h-full rounded-[inherit]"
         id="canvas"
         style={{ cursor: 'crosshair' }}
       />
