@@ -124,7 +124,7 @@ export function LocalServiceStatus({ url, className = "size-3.5" }) {
 
 const Bookmark = ({ title, content, cardClass, onTitleClick }) => {
   const titleContent = (
-    <div className="bookmark-title truncate font-semibold leading-none text-primary-foreground">
+    <div className="bookmark-title truncate text-center font-semibold leading-none text-primary-foreground">
       {title}
     </div>
   );
@@ -142,7 +142,7 @@ const Bookmark = ({ title, content, cardClass, onTitleClick }) => {
             <button
               type="button"
               onClick={onTitleClick}
-              className="block w-full text-left transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-foreground/45"
+              className="block w-full min-w-0 text-center transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-foreground/45"
               title="Open bookmark view"
             >
               {titleContent}

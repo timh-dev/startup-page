@@ -1451,11 +1451,16 @@
 }
 
 .bookmark-header {
-  padding: clamp(0.35rem, 4cqh, 0.625rem) clamp(0.5rem, 5cqw, 0.75rem);
+  min-width: 0;
+  padding: clamp(0.35rem, 4cqh, 0.625rem) clamp(0.85rem, 9cqw, 1.35rem);
 }
 
 .bookmark-title {
   margin-top: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: clamp(0.62rem, 6cqh, 0.875rem);
 }
 
