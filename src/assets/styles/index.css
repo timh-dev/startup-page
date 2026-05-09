@@ -846,7 +846,6 @@
 .weather-current {
   padding-block: clamp(0.5rem, 6cqh, 1rem);
   padding-inline: clamp(0.75rem, 7cqw, 1.25rem);
-  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.24);
 }
 
 .weather-current::after {
@@ -856,9 +855,9 @@
   z-index: 7;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 16%),
-    linear-gradient(180deg, transparent 0 58%, color-mix(in oklab, var(--primary) 20%, transparent) 100%),
-    radial-gradient(ellipse at 50% 112%, color-mix(in oklab, var(--primary) 26%, transparent), transparent 70%);
+    linear-gradient(0deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.13)),
+    linear-gradient(180deg, transparent 0 68%, color-mix(in oklab, var(--primary) 6%, transparent) 100%);
+  mix-blend-mode: screen;
 }
 
 .weather-current[data-condition="Clouds"]::after,
@@ -866,9 +865,9 @@
 .weather-current[data-condition="Drizzle"]::after,
 .weather-current[data-condition="Thunderstorm"]::after {
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.08) 18%, transparent 36%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.08), transparent 40%, color-mix(in oklab, var(--primary) 28%, transparent) 100%),
-    radial-gradient(ellipse at 50% 112%, color-mix(in oklab, var(--primary) 34%, transparent), transparent 72%);
+    linear-gradient(0deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.16)),
+    linear-gradient(180deg, transparent 0 68%, color-mix(in oklab, var(--primary) 8%, transparent) 100%);
+  mix-blend-mode: screen;
 }
 
 .weather-current[data-condition="Snow"]::after,
@@ -896,8 +895,7 @@
   line-height: 1.15;
 }
 
-.weather-meta,
-.weather-preview-link {
+.weather-meta {
   font-size: clamp(0.45rem, 3.6cqh, 0.625rem);
   line-height: 1.1;
 }
@@ -906,9 +904,10 @@
   align-items: stretch;
   min-height: clamp(3rem, 36cqh, 4.55rem);
   padding: clamp(0.35rem, 3.2cqh, 0.7rem) clamp(0.45rem, 3.4cqw, 0.8rem);
-  background: color-mix(in oklab, var(--primary) 84%, var(--card));
+  background: color-mix(in oklab, var(--primary) 38%, transparent);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border-top: 1px solid color-mix(in oklab, var(--primary-foreground) 12%, transparent);
   color: var(--primary-foreground);
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--primary-foreground) 10%, transparent);
 }
 
 .weather-forecast-day {
@@ -973,7 +972,6 @@
 }
 
 @container (max-height: 7.75rem) {
-  .weather-preview-link,
   .weather-meta {
     display: none;
   }

@@ -5,7 +5,7 @@ module.exports = {
   darkMode: 'class',
   content: [
     "./index.html",
-    "./src/**/*.jsx",
+    "./src/**/*.{jsx,tsx,ts,js}",
   ],
   theme: {
     colors: {

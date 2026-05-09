@@ -23,7 +23,7 @@ import FeaturePanel from "../components/FeaturePanel";
 import Unsplash from "../components/Unsplash";
 import SearchBox from "../components/Search";
 import SolarGraph from "../components/SolarGraph/index";
-import WeatherBox from "../components/Weather";
+import { WeatherBox } from "../components/weather/WeatherBox";
 import Toggle from "../components/ThemeToggle";
 import ThemeProvider from "../components/ThemeContext";
 import Bookmark, { faviconUrl, isSelfHostedUrl, LocalServiceStatus } from "../components/Bookmark";

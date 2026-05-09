@@ -1,42 +1,7 @@
 import React from "react";
 import { NeuroNoise } from "@paper-design/shaders-react";
 import VolumetricCloudscape from "@/components/VolumetricCloudscape";
-
-const CONDITION_GRADIENTS = {
-  Clear: {
-    day: "from-sky-400 via-blue-500 to-blue-400",
-    night: "from-slate-950 via-indigo-950 to-slate-900",
-  },
-  Clouds: {
-    day: "from-slate-800 via-slate-900 to-gray-900",
-    night: "from-slate-800 via-slate-900 to-gray-900",
-  },
-  Rain: {
-    day: "from-slate-700 via-slate-800 to-gray-800",
-    night: "from-slate-950 via-gray-950 to-slate-900",
-  },
-  Snow: {
-    day: "from-white via-sky-50 to-blue-100",
-    night: "from-slate-800 via-blue-950 to-indigo-950",
-  },
-  Thunderstorm: {
-    day: "from-gray-900 via-slate-800 to-purple-950",
-    night: "from-gray-950 via-slate-950 to-purple-950",
-  },
-  Fog: {
-    day: "from-gray-200 via-slate-300 to-gray-300",
-    night: "from-gray-800 via-slate-800 to-gray-700",
-  },
-};
-
-const SHADER_COLORS = {
-  Clear: { day: ["#38bdf8", "#0284c7", "#0ea5e9"], night: ["#1e1b4b", "#312e81", "#0f172a"] },
-  Clouds: { day: ["#475569", "#1f2937", "#111827"], night: ["#334155", "#1e293b", "#111827"] },
-  Rain: { day: ["#334155", "#1e293b", "#475569"], night: ["#0f172a", "#1e293b", "#020617"] },
-  Snow: { day: ["#e0f2fe", "#bae6fd", "#7dd3fc"], night: ["#1e3a5f", "#172554", "#1e293b"] },
-  Thunderstorm: { day: ["#581c87", "#1f2937", "#374151"], night: ["#3b0764", "#111827", "#1e1b4b"] },
-  Fog: { day: ["#d1d5db", "#e5e7eb", "#9ca3af"], night: ["#374151", "#4b5563", "#334155"] },
-};
+import { CONDITION_GRADIENTS, SHADER_COLORS } from "@/components/weather/constants";
 
 const PREVIEW_DATA = [
   { title: "Sunny", condition: "Clear", time: "day", phase: 0, coverage: "none", temp: 78, desc: "Clear sky", location: "Los Angeles" },
@@ -172,9 +137,7 @@ function CloudLayers({ coverage = "full", phase = "day" }) {
 function WeatherCard({ condition, time, phase, coverage, heavySnow, temp, desc, location }) {
   const gradient = CONDITION_GRADIENTS[condition]?.[time];
   const shaderColors = SHADER_COLORS[condition]?.[time];
-  const isSnowDay = condition === "Snow" && time === "day";
-  const isFogDay = condition === "Fog" && time === "day";
-  const darkText = isSnowDay || isFogDay;
+  const darkText = time === "day" && condition !== "Thunderstorm" && condition !== "Rain" && condition !== "Drizzle";
   const textColor = darkText ? "text-slate-800" : "text-white";
   const textColorMuted = darkText ? "text-slate-600" : "text-white/70";
   const shaderOpacity = condition === "Clear" && time === "day" ? "opacity-[0.12]" : "opacity-[0.3]";
@@ -183,11 +146,11 @@ function WeatherCard({ condition, time, phase, coverage, heavySnow, temp, desc, 
   const rangeSpan = Math.max(rangeMax - rangeMin, 1);
 
   return (
-    <div className="weather-widget flex aspect-[16/9] min-h-40 w-full flex-col overflow-hidden rounded-lg shadow-lg">
+    <div className="weather-widget isolate flex aspect-[16/9] min-h-40 w-full flex-col overflow-hidden rounded-lg shadow-lg">
       {/* Top section */}
       <div className={`relative flex flex-1 flex-col justify-between bg-gradient-to-br ${gradient} p-4`}>
-        {/* Shader overlay — visible modern texture */}
-        <div className={`absolute inset-0 ${shaderOpacity} mix-blend-soft-light pointer-events-none`}>
+        {/* z-[1]: NeuroNoise texture blend */}
+        <div className={`absolute inset-0 z-[1] ${shaderOpacity} mix-blend-soft-light pointer-events-none`}>
           <NeuroNoise
             colorFront={shaderColors[0]}
             colorMid={shaderColors[1]}
@@ -200,20 +163,31 @@ function WeatherCard({ condition, time, phase, coverage, heavySnow, temp, desc, 
           />
         </div>
 
-        {/* Condition-specific effects */}
-        {condition === "Clear" && <ClearSky phase={phase} />}
-        {coverage !== "none" && <CloudLayers coverage={coverage} phase={phase || time} />}
-        {condition === "Rain" && <RainDrops />}
-        {condition === "Snow" && <CloudLayers coverage={heavySnow ? "storm" : "full"} phase={heavySnow ? "storm" : phase || time} />}
-        {condition === "Snow" && <SnowFlakes heavy={heavySnow} />}
-        {condition === "Fog" && <FogLayer />}
-        {condition === "Thunderstorm" && (
-          <>
-            <RainDrops />
-            <Lightning />
-          </>
+        {/* z-[2]: WebGL sky/cloud canvas */}
+        {condition === "Clear" && (
+          <div className="absolute inset-0 z-[2] pointer-events-none">
+            <ClearSky phase={phase} />
+          </div>
         )}
-        {((condition === "Clear" && time === "night") || (condition === "Clouds" && time === "night" && coverage === "partly")) && <Stars />}
+        {coverage !== "none" && condition !== "Snow" && (
+          <div className="absolute inset-0 z-[2] pointer-events-none">
+            <CloudLayers coverage={coverage} phase={phase || time} />
+          </div>
+        )}
+        {condition === "Snow" && (
+          <div className="absolute inset-0 z-[2] pointer-events-none">
+            <CloudLayers coverage={heavySnow ? "storm" : "full"} phase={heavySnow ? "storm" : phase || time} />
+          </div>
+        )}
+
+        {/* z-[5]: Particle/overlay effects above the WebGL canvas */}
+        <div className="absolute inset-0 z-[5] overflow-hidden pointer-events-none">
+          {condition === "Rain" && <RainDrops />}
+          {condition === "Snow" && <SnowFlakes heavy={heavySnow} />}
+          {condition === "Fog" && <FogLayer />}
+          {condition === "Thunderstorm" && <><RainDrops /><Lightning /></>}
+          {((condition === "Clear" && time === "night") || (condition === "Clouds" && time === "night" && coverage === "partly")) && <Stars />}
+        </div>
 
         {/* Content */}
         <div className="relative z-10 flex items-start justify-between">
