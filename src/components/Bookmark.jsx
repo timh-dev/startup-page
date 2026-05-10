@@ -21,9 +21,28 @@ export function getHostname(url) {
   }
 }
 
-export function faviconUrl(url) {
+export function faviconUrl(url, size = 64) {
   const host = getHostname(url);
-  return host ? `https://www.google.com/s2/favicons?domain=${host}&sz=16` : null;
+  return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${size}` : null;
+}
+
+export function faviconSrcSet(url) {
+  const host = getHostname(url);
+
+  if (!host) {
+    return undefined;
+  }
+
+  return [
+    `${faviconUrl(url, 32)} 1x`,
+    `${faviconUrl(url, 64)} 2x`,
+    `${faviconUrl(url, 128)} 3x`,
+  ].join(", ");
+}
+
+export function faviconFallbackLabel(name, url) {
+  const source = String(name || getHostname(url) || "?").trim();
+  return (source.match(/[a-z0-9]/i)?.[0] || "?").toUpperCase();
 }
 
 function isIPv4(host) {
@@ -124,7 +143,7 @@ export function LocalServiceStatus({ url, className = "size-3.5" }) {
 
 const Bookmark = ({ title, content, cardClass, onTitleClick }) => {
   const titleContent = (
-    <div className="bookmark-title truncate font-semibold leading-none text-primary-foreground">
+    <div className="bookmark-title truncate text-center font-semibold leading-none text-primary-foreground">
       {title}
     </div>
   );
@@ -142,7 +161,7 @@ const Bookmark = ({ title, content, cardClass, onTitleClick }) => {
             <button
               type="button"
               onClick={onTitleClick}
-              className="block w-full text-left transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-foreground/45"
+              className="block w-full min-w-0 text-center transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-foreground/45"
               title="Open bookmark view"
             >
               {titleContent}
@@ -166,11 +185,20 @@ const Bookmark = ({ title, content, cardClass, onTitleClick }) => {
                   ) : faviconUrl(url) ? (
                     <img
                       src={faviconUrl(url)}
+                      srcSet={faviconSrcSet(url)}
                       alt=""
                       className="bookmark-favicon shrink-0 rounded-sm object-contain opacity-90"
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        e.currentTarget.nextElementSibling?.removeAttribute("hidden");
+                      }}
                     />
                   ) : null}
+                  {!isSelfHostedUrl(url) && (
+                    <span hidden className="bookmark-favicon-fallback bookmark-favicon shrink-0">
+                      {faviconFallbackLabel(name, url)}
+                    </span>
+                  )}
                   <div className="min-w-0">
                     <div className="bookmark-name truncate font-medium leading-tight text-primary-foreground">
                       {name}

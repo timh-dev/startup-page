@@ -17,6 +17,7 @@ const TILE_LABELS = {
   weather: "Weather",
   featurePanel: "Feature Panel",
   solarGraph: "Solar Graph",
+  vaultPreview: "Vault Preview",
   clock: "Clock",
   themeTools: "Theme Tools",
   bookmark1: "Bookmark 1",

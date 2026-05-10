@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import React from "react";
-import { KBarProvider } from "kbar";
-import { HiArrowLeft, HiArrowTopRightOnSquare, HiBookmark, HiChevronLeft, HiChevronRight, HiMinus, HiPencil, HiPlus, HiTrash } from "react-icons/hi2";
+import { KBarProvider, useRegisterActions } from "kbar";
+import { HiArchiveBox, HiArrowLeft, HiArrowTopRightOnSquare, HiBookmark, HiCheck, HiChevronLeft, HiChevronRight, HiChevronUpDown, HiHome, HiMinus, HiPencil, HiPlus, HiTrash } from "react-icons/hi2";
 
 import { readSettings, writeSettings } from '../lib/settings';
 import { isBuiltInPalette } from '../lib/theme-palettes';
@@ -23,10 +23,10 @@ import FeaturePanel from "../components/FeaturePanel";
 import Unsplash from "../components/Unsplash";
 import SearchBox from "../components/Search";
 import SolarGraph from "../components/SolarGraph/index";
-import WeatherBox from "../components/Weather";
+import { WeatherBox } from "../components/weather/WeatherBox";
 import Toggle from "../components/ThemeToggle";
 import ThemeProvider from "../components/ThemeContext";
-import Bookmark, { faviconUrl, isSelfHostedUrl, LocalServiceStatus } from "../components/Bookmark";
+import Bookmark, { faviconFallbackLabel, faviconSrcSet, faviconUrl, isSelfHostedUrl, LocalServiceStatus } from "../components/Bookmark";
 import SettingsButton from "../components/SettingsButton";
 import CommandPalette from "../components/CommandPalette";
 import useKBarActions from "../hooks/useKBarActions";
@@ -37,6 +37,22 @@ import desert from "../assets/media/desert.mp4"
 
 const STARTUP_PAGE_VIEW_KEY = "startup-page.active-view";
 const STARTUP_PAGE_BOOKMARK_CATEGORY_KEY = "startup-page.active-bookmark-category";
+const RESOURCE_VAULT_SKIP_DELETE_CONFIRM_KEY = "startup-page.resource-vault.skip-delete-confirm";
+const VALID_PAGE_VIEWS = new Set(["dashboard", "bookmarks", "read"]);
+
+const DEFAULT_READ_TAGS = ["Read", "Watch", "Listen", "Browse", "Use", "Build", "Learn", "Join", "Follow"];
+
+const READ_TAG_COLORS = {
+  Read: "read-tag-read",
+  Watch: "read-tag-watch",
+  Listen: "read-tag-listen",
+  Browse: "read-tag-browse",
+  Use: "read-tag-use",
+  Build: "read-tag-build",
+  Learn: "read-tag-learn",
+  Join: "read-tag-join",
+  Follow: "read-tag-follow",
+};
 
 const detectBookmarkBrowser = () => {
   if (typeof navigator === "undefined") {
@@ -237,6 +253,524 @@ function KBarWrapper({ children }) {
       <CommandPalette />
       {children}
     </>
+  );
+}
+
+function VaultNavigationActions({ onDashboard, onOpenBookmarks, onOpenResources }) {
+  const actions = React.useMemo(() => [
+    {
+      id: "open-bookmark-vault",
+      name: "Open Bookmark Vault",
+      shortcut: ["3"],
+      section: "Navigation",
+      perform: onOpenBookmarks,
+    },
+    {
+      id: "open-resource-vault",
+      name: "Open Resource Vault",
+      shortcut: ["1"],
+      section: "Navigation",
+      perform: onOpenResources,
+    },
+    {
+      id: "show-dashboard",
+      name: "Show Dashboard",
+      shortcut: ["2"],
+      section: "Navigation",
+      perform: onDashboard,
+    },
+  ], [onDashboard, onOpenBookmarks, onOpenResources]);
+
+  useRegisterActions(actions, [actions]);
+  return null;
+}
+
+function formatReadDate(value) {
+  const date = value ? new Date(value) : new Date();
+  const month = date.toLocaleString(undefined, { month: "short" }).toUpperCase();
+  const day = String(date.getDate()).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month} ${day}, ${year}`;
+}
+
+function normalizeResourceVaultItems(value) {
+  const sourceItems = Array.isArray(value)
+    ? value
+    : Array.isArray(value?.readItems)
+      ? value.readItems
+      : Array.isArray(value?.items)
+        ? value.items
+        : [];
+
+  return sourceItems
+    .map((item, index) => {
+      const title = String(item?.title || "").trim();
+
+      if (!title) {
+        return null;
+      }
+
+      const createdAt = item?.createdAt && !Number.isNaN(new Date(item.createdAt).getTime())
+        ? new Date(item.createdAt).toISOString()
+        : new Date().toISOString();
+      const status = item?.status === "done" ? "done" : "todo";
+      const completedAt = status === "done" && item?.completedAt && !Number.isNaN(new Date(item.completedAt).getTime())
+        ? new Date(item.completedAt).toISOString()
+        : status === "done"
+          ? createdAt
+          : null;
+
+      return {
+        id: String(item?.id || `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`),
+        title,
+        description: String(item?.description || "").trim(),
+        url: String(item?.url || "").trim(),
+        tag: DEFAULT_READ_TAGS.includes(item?.tag) ? item.tag : "Read",
+        status,
+        createdAt,
+        completedAt,
+      };
+    })
+    .filter(Boolean);
+}
+
+function ResourceVaultPreview({ items, onOpen }) {
+  const recentItems = React.useMemo(() => (
+    normalizeResourceVaultItems(items)
+      .sort((a, b) => {
+        const aTime = new Date(a.completedAt || a.createdAt || 0).getTime();
+        const bTime = new Date(b.completedAt || b.createdAt || 0).getTime();
+        return bTime - aTime;
+      })
+      .slice(0, 10)
+  ), [items]);
+
+  return (
+    <button type="button" className="vault-preview" onClick={onOpen} title="Open Resource Vault">
+      <div className="vault-preview-header">
+        <span>Vault</span>
+        <HiArchiveBox className="size-4" />
+      </div>
+      <ul className="vault-preview-list">
+        {recentItems.length ? recentItems.map((item) => (
+          <li key={item.id} className="vault-preview-item">
+            <span className={`read-tag-dot ${READ_TAG_COLORS[item.tag] || "bg-primary"}`} />
+            <span className={`vault-preview-title ${item.status === "done" ? "line-through opacity-55" : ""}`}>
+              {item.title}
+            </span>
+          </li>
+        )) : (
+          <li className="vault-preview-empty">No resources yet.</li>
+        )}
+      </ul>
+    </button>
+  );
+}
+
+function ReadView({
+  items,
+  onAddItem,
+  onBack,
+  onDeleteItem,
+  onExportItems,
+  onImportItems,
+  onToggleItem,
+  onUpdateItem,
+}) {
+  const importInputRef = React.useRef(null);
+  const [query, setQuery] = React.useState("");
+  const [activeTag, setActiveTag] = React.useState("All");
+  const [activeStatus, setActiveStatus] = React.useState("todo");
+  const [sortDirection, setSortDirection] = React.useState("desc");
+  const [tagMenuOpen, setTagMenuOpen] = React.useState(false);
+  const tagMenuRef = React.useRef(null);
+  const [editingItemId, setEditingItemId] = React.useState(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = React.useState(null);
+  const [rememberDeleteConfirm, setRememberDeleteConfirm] = React.useState(false);
+  const [skipDeleteConfirm, setSkipDeleteConfirm] = React.useState(() => (
+    typeof window !== "undefined" && window.localStorage?.getItem(RESOURCE_VAULT_SKIP_DELETE_CONFIRM_KEY) === "true"
+  ));
+  const [importMessage, setImportMessage] = React.useState("");
+  const [draft, setDraft] = React.useState({
+    title: "",
+    description: "",
+    url: "",
+    tag: "Read",
+  });
+
+  const normalizedItems = React.useMemo(() => (
+    Array.isArray(items) ? items : []
+  ), [items]);
+
+  const visibleItems = React.useMemo(() => {
+    const lowerQuery = query.trim().toLowerCase();
+
+    return normalizedItems
+      .filter((item) => {
+        const matchesQuery = !lowerQuery || [
+          item.title,
+          item.description,
+          item.url,
+          item.tag,
+        ].some((value) => String(value || "").toLowerCase().includes(lowerQuery));
+        const matchesTag = activeTag === "All" || item.tag === activeTag;
+        return matchesQuery && matchesTag;
+      })
+      .sort((a, b) => {
+        const aSortDate = a.status === "done" ? (a.completedAt || a.createdAt) : a.createdAt;
+        const bSortDate = b.status === "done" ? (b.completedAt || b.createdAt) : b.createdAt;
+        const aTime = new Date(aSortDate || 0).getTime();
+        const bTime = new Date(bSortDate || 0).getTime();
+        return sortDirection === "desc" ? bTime - aTime : aTime - bTime;
+      });
+  }, [activeTag, normalizedItems, query, sortDirection]);
+
+  const todoItems = visibleItems.filter((item) => item.status !== "done");
+  const doneItems = visibleItems.filter((item) => item.status === "done");
+  const activeItems = activeStatus === "todo" ? todoItems : doneItems;
+  const pickDraftTag = React.useCallback((tag) => {
+    setDraft((current) => ({ ...current, tag }));
+    setTagMenuOpen(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (!tagMenuOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (tagMenuRef.current && !tagMenuRef.current.contains(event.target)) {
+        setTagMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setTagMenuOpen(false);
+        return;
+      }
+
+      const tagIndex = Number(event.key) - 1;
+      if (tagIndex >= 0 && tagIndex < DEFAULT_READ_TAGS.length) {
+        event.preventDefault();
+        pickDraftTag(DEFAULT_READ_TAGS[tagIndex]);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pickDraftTag, tagMenuOpen]);
+
+  const submitDraft = (event) => {
+    event.preventDefault();
+    const title = draft.title.trim();
+
+    if (!title) {
+      return;
+    }
+
+    const nextItem = {
+      title,
+      description: draft.description.trim(),
+      url: draft.url.trim(),
+      tag: draft.tag,
+    };
+
+    if (editingItemId) {
+      onUpdateItem(editingItemId, nextItem);
+      setEditingItemId(null);
+    } else {
+      onAddItem(nextItem);
+    }
+
+    setDraft({ title: "", description: "", url: "", tag: draft.tag });
+  };
+
+  const editItem = (item) => {
+    setEditingItemId(item.id);
+    setDraft({
+      title: item.title || "",
+      description: item.description || "",
+      url: item.url || "",
+      tag: item.tag || "Read",
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingItemId(null);
+    setDraft({ title: "", description: "", url: "", tag: draft.tag });
+  };
+
+  const requestDeleteItem = (itemId) => {
+    if (skipDeleteConfirm) {
+      onDeleteItem(itemId);
+      return;
+    }
+
+    setConfirmingDeleteId((current) => (current === itemId ? null : itemId));
+  };
+
+  const confirmDeleteItem = (itemId) => {
+    if (rememberDeleteConfirm && typeof window !== "undefined") {
+      window.localStorage?.setItem(RESOURCE_VAULT_SKIP_DELETE_CONFIRM_KEY, "true");
+      setSkipDeleteConfirm(true);
+    }
+
+    setConfirmingDeleteId(null);
+    onDeleteItem(itemId);
+  };
+
+  const importResourceVault = async (file) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      const importedItems = normalizeResourceVaultItems(JSON.parse(await file.text()));
+
+      if (!importedItems.length) {
+        setImportMessage("No resource items found.");
+        return;
+      }
+
+      await onImportItems(importedItems);
+      setImportMessage(`Imported ${importedItems.length} resources.`);
+    } catch (_error) {
+      setImportMessage("Could not import that JSON file.");
+    }
+  };
+
+  const renderItem = (item) => (
+    <li key={item.id} className="read-item group/read-item">
+      <button
+        type="button"
+        className="read-status-dot"
+        onClick={() => onToggleItem(item.id)}
+        title={item.status === "done" ? "Move to todo" : "Mark done"}
+      >
+        <span className={`read-tag-dot ${READ_TAG_COLORS[item.tag] || "bg-primary"}`} />
+      </button>
+      <a
+        href={item.url || undefined}
+        target={item.url ? "_blank" : undefined}
+        rel={item.url ? "noreferrer" : undefined}
+        className={`read-item-main ${!item.url ? "pointer-events-none" : ""}`}
+      >
+        <span className={`read-item-title ${item.status === "done" ? "line-through opacity-55" : ""}`}>
+          {item.title}
+        </span>
+        {item.description && (
+          <>
+            <span className="read-item-separator">•</span>
+            <span className="read-item-description">{item.description}</span>
+          </>
+        )}
+      </a>
+      <span className="read-item-rule" aria-hidden="true" />
+      <span className="read-item-date">
+        {formatReadDate(item.status === "done" ? (item.completedAt || item.createdAt) : item.createdAt)}
+      </span>
+      <span className={`read-item-actions ${confirmingDeleteId === item.id ? "read-item-actions-confirming" : ""}`}>
+        <button
+          type="button"
+          className="read-item-action"
+          onClick={() => editItem(item)}
+          title="Edit item"
+        >
+          <HiPencil className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          className="read-item-action"
+          onClick={() => onToggleItem(item.id)}
+          title={item.status === "done" ? "Move back to todo" : "Archive to done"}
+        >
+          {item.status === "done" ? <HiChevronLeft className="size-3.5" /> : <HiCheck className="size-3.5" />}
+        </button>
+        <button
+          type="button"
+          className="read-item-action"
+          onClick={() => requestDeleteItem(item.id)}
+          title="Delete item"
+        >
+          <HiTrash className="size-3.5" />
+        </button>
+        {confirmingDeleteId === item.id && (
+          <span className="read-delete-confirm">
+            <button
+              type="button"
+              className="read-item-action read-delete-confirm-button"
+              onClick={() => confirmDeleteItem(item.id)}
+              title="Confirm delete"
+            >
+              <HiCheck className="size-3.5" />
+            </button>
+            <label className="read-remember-delete">
+              <input
+                type="checkbox"
+                checked={rememberDeleteConfirm}
+                onChange={(event) => setRememberDeleteConfirm(event.target.checked)}
+              />
+              <span>Remember</span>
+            </label>
+          </span>
+        )}
+      </span>
+    </li>
+  );
+
+  return (
+    <div className="read-view h-screen w-full overflow-y-auto px-4 pb-16 pt-24 sm:px-6">
+      <div className="read-panel">
+        <div className="read-panel-header">
+          <h1>Resource Vault:</h1>
+          <button type="button" className="read-back" onClick={onBack} title="Back to dashboard">
+            <HiChevronRight className="size-4" />
+          </button>
+        </div>
+
+        <div className="read-toolbar">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={async (event) => {
+              const [file] = Array.from(event.target.files || []);
+              event.target.value = "";
+              await importResourceVault(file);
+            }}
+          />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search here..."
+            className="read-search"
+          />
+          <button
+            type="button"
+            className="read-chip"
+            onClick={() => setSortDirection((current) => (current === "desc" ? "asc" : "desc"))}
+          >
+            Date {sortDirection === "desc" ? "↓" : "↑"}
+          </button>
+          <button type="button" className="read-chip" onClick={() => importInputRef.current?.click()}>
+            Import
+          </button>
+          <button type="button" className="read-chip" onClick={onExportItems}>
+            Export
+          </button>
+          {["All", ...DEFAULT_READ_TAGS].map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              className={`read-chip ${activeTag === tag ? "read-chip-active" : ""}`}
+              onClick={() => setActiveTag(tag)}
+            >
+              {tag !== "All" && <span className={`read-tag-dot ${READ_TAG_COLORS[tag] || "bg-primary"}`} />}
+              {tag}
+            </button>
+          ))}
+          <button type="button" className="read-chip read-chip-muted" onClick={() => { setQuery(""); setActiveTag("All"); }}>
+            Clear All
+          </button>
+          {importMessage && <span className="read-import-message">{importMessage}</span>}
+        </div>
+
+        <form className="read-form" onSubmit={submitDraft}>
+          <input
+            value={draft.title}
+            onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+            placeholder="Title"
+          />
+          <input
+            value={draft.description}
+            onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+            placeholder="Description"
+          />
+          <input
+            value={draft.url}
+            onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))}
+            placeholder="URL"
+          />
+          <div className="read-tag-menu" ref={tagMenuRef}>
+            <button
+              type="button"
+              className="read-tag-trigger"
+              aria-expanded={tagMenuOpen}
+              aria-haspopup="listbox"
+              onClick={() => setTagMenuOpen((current) => !current)}
+            >
+              <span className={`read-tag-dot read-tag-dot-lg ${READ_TAG_COLORS[draft.tag] || "bg-primary"}`} />
+              <span className="read-tag-trigger-label">{draft.tag}</span>
+              <HiChevronUpDown className="size-4" />
+            </button>
+            {tagMenuOpen && (
+              <div className="read-tag-popover" role="listbox" aria-label="Choose tag">
+                {DEFAULT_READ_TAGS.map((tag, index) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    role="option"
+                    aria-selected={draft.tag === tag}
+                    className={`read-tag-option ${draft.tag === tag ? "read-tag-option-active" : ""}`}
+                    onClick={() => pickDraftTag(tag)}
+                  >
+                    <span className={`read-tag-dot read-tag-dot-lg ${READ_TAG_COLORS[tag] || "bg-primary"}`} />
+                    <span className="read-tag-option-label">{tag}</span>
+                    {draft.tag === tag && <HiCheck className="size-4" />}
+                    <span className="read-tag-shortcut">{index + 1}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button type="submit">
+            <HiPlus className="size-4" />
+            {editingItemId ? "Save" : "Add"}
+          </button>
+          {editingItemId && (
+            <button type="button" className="read-form-secondary" onClick={cancelEdit}>
+              Cancel
+            </button>
+          )}
+        </form>
+
+        <div className="read-tabs" role="tablist" aria-label="Read item status">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeStatus === "todo"}
+            className={`read-tab ${activeStatus === "todo" ? "read-tab-active" : ""}`}
+            onClick={() => setActiveStatus("todo")}
+          >
+            Todo <span>{todoItems.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeStatus === "done"}
+            className={`read-tab ${activeStatus === "done" ? "read-tab-active" : ""}`}
+            onClick={() => setActiveStatus("done")}
+          >
+            Done <span>{doneItems.length}</span>
+          </button>
+        </div>
+
+        <div className="read-sections">
+          <ul className="read-list" role="tabpanel">
+            {activeItems.length
+              ? activeItems.map(renderItem)
+              : <li className="read-empty">No {activeStatus} items.</li>}
+          </ul>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -691,15 +1225,26 @@ function BookmarkView({
                   {selfHosted ? (
                     <LocalServiceStatus url={url} className="size-4" />
                   ) : iconUrl ? (
-                    <img
-                      src={iconUrl}
-                      alt=""
-                      className="rounded-sm object-contain"
-                      style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
-                      onError={(imgEvent) => { imgEvent.currentTarget.style.display = "none"; }}
-                    />
+                    <>
+                      <img
+                        src={iconUrl}
+                        srcSet={faviconSrcSet(url)}
+                        alt=""
+                        className="rounded-sm object-contain"
+                        style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                        onError={(imgEvent) => {
+                          imgEvent.currentTarget.style.display = "none";
+                          imgEvent.currentTarget.nextElementSibling?.removeAttribute("hidden");
+                        }}
+                      />
+                      <span hidden className="bookmark-favicon-fallback" style={{ width: `${iconSize}px`, height: `${iconSize}px`, fontSize: `${Math.max(10, iconSize * 0.48)}px` }}>
+                        {faviconFallbackLabel(name, url)}
+                      </span>
+                    </>
                   ) : (
-                    <HiArrowTopRightOnSquare className="opacity-65" style={{ width: `${iconSize}px`, height: `${iconSize}px` }} />
+                    <span className="bookmark-favicon-fallback" style={{ width: `${iconSize}px`, height: `${iconSize}px`, fontSize: `${Math.max(10, iconSize * 0.48)}px` }}>
+                      {faviconFallbackLabel(name, url)}
+                    </span>
                   )}
                 </span>
                 <span className="truncate font-medium">{name}</span>
@@ -752,32 +1297,35 @@ function BookmarkView({
   }
 
   return (
-    <div className="h-screen w-full overflow-y-auto bg-background px-4 pb-16 pt-24 text-foreground sm:px-6">
-      <div className="flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-5">
+    <div className="bookmark-vault h-screen w-full overflow-y-auto px-4 pb-16 pt-24 sm:px-6">
+      <div className="bookmark-vault-header">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex size-12 items-center justify-center rounded-full bg-card text-card-foreground shadow-lg transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="bookmark-vault-back"
           title="Back to dashboard"
         >
-          <HiArrowLeft className="size-5" />
+          <HiChevronLeft className="size-4" />
         </button>
-        <button
-          type="button"
-          onClick={openImportModal}
-          className="inline-flex h-12 items-center justify-center rounded-full bg-card px-5 text-sm font-medium text-card-foreground shadow-lg transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          title="Import browser bookmarks export"
-        >
-          Import Bookmarks
-        </button>
-        <button
-          type="button"
-          onClick={onExportBookmarks}
-          className="inline-flex h-12 items-center justify-center rounded-full bg-card px-5 text-sm font-medium text-card-foreground shadow-lg transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          title="Export bookmarks as browser HTML"
-        >
-          Export Bookmarks
-        </button>
+        <h1>Bookmark Vault:</h1>
+        <div className="bookmark-vault-actions">
+          <button
+            type="button"
+            onClick={openImportModal}
+            className="bookmark-vault-button"
+            title="Import browser bookmarks export"
+          >
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={onExportBookmarks}
+            className="bookmark-vault-button"
+            title="Export bookmarks as browser HTML"
+          >
+            Export
+          </button>
+        </div>
       </div>
       <input
         ref={fileInputRef}
@@ -826,7 +1374,7 @@ function BookmarkView({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-5">
+      <div className="bookmark-vault-list">
         {orderedBookmarks.map((group) => {
           const content = Array.isArray(group.content) ? group.content : [];
           const children = Array.isArray(group.children) ? group.children : [];
@@ -989,15 +1537,26 @@ function BookmarkView({
                         {selfHosted ? (
                           <LocalServiceStatus url={url} className="size-4" />
                         ) : iconUrl ? (
-                          <img
-                            src={iconUrl}
-                            alt=""
-                            className="rounded-sm object-contain"
-                            style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
-                            onError={(event) => { event.currentTarget.style.display = "none"; }}
-                          />
+                          <>
+                            <img
+                              src={iconUrl}
+                              srcSet={faviconSrcSet(url)}
+                              alt=""
+                              className="rounded-sm object-contain"
+                              style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                              onError={(event) => {
+                                event.currentTarget.style.display = "none";
+                                event.currentTarget.nextElementSibling?.removeAttribute("hidden");
+                              }}
+                            />
+                            <span hidden className="bookmark-favicon-fallback" style={{ width: `${iconSize}px`, height: `${iconSize}px`, fontSize: `${Math.max(10, iconSize * 0.48)}px` }}>
+                              {faviconFallbackLabel(name, url)}
+                            </span>
+                          </>
                         ) : (
-                          <HiArrowTopRightOnSquare className="opacity-65" style={{ width: `${iconSize}px`, height: `${iconSize}px` }} />
+                          <span className="bookmark-favicon-fallback" style={{ width: `${iconSize}px`, height: `${iconSize}px`, fontSize: `${Math.max(10, iconSize * 0.48)}px` }}>
+                            {faviconFallbackLabel(name, url)}
+                          </span>
                         )}
                       </span>
                       <span className="truncate font-medium">{name}</span>
@@ -1051,7 +1610,7 @@ function BookmarkView({
         <button
           type="button"
           onClick={handleAddToggle}
-          className="inline-flex items-center justify-center rounded-full bg-card text-card-foreground shadow-lg transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="bookmark-vault-add"
           style={addButtonStyle}
           title="Add bookmark"
         >
@@ -1067,7 +1626,7 @@ function BookmarkView({
             setCategoryParentPath("");
             setCategoryOpen((open) => !open);
           }}
-          className="inline-flex items-center justify-center rounded-full bg-card px-5 font-medium text-card-foreground shadow-lg transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="bookmark-vault-category-add"
           style={{ height: `${pillHeight}px`, fontSize: `${textSize}px` }}
           title="Add category"
         >
@@ -1078,7 +1637,7 @@ function BookmarkView({
       {categoryOpen ? (
         <form
           onSubmit={handleCategorySubmit}
-          className="mt-7 flex max-w-xl flex-wrap items-end gap-3 rounded-3xl border border-border/60 bg-card p-4 shadow-lg"
+          className="bookmark-vault-form max-w-xl"
         >
           <label className="grid min-w-64 flex-1 gap-1 text-xs text-muted-foreground">
             {editingCategory ? "Rename Category" : "Category Name"}
@@ -1118,7 +1677,7 @@ function BookmarkView({
       {addOpen ? (
         <form
           onSubmit={handleSubmit}
-          className="mt-7 flex max-w-4xl flex-wrap items-end gap-3 rounded-3xl border border-border/60 bg-card p-4 shadow-lg"
+          className="bookmark-vault-form max-w-4xl"
         >
           <label className="grid gap-1 text-xs text-muted-foreground">
             Category
@@ -1239,9 +1798,7 @@ export default function Index() {
     const randomIndex = Math.floor(Math.random() * decorativeVideoUrls.length);
     return decorativeVideoUrls[randomIndex] || desert;
   });
-  const [bookmarksOpen, setBookmarksOpen] = React.useState(() =>
-    typeof window !== "undefined" && window.localStorage?.getItem(STARTUP_PAGE_VIEW_KEY) === "bookmarks"
-  );
+  const [activeView, setActiveView] = React.useState("dashboard");
   const [activeBookmarkCategory, setActiveBookmarkCategory] = React.useState(() => {
     if (typeof window === "undefined") {
       return null;
@@ -1255,9 +1812,11 @@ export default function Index() {
   const surface = "bg-card text-card-foreground border border-border/60 shadow-lg";
   const mutedSurface = "bg-muted/50 text-foreground border border-border/60 shadow-lg";
   const strongSurface = "bg-primary text-primary-foreground border border-border/40 shadow-lg";
-  const openBookmarkView = (categoryIndex = null) => {
+  const bookmarksOpen = activeView === "bookmarks";
+  const readOpen = activeView === "read";
+  const openBookmarkView = React.useCallback((categoryIndex = null) => {
     setActiveBookmarkCategory(categoryIndex);
-    setBookmarksOpen(true);
+    setActiveView("bookmarks");
     window.localStorage?.setItem(STARTUP_PAGE_VIEW_KEY, "bookmarks");
 
     if (categoryIndex === null) {
@@ -1265,12 +1824,92 @@ export default function Index() {
     } else {
       window.localStorage?.setItem(STARTUP_PAGE_BOOKMARK_CATEGORY_KEY, String(categoryIndex));
     }
-  };
+  }, []);
 
-  const closeBookmarkView = () => {
-    setBookmarksOpen(false);
+  const openBookmarkVault = React.useCallback(() => {
+    openBookmarkView(null);
+  }, [openBookmarkView]);
+
+  const closeBookmarkView = React.useCallback(() => {
+    setActiveView("dashboard");
     window.localStorage?.setItem(STARTUP_PAGE_VIEW_KEY, "dashboard");
-  };
+  }, []);
+
+  const openReadView = React.useCallback(() => {
+    setActiveView("read");
+    window.localStorage?.setItem(STARTUP_PAGE_VIEW_KEY, "read");
+  }, []);
+
+  const closeReadView = React.useCallback(() => {
+    setActiveView("dashboard");
+    window.localStorage?.setItem(STARTUP_PAGE_VIEW_KEY, "dashboard");
+  }, []);
+
+  const handleVaultWheel = React.useCallback((event) => {
+    if (Math.abs(event.deltaX) < 72 || Math.abs(event.deltaX) < Math.abs(event.deltaY) * 1.35) {
+      return;
+    }
+
+    const target = event.target;
+    if (target?.closest?.("input, textarea, select, [contenteditable='true']")) {
+      return;
+    }
+
+    if (event.deltaX > 0) {
+      if (readOpen) {
+        closeReadView();
+      } else if (!bookmarksOpen) {
+        openBookmarkVault();
+      }
+      return;
+    }
+
+    if (bookmarksOpen) {
+      closeBookmarkView();
+    } else if (!readOpen) {
+      openReadView();
+    }
+  }, [bookmarksOpen, closeBookmarkView, closeReadView, openBookmarkVault, openReadView, readOpen]);
+
+  React.useEffect(() => {
+    const handleKeyDown = (event) => {
+      const target = event.target;
+
+      if (target?.closest?.("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+
+      if (event.key === "Escape" && activeView !== "dashboard") {
+        event.preventDefault();
+        closeReadView();
+        return;
+      }
+
+      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+        if (event.key === "1") {
+          event.preventDefault();
+          openReadView();
+          return;
+        }
+
+        if (event.key === "2") {
+          event.preventDefault();
+          closeReadView();
+          return;
+        }
+
+        if (event.key === "3") {
+          event.preventDefault();
+          openBookmarkVault();
+          return;
+        }
+      }
+
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeView, closeReadView, openBookmarkVault, openReadView]);
 
   const updateActiveBookmarkCategory = (categoryIndex) => {
     setActiveBookmarkCategory(categoryIndex);
@@ -1699,6 +2338,103 @@ export default function Index() {
     });
   };
 
+  const handleAddReadItem = async (item) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentItems = Array.isArray(currentSettings.readItems) ? currentSettings.readItems : [];
+    const nextItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: item.title,
+      description: item.description,
+      url: item.url,
+      tag: item.tag,
+      status: "todo",
+      createdAt: new Date().toISOString(),
+    };
+
+    await persistSettings({
+      ...currentSettings,
+      readItems: [nextItem, ...currentItems],
+    });
+  };
+
+  const handleToggleReadItem = async (itemId) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentItems = Array.isArray(currentSettings.readItems) ? currentSettings.readItems : [];
+
+    await persistSettings({
+      ...currentSettings,
+      readItems: currentItems.map((item) => (
+        item.id === itemId
+          ? {
+              ...item,
+              status: item.status === "done" ? "todo" : "done",
+              completedAt: item.status === "done" ? null : new Date().toISOString(),
+            }
+          : item
+      )),
+    });
+  };
+
+  const handleUpdateReadItem = async (itemId, nextItem) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentItems = Array.isArray(currentSettings.readItems) ? currentSettings.readItems : [];
+
+    await persistSettings({
+      ...currentSettings,
+      readItems: currentItems.map((item) => (
+        item.id === itemId
+          ? {
+              ...item,
+              title: nextItem.title,
+              description: nextItem.description,
+              url: nextItem.url,
+              tag: nextItem.tag,
+            }
+          : item
+      )),
+    });
+  };
+
+  const handleDeleteReadItem = async (itemId) => {
+    const currentSettings = latestSettingsRef.current;
+    const currentItems = Array.isArray(currentSettings.readItems) ? currentSettings.readItems : [];
+
+    await persistSettings({
+      ...currentSettings,
+      readItems: currentItems.filter((item) => item.id !== itemId),
+    });
+  };
+
+  const handleImportReadItems = async (items) => {
+    const currentSettings = latestSettingsRef.current;
+
+    await persistSettings({
+      ...currentSettings,
+      readItems: normalizeResourceVaultItems(items),
+    });
+  };
+
+  const handleExportReadItems = () => {
+    const currentSettings = latestSettingsRef.current;
+    const currentItems = normalizeResourceVaultItems(currentSettings.readItems);
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      items: currentItems,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+
+    anchor.href = url;
+    anchor.download = `startup-page-resource-vault-${date}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const renderDecorativeVideo = (variant, className) => {
     const sceneWidth = tilePx + decorativeGap + tilePx;
     const sceneHeight = tallTilePx;
@@ -1757,13 +2493,56 @@ export default function Index() {
     <ThemeProvider initialThemeMode={ui.themeMode} initialThemePalette={ui.themePalette} initialCustomThemeVars={initialCustomThemeVars}>
       <KBarProvider>
         <KBarWrapper>
-      <section className="relative min-h-screen overflow-hidden bg-background text-foreground transition-colors">
+      <VaultNavigationActions
+        onDashboard={closeReadView}
+        onOpenBookmarks={openBookmarkVault}
+        onOpenResources={openReadView}
+      />
+      <section
+        className="relative min-h-screen overflow-x-hidden bg-background text-foreground transition-colors"
+        onWheel={handleVaultWheel}
+      >
         <style>{gridCss}</style>
-        <div className="fixed right-5 top-5 z-40 flex items-center gap-4 text-foreground drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
+        <nav className="vault-nav-center" aria-label="Page navigation">
+          <button
+            type="button"
+            className={`vault-nav-button ${readOpen ? "vault-nav-button-active" : ""}`}
+            onClick={openReadView}
+            title="Open Resource Vault (1)"
+            aria-label="Resource Vault"
+            aria-current={readOpen ? "page" : undefined}
+          >
+            <HiArchiveBox className="size-4" />
+            <span className="vault-nav-number">1</span>
+          </button>
+          <button
+            type="button"
+            className={`vault-nav-button ${activeView === "dashboard" ? "vault-nav-button-active" : ""}`}
+            onClick={closeReadView}
+            title="Dashboard (2)"
+            aria-label="Dashboard"
+            aria-current={activeView === "dashboard" ? "page" : undefined}
+          >
+            <HiHome className="size-4" />
+            <span className="vault-nav-number">2</span>
+          </button>
+          <button
+            type="button"
+            className={`vault-nav-button ${bookmarksOpen ? "vault-nav-button-active" : ""}`}
+            onClick={openBookmarkVault}
+            title="Open Bookmark Vault (3)"
+            aria-label="Bookmark Vault"
+            aria-current={bookmarksOpen ? "page" : undefined}
+          >
+            <HiBookmark className="size-4" />
+            <span className="vault-nav-number">3</span>
+          </button>
+        </nav>
+        <div className="fixed right-5 top-5 z-40 flex items-center gap-3 text-foreground drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
           <Toggle />
           <SettingsButton />
         </div>
-        <div className={`flex min-h-screen items-center justify-center px-4 pb-10 pt-28 transition-all duration-500 ease-in-out ${bookmarksOpen ? "-translate-x-full opacity-0" : "translate-x-0 opacity-100"}`}>
+        <div className={`flex min-h-screen items-center justify-center px-4 pb-10 pt-28 transition-all duration-500 ease-in-out ${bookmarksOpen ? "-translate-x-full opacity-0" : readOpen ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"}`}>
         <div className={`dashboard-grid grid w-fit ${gapClass} grid-flow-row-dense content-center justify-center`}>
 
           {/* row 1 */}
@@ -1791,40 +2570,47 @@ export default function Index() {
           {showBox("bookmark4") && <Bookmark title={ getBookmarkGroupForBox(3).title } content={ getBookmarkGroupForBox(3).content } onTitleClick={() => openBookmarkView(bookmarkBoxCategories[3] ?? 3)} cardClass={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} overflow-y-auto ${strongSurface}`)} />}
           {showBox("bookmark5") && <Bookmark title={ getBookmarkGroupForBox(4).title } content={ getBookmarkGroupForBox(4).content } onTitleClick={() => openBookmarkView(bookmarkBoxCategories[4] ?? 4)} cardClass={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} overflow-y-auto ${strongSurface}`)} />}
           {showBox("unsplash4") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}><Unsplash search={ settings.unsplash.unsplashBox4 } cardClass={panel("relative overflow-hidden h-full w-full bg-center bg-no-repeat")} /></div>}
-          {showBox("themeTools") && (
-            <button
-              type="button"
-              onClick={() => openBookmarkView(null)}
-              className={panel(`h-full w-full ${GRID_SINGLE} ${DASHBOARD_TILE} ${strongSurface} flex items-center justify-center transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-foreground/45`)}
-              title="Open bookmark view"
-            >
-              <HiBookmark className="size-20 text-primary-foreground sm:size-24" />
-            </button>
-          )}
           {showBox("unsplash5") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${surface}`)}><Unsplash search={ settings.unsplash.unsplashBox5 } cardClass={panel("relative overflow-hidden h-full w-full bg-center bg-no-repeat")} /></div>}
+          {showBox("vaultPreview") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${strongSurface} overflow-hidden`)}><ResourceVaultPreview items={settings.readItems} onOpen={openReadView} /></div>}
           {showBox("clock") && <div className={panel(`${GRID_SINGLE} ${DASHBOARD_TILE} ${mutedSurface}`)}><Clock /></div>}
         </div>
         </div>
-        <div className={`absolute inset-0 overflow-y-auto transition-all duration-500 ease-in-out ${bookmarksOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"}`}>
-          <BookmarkView
-            bookmarks={bookmarkGroups}
-            activeCategoryIndex={activeBookmarkCategory}
-            onBack={closeBookmarkView}
-            onAddBookmark={handleAddBookmark}
-            onRemoveBookmark={handleRemoveBookmark}
-            onUpdateBookmark={handleUpdateBookmark}
-            onAddCategory={handleAddBookmarkCategory}
-            onRenameCategory={handleRenameBookmarkCategory}
-            onDeleteCategory={handleDeleteBookmarkCategory}
-            onMoveCategory={handleMoveBookmarkCategory}
-            onMoveBookmark={handleMoveBookmark}
-            onReorderCategory={handleReorderBookmarkCategory}
-            onReorderBookmark={handleReorderBookmark}
-            onImportBookmarks={handleImportBookmarks}
-            onExportBookmarks={handleExportBookmarks}
-            pillSize={ui.bookmarkPillSize}
-          />
-        </div>
+        {bookmarksOpen && (
+          <div className="absolute inset-0 z-20 overflow-y-auto transition-all duration-500 ease-in-out">
+            <BookmarkView
+              bookmarks={bookmarkGroups}
+              activeCategoryIndex={activeBookmarkCategory}
+              onBack={closeBookmarkView}
+              onAddBookmark={handleAddBookmark}
+              onRemoveBookmark={handleRemoveBookmark}
+              onUpdateBookmark={handleUpdateBookmark}
+              onAddCategory={handleAddBookmarkCategory}
+              onRenameCategory={handleRenameBookmarkCategory}
+              onDeleteCategory={handleDeleteBookmarkCategory}
+              onMoveCategory={handleMoveBookmarkCategory}
+              onMoveBookmark={handleMoveBookmark}
+              onReorderCategory={handleReorderBookmarkCategory}
+              onReorderBookmark={handleReorderBookmark}
+              onImportBookmarks={handleImportBookmarks}
+              onExportBookmarks={handleExportBookmarks}
+              pillSize={ui.bookmarkPillSize}
+            />
+          </div>
+        )}
+        {readOpen && (
+          <div className="absolute inset-0 z-20 overflow-y-auto transition-all duration-500 ease-in-out">
+            <ReadView
+              items={settings.readItems}
+              onBack={closeReadView}
+              onAddItem={handleAddReadItem}
+              onExportItems={handleExportReadItems}
+              onImportItems={handleImportReadItems}
+              onToggleItem={handleToggleReadItem}
+              onUpdateItem={handleUpdateReadItem}
+              onDeleteItem={handleDeleteReadItem}
+            />
+          </div>
+        )}
       </section>
         </KBarWrapper>
       </KBarProvider>

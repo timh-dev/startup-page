@@ -79,7 +79,7 @@ class Unsplash extends Component {
     this._mounted = false;
     this._blobUrl = null;
     this.state = {
-      photos: "",
+      photos: null,
       category: "",
       loaded: false,
       filterKey: null,
@@ -260,7 +260,7 @@ class Unsplash extends Component {
         )}
         <img
           className={shouldUseShader ? "hidden" : "min-w-full min-h-full object-cover"}
-          src={this.state.photos}
+          src={this.state.photos || undefined}
           alt={`Theme tile for ${this.state.category || "landscape"}`}
           onLoad={() => this.setState({ loaded: true, imageReady: true })}
           onError={() => {

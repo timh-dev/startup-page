@@ -143,7 +143,7 @@ export function calculateSolarContext(lat, lng) {
   const minElevation = Math.min(winterTrough, todayMin, -5);
 
   // Pre-compute curve elevations (doesn't change during the day)
-  const curveHours = linspace(0, 24, 500);
+  const curveHours = linspace(0, 24, 1440);
   const curveElevations = curveHours.map((h) => sunElevation(lat, lng, h, doy));
 
   const context = {

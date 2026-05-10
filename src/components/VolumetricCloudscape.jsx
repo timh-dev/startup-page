@@ -65,11 +65,12 @@ float ridge(float x) {
 }
 
 vec3 skyColor(float y) {
-  if (u_phase > 2.5) return mix(vec3(0.02, 0.025, 0.04), vec3(0.15, 0.16, 0.22), y);
+  float toneY = mix(0.34, 0.68, y);
+  if (u_phase > 2.5) return mix(vec3(0.02, 0.025, 0.04), vec3(0.15, 0.16, 0.22), toneY);
 
-  vec3 day = mix(vec3(0.29, 0.62, 0.93), vec3(0.67, 0.86, 1.0), y);
-  vec3 sunset = mix(vec3(0.77, 0.35, 0.38), vec3(0.32, 0.27, 0.55), y);
-  vec3 night = mix(vec3(0.02, 0.04, 0.08), vec3(0.08, 0.11, 0.18), y);
+  vec3 day = mix(vec3(0.29, 0.62, 0.93), vec3(0.67, 0.86, 1.0), toneY);
+  vec3 sunset = mix(vec3(0.77, 0.35, 0.38), vec3(0.32, 0.27, 0.55), toneY);
+  vec3 night = mix(vec3(0.02, 0.04, 0.08), vec3(0.08, 0.11, 0.18), toneY);
   float toSunset = smoothstep(0.0, 1.0, clamp(u_phase, 0.0, 1.0));
   float toNight = smoothstep(1.0, 2.0, clamp(u_phase, 1.0, 2.0));
   return mix(mix(day, sunset, toSunset), night, toNight);
@@ -131,17 +132,20 @@ void main() {
 
     float shade = smoothstep(0.28, 0.78, broad + detail * 0.5 + curl * 0.18);
     vec3 lit = mix(cloudShadowColor(), cloudLightColor(), shade);
-    lit += vec3(0.16, 0.14, 0.11) * smoothstep(0.46, 1.0, uv.y) * (1.0 - step(2.5, u_phase));
+    lit += vec3(0.045, 0.04, 0.035) * (1.0 - step(2.5, u_phase));
 
     float stepAlpha = density * 0.095 * (1.0 - alpha);
     clouds += lit * stepAlpha;
     alpha += stepAlpha;
   }
 
-  float haze = smoothstep(0.28, 1.0, uv.y) * 0.045;
+  float haze = 0.018 + smoothstep(0.55, 1.0, uv.y) * 0.012;
   color = mix(color, cloudLightColor(), haze * coverage);
   color = color * (1.0 - alpha) + clouds;
-  color = mix(color, vec3(0.02, 0.025, 0.035), smoothstep(0.0, 0.22, 1.0 - uv.y) * 0.35);
+  float topEqualizer = smoothstep(0.76, 1.0, uv.y) * (1.0 - step(2.5, u_phase));
+  color = mix(color, color * 0.80, topEqualizer);
+  color += vec3(0.055, 0.052, 0.048) * coverage * (1.0 - step(2.5, u_phase));
+  color = mix(color, vec3(0.02, 0.025, 0.035), smoothstep(0.0, 0.22, 1.0 - uv.y) * 0.22);
 
   gl_FragColor = vec4(color, 1.0);
 }

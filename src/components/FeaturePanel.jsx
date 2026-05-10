@@ -5,7 +5,6 @@ import HeadlinesHero from "./HeadlinesHero";
 import TimerBox from "./TimerBox";
 import Windy from "./Windy";
 import Upsplash from "./Unsplash";
-import WeatherForecast from "./WeatherForecast";
 import AirQuality from "./AirQuality";
 import WikipediaToD from "./WikipediaToD";
 import RSSFeed from "./RSSFeed";
@@ -15,7 +14,6 @@ import { readSettings, writeSettings } from "@/lib/settings";
 
 export const ALL_MODES = [
   { key: "headlines", label: "Headlines" },
-  { key: "forecast", label: "Forecast" },
   { key: "airQuality", label: "Air Quality" },
   { key: "timer", label: "Timer" },
   { key: "windy", label: "Windy" },
@@ -30,7 +28,6 @@ function FeatureContent({ mode, settings }) {
   if (mode === "windy") return <Windy cardClass="h-full w-full overflow-hidden rounded-[inherit]" />;
   if (mode === "timer") return <TimerBox />;
   if (mode === "unsplash") return <Upsplash search={settings.unsplash.unsplashBox6} cardClass="relative overflow-hidden h-full w-full bg-center bg-no-repeat rounded-[inherit]" />;
-  if (mode === "forecast") return <WeatherForecast />;
   if (mode === "airQuality") return <AirQuality />;
   if (mode === "wikipedia") return <WikipediaToD />;
   if (mode === "rss") return <RSSFeed />;

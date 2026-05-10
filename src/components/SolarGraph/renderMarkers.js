@@ -22,7 +22,8 @@ function drawPill(ctx, x, y, text, fontSize) {
   const padY = 3;
   const pw = metrics.width + padX * 2;
   const ph = fontSize + padY * 2;
-  const px = Math.max(1, Math.min(x - pw / 2, ctx.canvas.width / (window.devicePixelRatio || 1) - pw - 1));
+  const canvasWidth = ctx.canvas.clientWidth || ctx.canvas.width / (window.devicePixelRatio || 1);
+  const px = Math.max(1, Math.min(x - pw / 2, canvasWidth - pw - 1));
   const py = y - ph / 2;
 
   ctx.fillStyle = 'rgba(15, 15, 20, 0.65)';
