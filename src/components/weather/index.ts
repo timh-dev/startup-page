@@ -1,1 +1,0 @@
-export { WeatherBox } from "./WeatherBox";
