@@ -1,5 +1,6 @@
 import React from "react";
 import { readSettings } from "@/lib/settings";
+import { fetchRssFeed } from "@/lib/rss";
 
 function timeAgo(dateStr) {
   const s = Math.floor((Date.now() - new Date(dateStr)) / 1000);
@@ -22,14 +23,10 @@ export default function RSSFeed() {
 
     async function load() {
       try {
-        const res = await fetch(
-          `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&count=12`
-        );
-        const data = await res.json();
+        const { feed: parsedFeed, items: parsedItems } = await fetchRssFeed(feedUrl, { limit: 12 });
         if (cancelled) return;
-        if (data.status !== "ok") throw new Error(data.message || "Feed error");
-        setFeed(data.feed);
-        setItems(data.items || []);
+        setFeed(parsedFeed);
+        setItems(parsedItems);
         setStatus("ready");
       } catch {
         if (!cancelled) setStatus("error");

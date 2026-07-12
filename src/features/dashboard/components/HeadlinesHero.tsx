@@ -2,10 +2,11 @@ import React from "react";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 
 import { readSettings } from "@/lib/settings";
+import { fetchRssFeed } from "@/lib/rss";
 
 // Reddit blocks anonymous browser requests to its *.json endpoints (HTTP 403 with
-// no CORS headers), so the headlines are loaded from the subreddit RSS feed through
-// the same rss2json proxy the RSS feature panel uses.
+// no CORS headers), so the headlines are loaded from the subreddit RSS feed, parsed
+// by the same client-side helper the RSS feature panel uses.
 function decodeEntities(value) {
   return typeof value === "string" ? value.replaceAll("&amp;", "&") : value;
 }
@@ -52,8 +53,8 @@ function formatPublishedLabel(pubDate) {
     return "";
   }
 
-  // rss2json returns UTC timestamps formatted as "YYYY-MM-DD HH:MM:SS".
-  const parsed = new Date(`${pubDate.replace(" ", "T")}Z`);
+  // fetchRssFeed normalizes publication dates to ISO-8601 strings.
+  const parsed = new Date(pubDate);
   if (Number.isNaN(parsed.getTime())) {
     return "";
   }
@@ -90,15 +91,9 @@ export default function HeadlinesHero() {
 
       try {
         const feedUrl = `https://www.reddit.com/r/${subreddit}/.rss`;
-        const response = await fetch(
-          `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`
-        );
-        const data = await response.json();
-        if (data.status !== "ok") {
-          throw new Error(data.message || "Feed error");
-        }
+        const { items } = await fetchRssFeed(feedUrl);
 
-        const nextArticles = (data.items || [])
+        const nextArticles = items
           .map(normalizeArticle)
           .filter((article) => article.title && article.image);
 
