@@ -13,7 +13,7 @@ class Windy extends React.Component {
   }
 
   setLink(lat, long) {
-    const link = `https://embed.windy.com/embed.html?type=map&lat=${String(lat)}&lon=${String(long)}`;
+    const link = `https://embed.windy.com/embed.html?type=map&overlay=rain&lat=${String(lat)}&lon=${String(long)}`;
     this.setState({ link });
   }
 
@@ -25,12 +25,12 @@ class Windy extends React.Component {
         this.setLink(position.coords.latitude, position.coords.longitude);
       }, () => {
         this.setState({
-          link: "https://embed.windy.com/embed.html?type=map",
+          link: "https://embed.windy.com/embed.html?type=map&overlay=rain",
         });
       });
     } else {
       this.setState({
-        link: "https://embed.windy.com/embed.html?type=map",
+        link: "https://embed.windy.com/embed.html?type=map&overlay=rain",
       });
     }
   }
