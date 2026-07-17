@@ -21,13 +21,16 @@ function RenderResults() {
           </div>
         ) : (
           <div
-            className={`flex items-center gap-2 px-3 py-2.5 mx-1.5 rounded-lg cursor-pointer text-sm transition-colors ${
+            className={`flex items-baseline justify-between gap-3 px-3 py-2.5 mx-1.5 rounded-lg cursor-pointer text-sm transition-colors ${
               active
                 ? "bg-primary/10 text-foreground"
                 : "text-foreground/80"
             }`}
           >
-            {item.name}
+            <span className="truncate">{item.name}</span>
+            {item.subtitle && (
+              <span className="max-w-[45%] truncate text-xs text-muted-foreground">{item.subtitle}</span>
+            )}
           </div>
         )
       }

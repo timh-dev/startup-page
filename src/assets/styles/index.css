@@ -1620,6 +1620,33 @@
   container-type: size;
 }
 
+/* ── Clock year view: 12 month rows × 31 day dots ──────────────────────────── */
+
+.clock-year-view {
+  position: absolute;
+  inset: var(--clock-grid-inset);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.2rem, 3.4cqh, 0.5rem);
+}
+
+.clock-year-canvas {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.clock-year-caption {
+  font-size: clamp(0.55rem, 6.5cqh, 0.78rem);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .clock-widget {
   container-type: size;
   position: relative;

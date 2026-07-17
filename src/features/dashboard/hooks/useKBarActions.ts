@@ -1,5 +1,5 @@
 import React from "react";
-import { useRegisterActions } from "kbar";
+import { useKBar, useRegisterActions, Priority } from "kbar";
 import { ThemeContext } from "@/components/layout/ThemeContext";
 import { BUILT_IN_PALETTES } from "@/lib/theme-palettes";
 import {
@@ -9,6 +9,34 @@ import {
   exportSettingsBlob,
   createSettingsExportFilename,
 } from "@/lib/settings";
+import { useSettingsStore } from "@/features/settings/stores";
+
+// Search-provider bangs: "!yt lofi beats" → YouTube search
+const SEARCH_BANGS = {
+  g: { label: "Google", url: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}` },
+  ddg: { label: "DuckDuckGo", url: (q) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}` },
+  yt: { label: "YouTube", url: (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` },
+  gh: { label: "GitHub", url: (q) => `https://github.com/search?q=${encodeURIComponent(q)}` },
+  w: { label: "Wikipedia", url: (q) => `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(q)}` },
+  r: { label: "Reddit", url: (q) => `https://www.reddit.com/search/?q=${encodeURIComponent(q)}` },
+  maps: { label: "Google Maps", url: (q) => `https://www.google.com/maps/search/${encodeURIComponent(q)}` },
+  npm: { label: "npm", url: (q) => `https://www.npmjs.com/search?q=${encodeURIComponent(q)}` },
+};
+
+// Inline calculator for "= 340*1.08" queries. The whitelist regex keeps
+// Function() safe: digits, operators, parens, and scientific notation only —
+// no letters (beyond e/E), brackets, or quotes ever reach evaluation.
+function safeCalculate(expression) {
+  const cleaned = expression.replace(/\^/g, "**").replace(/,/g, "");
+  if (!/^[\d\s+\-*/().%eE]*$/.test(cleaned) || !/\d/.test(cleaned)) return null;
+  try {
+    const value = Function(`"use strict"; return (${cleaned});`)();
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
 
 const TILE_LABELS = {
   videoTall: "Tall Video",
@@ -34,11 +62,43 @@ const TILE_LABELS = {
 
 export default function useKBarActions() {
   const { setThemeMode, setThemePalette, setCustomThemeVars } = React.useContext(ThemeContext);
+  // Subscribing to the store keeps bookmark/vault actions fresh after edits
+  const storeSettings = useSettingsStore((s) => s.settings);
 
   const actions = React.useMemo(() => {
     const list = [];
-    const settings = readSettings();
+    const settings = storeSettings || readSettings();
     const customThemes = settings.customThemes || [];
+
+    // --- Bookmarks: fuzzy-search every saved link ---
+    const bookmarkGroups = Array.isArray(settings.bookmark) ? settings.bookmark : [];
+    bookmarkGroups.forEach((group, groupIndex) => {
+      (group?.content || []).forEach((link, linkIndex) => {
+        if (!link?.url) return;
+        list.push({
+          id: `bookmark-${groupIndex}-${linkIndex}`,
+          name: link.name || link.url,
+          subtitle: link.url,
+          keywords: `${link.url} ${group?.title || ""}`,
+          section: "Bookmarks",
+          perform: () => window.location.assign(link.url),
+        });
+      });
+    });
+
+    // --- Resource Vault: search saved items by title, tag, and description ---
+    const readItems = Array.isArray(settings.readItems) ? settings.readItems : [];
+    readItems.forEach((item) => {
+      if (!item?.url) return;
+      list.push({
+        id: `vault-item-${item.id}`,
+        name: item.title || item.url,
+        subtitle: item.url,
+        keywords: `${item.tag || ""} ${String(item.description || "").slice(0, 80)}`,
+        section: "Resource Vault",
+        perform: () => window.location.assign(item.url),
+      });
+    });
 
     // --- Theme: Mode ---
     list.push({
@@ -185,7 +245,100 @@ export default function useKBarActions() {
     });
 
     return list;
-  }, [setThemeMode, setThemePalette, setCustomThemeVars]);
+  }, [setThemeMode, setThemePalette, setCustomThemeVars, storeSettings]);
 
   useRegisterActions(actions, [actions]);
+
+  // ── Query-driven actions: calculator, web-search bangs, quick-add ─────────
+  // These only exist while the query matches their trigger; setting the raw
+  // query as `keywords` guarantees they pass kbar's fuzzy filter.
+  const { searchQuery } = useKBar((state) => ({ searchQuery: state.searchQuery }));
+
+  const dynamicActions = React.useMemo(() => {
+    const query = (searchQuery || "").trim();
+    const out = [];
+
+    // Calculator: "= 340*1.08"
+    if (query.startsWith("=") && query.length > 1) {
+      const result = safeCalculate(query.slice(1));
+      if (result !== null) {
+        const pretty = Number.isInteger(result)
+          ? String(result)
+          : String(Math.round(result * 1e10) / 1e10);
+        out.push({
+          id: "calc-result",
+          name: `= ${pretty}`,
+          subtitle: "Press Enter to copy",
+          keywords: query,
+          section: "Calculator",
+          priority: Priority.HIGH,
+          perform: () => {
+            void navigator.clipboard?.writeText(pretty);
+          },
+        });
+      }
+    }
+
+    // Web search bangs: "!yt query", "!gh query", …
+    const bang = query.match(/^!(\w+)\s+(.+)$/);
+    if (bang) {
+      const provider = SEARCH_BANGS[bang[1].toLowerCase()];
+      if (provider) {
+        out.push({
+          id: `bang-${bang[1].toLowerCase()}`,
+          name: `Search ${provider.label} for “${bang[2]}”`,
+          keywords: query,
+          section: "Web Search",
+          priority: Priority.HIGH,
+          perform: () => window.location.assign(provider.url(bang[2])),
+        });
+      }
+    }
+
+    // Quick-add to Resource Vault: "+ https://example.com optional title"
+    const quickAdd = query.match(/^\+\s*(https?:\/\/\S+)(?:\s+(.+))?$/);
+    if (quickAdd) {
+      const url = quickAdd[1];
+      let title = quickAdd[2]?.trim();
+      if (!title) {
+        try {
+          title = new URL(url).hostname.replace(/^www\./, "");
+        } catch {
+          title = url;
+        }
+      }
+      out.push({
+        id: "vault-quick-add",
+        name: `Add “${title}” to Resource Vault`,
+        subtitle: url,
+        keywords: query,
+        section: "Resource Vault",
+        priority: Priority.HIGH,
+        perform: () => {
+          const s = readSettings();
+          const items = Array.isArray(s.readItems) ? s.readItems : [];
+          s.readItems = [
+            {
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              title,
+              description: "",
+              url,
+              tag: "Read",
+              status: "todo",
+              createdAt: new Date().toISOString(),
+              completedAt: null,
+            },
+            ...items,
+          ];
+          void writeSettings(s).then(() => {
+            useSettingsStore.getState().reloadSettings();
+          });
+        },
+      });
+    }
+
+    return out;
+  }, [searchQuery]);
+
+  useRegisterActions(dynamicActions, [dynamicActions]);
 }

@@ -145,6 +145,91 @@ function AnalogClock({ parts }) {
   );
 }
 
+function isLeapYear(year) {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function daysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function dayOfYear(date) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  return Math.floor((date.getTime() - start.getTime()) / 86400000);
+}
+
+// Year view: a real calendar in the flip-dot language — one row per month,
+// one dot per day. Drawn on canvas so every dot has the exact same radius
+// and spacing: DOM elements snap their boxes to device pixels individually,
+// which makes a ~4px dot grid look ragged; canvas doesn't snap.
+function YearClock({ now }) {
+  const canvasRef = React.useRef(null);
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const date = now.getDate();
+  const today = dayOfYear(now);
+  const totalDays = isLeapYear(year) ? 366 : 365;
+  const percent = Math.round((today / totalDays) * 100);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const ctx = canvas.getContext("2d");
+    let frameId = null;
+    let lastDraw = 0;
+
+    const draw = (timestamp) => {
+      frameId = requestAnimationFrame(draw);
+      if (timestamp - lastDraw < 66) return; // ~15 fps is plenty for the pulse
+      lastDraw = timestamp;
+
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (!w || !h) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      // One uniform step for both axes; grid centered in the canvas.
+      const step = Math.min(w / 31, h / 12);
+      const originX = (w - step * 31) / 2 + step / 2;
+      const originY = (h - step * 12) / 2 + step / 2;
+      const radius = step * 0.27;
+      const pulse = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin((timestamp / 2400) * Math.PI * 2));
+      ctx.fillStyle = getComputedStyle(canvas).color;
+
+      for (let m = 0; m < 12; m++) {
+        const monthLength = daysInMonth(year, m);
+        for (let d = 1; d <= monthLength; d++) {
+          const isPast = m < month || (m === month && d < date);
+          const isToday = m === month && d === date;
+          ctx.globalAlpha = isToday ? pulse : isPast ? 0.92 : 0.18;
+          ctx.beginPath();
+          ctx.arc(originX + (d - 1) * step, originY + m * step, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    frameId = requestAnimationFrame(draw);
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+    };
+  }, [year, month, date]);
+
+  return (
+    <div className="clock-year-view" aria-hidden="true">
+      <canvas ref={canvasRef} className="clock-year-canvas" />
+      <div className="clock-year-caption">{`Day ${today} · ${percent}%`}</div>
+    </div>
+  );
+}
+
 export default function Clock() {
   const [now, setNow] = useState(() => new Date());
   const [mode, setMode] = useState("digital");
@@ -155,22 +240,25 @@ export default function Clock() {
     return () => window.clearInterval(interval);
   }, []);
 
+  const nextMode = mode === "digital" ? "analog" : mode === "analog" ? "year" : "digital";
+
   return (
     <button
       type="button"
       className="clock-widget flex h-full w-full flex-col items-center justify-center rounded-[inherit] text-center"
-      onClick={() => setMode((current) => (current === "digital" ? "analog" : "digital"))}
-      aria-label={`Clock showing ${parts.time} ${parts.period}. Click to switch to ${mode === "digital" ? "analog" : "digital"} clock.`}
+      onClick={() => setMode(nextMode)}
+      title={`Switch to ${nextMode} view`}
+      aria-label={`Clock showing ${parts.time} ${parts.period}. Click to switch to the ${nextMode} view.`}
     >
-      {mode === "digital" ? (
-        <DigitalClock parts={parts} />
-      ) : (
+      {mode === "digital" && <DigitalClock parts={parts} />}
+      {mode === "analog" && (
         <>
           <span className="clock-hole-field" aria-hidden="true" />
           <AnalogClock parts={parts} />
           <span className="clock-perforated-mask" aria-hidden="true" />
         </>
       )}
+      {mode === "year" && <YearClock now={now} />}
     </button>
   );
 }
