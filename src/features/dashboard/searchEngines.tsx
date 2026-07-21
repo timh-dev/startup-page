@@ -14,6 +14,7 @@ import {
 import {
   SiBrave,
   SiDuckduckgo,
+  SiGooglemaps,
   SiPerplexity,
   SiWolframmathematica,
 } from "react-icons/si";
@@ -29,6 +30,7 @@ export interface SearchEngine {
 // fallback used whenever an engine's icon key is unknown or missing.
 export const SEARCH_ENGINE_ICONS: Record<string, IconType> = {
   google: FaGoogle,
+  maps: SiGooglemaps,
   duckduckgo: SiDuckduckgo,
   youtube: FaYoutube,
   wikipedia: FaWikipediaW,
@@ -48,6 +50,7 @@ export const SEARCH_ICON_OPTIONS: { key: string; label: string }[] = [
   { key: "search", label: "Search (generic)" },
   { key: "globe", label: "Globe (generic)" },
   { key: "google", label: "Google" },
+  { key: "maps", label: "Google Maps" },
   { key: "duckduckgo", label: "DuckDuckGo" },
   { key: "youtube", label: "YouTube" },
   { key: "wikipedia", label: "Wikipedia" },
@@ -64,10 +67,10 @@ export const SEARCH_ICON_OPTIONS: { key: string; label: string }[] = [
 // Mirrors config/settings.json so the search box still works if a user clears
 // every engine, and so the Settings editor can restore sensible defaults.
 export const DEFAULT_SEARCH_ENGINES: SearchEngine[] = [
-  { id: "google", name: "Google", url: "https://www.google.com/search?q=", icon: "google" },
   { id: "duckduckgo", name: "DuckDuckGo", url: "https://duckduckgo.com/?q=", icon: "duckduckgo" },
   { id: "youtube", name: "YouTube", url: "https://www.youtube.com/results?search_query=", icon: "youtube" },
   { id: "wikipedia", name: "Wikipedia", url: "https://en.wikipedia.org/w/index.php?search=", icon: "wikipedia" },
+  { id: "maps", name: "Google Maps", url: "https://www.google.com/maps/search/", icon: "maps" },
 ];
 
 export function getSearchEngineIcon(iconKey: string | undefined): IconType {

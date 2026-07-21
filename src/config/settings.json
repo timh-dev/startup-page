@@ -200,10 +200,10 @@
   },
   "search": {
     "engines": [
-      { "id": "google", "name": "Google", "url": "https://www.google.com/search?q=", "icon": "google" },
       { "id": "duckduckgo", "name": "DuckDuckGo", "url": "https://duckduckgo.com/?q=", "icon": "duckduckgo" },
       { "id": "youtube", "name": "YouTube", "url": "https://www.youtube.com/results?search_query=", "icon": "youtube" },
-      { "id": "wikipedia", "name": "Wikipedia", "url": "https://en.wikipedia.org/w/index.php?search=", "icon": "wikipedia" }
+      { "id": "wikipedia", "name": "Wikipedia", "url": "https://en.wikipedia.org/w/index.php?search=", "icon": "wikipedia" },
+      { "id": "maps", "name": "Google Maps", "url": "https://www.google.com/maps/search/", "icon": "maps" }
     ]
   },
   "decorativeVideo": {
