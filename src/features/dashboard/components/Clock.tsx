@@ -80,63 +80,278 @@ function SegmentDigit({ value }) {
   );
 }
 
-function DigitalClock({ parts }) {
-  const activeCells = new Set();
-  const colonCells = new Set();
-  const chars = parts.time.split("");
-  const glyphs = chars.map((char) => (char === ":" ? ["0", "1", "0", "1", "0"] : DOT_DIGITS[char] || DOT_DIGITS["0"]));
+const COLON_GLYPH = ["0", "1", "0", "1", "0"];
+const DIGITS_START_Y = 4;
+const DAY_LABEL_START_Y = 11;
+const EXPLODE_MS = 600;
+const CONVERGE_MS = 950;
+const CONVERGE_DELAY_MS = EXPLODE_MS * 0.6; // converge starts before the explode fully finishes, so motion stays continuous
+const RGB_SHIFT_CELLS = 0.85; // how far the chromatic fringe splits from the dot at peak speed
+const RIPPLE_FREQUENCY = 1; // spatial frequency of the wave along the radius, in radians per grid cell
+const RIPPLE_SPEED = 0.012; // how fast the ripple travels outward, in radians per ms
+const RIPPLE_AMPLITUDE = 5; // peak radial displacement, in grid cells
+const OCTAGON_STRENGTH = 0.35; // 0 = perfectly circular rings, higher = more octagonal
+
+function layoutGlyphCells(chars, glyphs, startY) {
   const glyphWidths = glyphs.map((glyph) => glyph[0].length);
   const contentWidth = glyphWidths.reduce((total, width) => total + width, 0) + chars.length - 1;
   let cursorX = Math.floor((DIGITAL_GRID_COLUMNS - contentWidth) / 2);
-  const startY = 4;
+  const cells = [];
 
   glyphs.forEach((glyph, glyphIndex) => {
     glyph.forEach((row, rowIndex) => {
       row.split("").forEach((cell, columnIndex) => {
         if (cell === "1") {
-          const cellKey = `${cursorX + columnIndex}-${startY + rowIndex}`;
-          activeCells.add(cellKey);
-          if (chars[glyphIndex] === ":") colonCells.add(cellKey);
+          cells.push({ x: cursorX + columnIndex, y: startY + rowIndex, isColon: chars[glyphIndex] === ":" });
         }
       });
     });
     cursorX += glyphWidths[glyphIndex] + 1;
   });
 
-  const dayGlyphs = parts.dayLabel.split("").map((char) => DOT_LETTERS[char] || DOT_LETTERS.S);
-  const dayGlyphWidths = dayGlyphs.map((glyph) => glyph[0].length);
-  const dayContentWidth = dayGlyphWidths.reduce((total, width) => total + width, 0) + dayGlyphs.length - 1;
-  let dayCursorX = Math.floor((DIGITAL_GRID_COLUMNS - dayContentWidth) / 2);
-  const dayStartY = 11;
+  return cells;
+}
 
-  dayGlyphs.forEach((glyph, glyphIndex) => {
-    glyph.forEach((row, rowIndex) => {
-      row.split("").forEach((cell, columnIndex) => {
-        if (cell === "1") {
-          activeCells.add(`${dayCursorX + columnIndex}-${dayStartY + rowIndex}`);
-        }
-      });
-    });
-    dayCursorX += dayGlyphWidths[glyphIndex] + 1;
+function computeActiveDots(parts) {
+  const chars = parts.time.split("");
+  const glyphs = chars.map((char) => (char === ":" ? COLON_GLYPH : DOT_DIGITS[char] || DOT_DIGITS["0"]));
+  const dayChars = parts.dayLabel.split("");
+  const dayGlyphs = dayChars.map((char) => DOT_LETTERS[char] || DOT_LETTERS.S);
+
+  return [
+    ...layoutGlyphCells(chars, glyphs, DIGITS_START_Y),
+    ...layoutGlyphCells(dayChars, dayGlyphs, DAY_LABEL_START_Y),
+  ];
+}
+
+function easeOutCubic(t) {
+  return 1 - (1 - t) ** 3;
+}
+
+// Distance and direction from the board's center, plus an 8-fold ("octagon")
+// angular modulation of that distance — cached once per dot since a ripple
+// wave is driven by each dot's own fixed distance from center, not by where
+// it ends up moving. Combining a cosine wave at 8x the angular frequency with
+// the radius warps an otherwise-circular ring into an octagon; higher
+// OCTAGON_STRENGTH makes the eight lobes more pronounced.
+function radialInfo(x, y) {
+  const centerX = (DIGITAL_GRID_COLUMNS - 1) / 2;
+  const centerY = (DIGITAL_GRID_ROWS - 1) / 2;
+  const dx = x - centerX;
+  const dy = y - centerY;
+  const r = Math.hypot(dx, dy);
+  const ux = r > 0.5 ? dx / r : 1;
+  const uy = r > 0.5 ? dy / r : 0;
+  const theta = Math.atan2(uy, ux);
+  const octagon = 1 + OCTAGON_STRENGTH * Math.cos(8 * theta);
+  return { r, ux, uy, octagon };
+}
+
+// Every grid cell's radial info, computed once since it only depends on the
+// (fixed) grid dimensions — used to ripple the dim background board itself,
+// not just the lit digit dots, so the whole grid waves together.
+const GRID_RADIAL = [];
+for (let y = 0; y < DIGITAL_GRID_ROWS; y++) {
+  for (let x = 0; x < DIGITAL_GRID_COLUMNS; x++) {
+    GRID_RADIAL.push(radialInfo(x, y));
+  }
+}
+const BOARD_RIPPLE_MS = CONVERGE_DELAY_MS + CONVERGE_MS;
+
+// Builds a two-phase transition: every previously-lit dot first blows outward
+// off the board (explode), then every newly-lit dot flies in and lands on the
+// new digits (converge). Rather than flying to a random scattered point, each
+// dot rides a sine wave along its own radial line, phased by its distance
+// from center (see radialInfo) so different rings peak at different times —
+// the surface stretches and squeezes outward like an actual ripple.
+function buildTransitionParticles(prevDots, nextDots, startTime) {
+  const outgoing = prevDots.map((dot) => {
+    const { r, ux, uy, octagon } = radialInfo(dot.x, dot.y);
+    return {
+      fromX: dot.x,
+      fromY: dot.y,
+      toX: dot.x,
+      toY: dot.y,
+      fromOpacity: 1,
+      toOpacity: 0,
+      isColon: false,
+      startTime,
+      duration: EXPLODE_MS,
+      ease: easeOutCubic,
+      r0: r,
+      ux,
+      uy,
+      octagon,
+    };
   });
 
-  return (
-    <div className="clock-digital-grid" aria-hidden="true">
-      {Array.from({ length: DIGITAL_GRID_COLUMNS * DIGITAL_GRID_ROWS }, (_, index) => {
-        const x = index % DIGITAL_GRID_COLUMNS;
-        const y = Math.floor(index / DIGITAL_GRID_COLUMNS);
-        return (
-          <span
-            key={index}
-            className={[
-              activeCells.has(`${x}-${y}`) ? "clock-lit-dot" : "",
-              colonCells.has(`${x}-${y}`) ? "clock-colon-dot" : "",
-            ].filter(Boolean).join(" ")}
-          />
-        );
-      })}
-    </div>
-  );
+  const incoming = nextDots.map((dot) => {
+    const { r, ux, uy, octagon } = radialInfo(dot.x, dot.y);
+    return {
+      fromX: dot.x,
+      fromY: dot.y,
+      toX: dot.x,
+      toY: dot.y,
+      fromOpacity: 0,
+      toOpacity: 1,
+      isColon: dot.isColon,
+      startTime: startTime + CONVERGE_DELAY_MS,
+      duration: CONVERGE_MS,
+      ease: easeOutCubic,
+      r0: r,
+      ux,
+      uy,
+      octagon,
+    };
+  });
+
+  return [...outgoing, ...incoming];
+}
+
+// Canvas-drawn (not DOM) so every dot keeps the same radius and can animate to
+// a non-grid-snapped position mid-flight; DOM boxes would snap to device
+// pixels and jitter as they moved. When the displayed digits change, the whole
+// board ripples outward in an octagonal wave and the new digits ripple back
+// together, with a chromatic red/blue fringe that splits away while rippling.
+function DigitalClock({ parts, containerRef }) {
+  const canvasRef = useRef(null);
+  const animRef = useRef({ particles: [], prevDots: [], transitionStartTime: 0 });
+  const targetDots = useMemo(() => computeActiveDots(parts), [parts.time, parts.dayLabel]);
+
+  useEffect(() => {
+    const anim = animRef.current;
+    const startTime = performance.now();
+    anim.particles = buildTransitionParticles(anim.prevDots, targetDots, startTime);
+    anim.prevDots = targetDots;
+    anim.transitionStartTime = startTime;
+  }, [targetDots]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const ctx = canvas.getContext("2d");
+    let frameId = null;
+
+    const draw = (timestamp) => {
+      frameId = requestAnimationFrame(draw);
+
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const refBox = containerRef.current;
+      const refW = refBox ? refBox.clientWidth : w;
+      const refH = refBox ? refBox.clientHeight : h;
+      if (!w || !h || !refW || !refH) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      // The canvas box is bigger than the visible card (see .clock-digital-canvas)
+      // so exploding dots have room to fly past its edges; padX/padY re-center the
+      // grid on the card's own footprint rather than the inflated canvas box.
+      // stepX/stepY are independent (rather than one shared min()) so the grid
+      // fills the card edge-to-edge on both axes instead of only the width, with
+      // dots letterboxed top/bottom; that leftover margin was why the explode/
+      // converge motion looked like it reached the card's edges horizontally but
+      // fell short vertically — the vertical dots simply started further from
+      // the edge. Dot radius still comes from the tighter axis so dots stay round.
+      const padX = (w - refW) / 2;
+      const padY = (h - refH) / 2;
+      const stepX = refW / DIGITAL_GRID_COLUMNS;
+      const stepY = refH / DIGITAL_GRID_ROWS;
+      const originX = padX + stepX / 2;
+      const originY = padY + stepY / 2;
+      const radius = Math.min(stepX, stepY) * 0.27;
+      const baseColor = getComputedStyle(canvas).color;
+
+      // Dim background dots: the always-visible board texture. These ripple too
+      // (using every cell's precomputed radial info) so the whole grid waves
+      // together on each transition, not just the lit digit dots.
+      const boardElapsed = timestamp - animRef.current.transitionStartTime;
+      const boardProgress = Math.min(1, Math.max(0, boardElapsed / BOARD_RIPPLE_MS));
+      const boardEnvelope = Math.sin(boardProgress * Math.PI);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = baseColor;
+      ctx.globalAlpha = 0.2;
+      for (let y = 0; y < DIGITAL_GRID_ROWS; y++) {
+        for (let x = 0; x < DIGITAL_GRID_COLUMNS; x++) {
+          const { r, ux, uy, octagon } = GRID_RADIAL[y * DIGITAL_GRID_COLUMNS + x];
+          const wavePhase = r * RIPPLE_FREQUENCY - Math.max(0, boardElapsed) * RIPPLE_SPEED;
+          const ripple = RIPPLE_AMPLITUDE * octagon * Math.sin(wavePhase) * boardEnvelope;
+          const bx = x + ux * ripple;
+          const by = y + uy * ripple;
+          ctx.beginPath();
+          ctx.arc(originX + bx * stepX, originY + by * stepY, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Lit dots: exploding out / converging in, with a chromatic fringe while moving.
+      const blinkOn = Math.floor(timestamp / 500) % 2 === 0;
+      animRef.current.particles.forEach((particle) => {
+        const elapsed = timestamp - particle.startTime;
+        const progress = Math.min(1, Math.max(0, elapsed / particle.duration));
+        const eased = particle.ease(progress);
+        let opacity = particle.fromOpacity + (particle.toOpacity - particle.fromOpacity) * eased;
+        if (particle.isColon && progress >= 1 && particle.toOpacity > 0) {
+          opacity = blinkOn ? 1 : 0.18;
+        }
+        opacity = Math.max(0, Math.min(1, opacity));
+        if (opacity <= 0.01) return;
+
+        // The ripple's own envelope: 0 at the start and end of this phase, peaking
+        // in the middle, so the dot always lands exactly back on its real digit
+        // position (zero displacement) right as it finishes fading in or out.
+        const envelope = Math.sin(progress * Math.PI);
+        const wavePhase = particle.r0 * RIPPLE_FREQUENCY - Math.max(0, elapsed) * RIPPLE_SPEED;
+        const ripple = RIPPLE_AMPLITUDE * particle.octagon * Math.sin(wavePhase) * envelope;
+        const x = particle.fromX + particle.ux * ripple;
+        const y = particle.fromY + particle.uy * ripple;
+
+        const px = originX + x * stepX;
+        const py = originY + y * stepY;
+
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = baseColor;
+        ctx.globalAlpha = opacity;
+        ctx.beginPath();
+        ctx.arc(px, py, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Chromatic fringe peaks mid-ripple and disappears once the dot settles.
+        if (envelope > 0.02) {
+          const shiftX = particle.ux * RGB_SHIFT_CELLS * envelope * stepX;
+          const shiftY = particle.uy * RGB_SHIFT_CELLS * envelope * stepY;
+
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = opacity * envelope * 0.8;
+
+          ctx.fillStyle = "rgb(255, 45, 95)";
+          ctx.beginPath();
+          ctx.arc(px + shiftX, py + shiftY, radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "rgb(50, 140, 255)";
+          ctx.beginPath();
+          ctx.arc(px - shiftX, py - shiftY, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    };
+
+    frameId = requestAnimationFrame(draw);
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="clock-digital-canvas" aria-hidden="true" />;
 }
 
 function AnalogClock({ parts }) {
@@ -240,6 +455,7 @@ export default function Clock() {
   const [now, setNow] = useState(() => new Date());
   const [mode, setMode] = useState("digital");
   const parts = useMemo(() => getClockParts(now, use24Hour), [now, use24Hour]);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 1000);
@@ -249,22 +465,26 @@ export default function Clock() {
   const nextMode = mode === "digital" ? "analog" : mode === "analog" ? "year" : "digital";
 
   return (
-    <button
-      type="button"
-      className="clock-widget flex h-full w-full flex-col items-center justify-center rounded-[inherit] text-center"
-      onClick={() => setMode(nextMode)}
-      title={`Switch to ${nextMode} view`}
-      aria-label={`Clock showing ${parts.time}${use24Hour ? "" : ` ${parts.period}`}. Click to switch to the ${nextMode} view.`}
-    >
-      {mode === "digital" && <DigitalClock parts={parts} />}
-      {mode === "analog" && (
-        <>
-          <span className="clock-hole-field" aria-hidden="true" />
-          <AnalogClock parts={parts} />
-          <span className="clock-perforated-mask" aria-hidden="true" />
-        </>
-      )}
-      {mode === "year" && <YearClock now={now} />}
-    </button>
+    <div className="clock-shell relative h-full w-full rounded-[inherit]">
+      <button
+        ref={buttonRef}
+        type="button"
+        className="clock-widget flex h-full w-full flex-col items-center justify-center rounded-[inherit] text-center"
+        onClick={() => setMode(nextMode)}
+        title={`Switch to ${nextMode} view`}
+        aria-label={`Clock showing ${parts.time}${use24Hour ? "" : ` ${parts.period}`}. Click to switch to the ${nextMode} view.`}
+      >
+        {mode === "analog" && (
+          <>
+            <span className="clock-hole-field" aria-hidden="true" />
+            <AnalogClock parts={parts} />
+            <span className="clock-perforated-mask" aria-hidden="true" />
+          </>
+        )}
+        {mode === "year" && <YearClock now={now} />}
+      </button>
+      {/* Rendered outside the button so the exploding dots can fly past the card's own clipped edges. */}
+      {mode === "digital" && <DigitalClock parts={parts} containerRef={buttonRef} />}
+    </div>
   );
 }
