@@ -1476,8 +1476,19 @@
   white-space: nowrap;
 }
 
-.clock-widget {
+.clock-shell {
   container-type: size;
+  --clock-grid-inset: clamp(0.35rem, 3.2cqw, 0.62rem);
+  --clock-hole-radius: clamp(0.095rem, min(1.42cqw, 2.08cqh), 0.17rem);
+  --clock-grid-step: clamp(0.36rem, min(5.25cqw, 6.9cqh), 0.62rem);
+  --clock-digit-height: min(54cqh, 6.6rem);
+  --clock-digit-width: calc(var(--clock-digit-height) * 0.58);
+  --clock-segment-thickness: calc(var(--clock-grid-step) * 1.38);
+  --clock-segment-radius: calc(var(--clock-segment-thickness) * 0.18);
+  --clock-overflow-margin: clamp(1.5rem, 20cqw, 4.5rem);
+}
+
+.clock-widget {
   position: relative;
   overflow: hidden;
   isolation: isolate;
@@ -1548,56 +1559,14 @@
   pointer-events: none;
 }
 
-.clock-widget {
-  --clock-grid-inset: clamp(0.35rem, 3.2cqw, 0.62rem);
-  --clock-hole-radius: clamp(0.095rem, min(1.42cqw, 2.08cqh), 0.17rem);
-  --clock-grid-step: clamp(0.36rem, min(5.25cqw, 6.9cqh), 0.62rem);
-  --clock-lit-dot-size: calc(var(--clock-hole-radius) * 2);
-  --clock-lit-dot-gap: calc(var(--clock-grid-step) - var(--clock-lit-dot-size));
-  --clock-digit-height: min(54cqh, 6.6rem);
-  --clock-digit-width: calc(var(--clock-digit-height) * 0.58);
-  --clock-segment-thickness: calc(var(--clock-grid-step) * 1.38);
-  --clock-segment-radius: calc(var(--clock-segment-thickness) * 0.18);
-}
-
-.clock-digital-grid {
+.clock-digital-canvas {
   position: absolute;
-  inset: var(--clock-grid-inset);
-  z-index: 2;
-  display: grid;
-  grid-template-columns: repeat(21, var(--clock-grid-step));
-  grid-auto-rows: var(--clock-grid-step);
-  place-content: center;
-  border-radius: inherit;
-  overflow: hidden;
-  clip-path: inset(0 round inherit);
-}
-
-.clock-digital-grid span {
-  width: var(--clock-lit-dot-size);
-  height: var(--clock-lit-dot-size);
-  border-radius: 9999px;
-  place-self: center;
-  background: color-mix(in oklab, currentColor 20%, transparent);
-}
-
-.clock-digital-grid .clock-lit-dot {
-  background: color-mix(in oklab, currentColor 94%, white);
-  box-shadow: none;
-}
-
-.clock-digital-grid .clock-colon-dot {
-  animation: clock-colon-blink 1s steps(1, end) infinite;
-}
-
-@keyframes clock-colon-blink {
-  0%, 49% {
-    opacity: 1;
-  }
-
-  50%, 100% {
-    opacity: 0.18;
-  }
+  inset: calc(var(--clock-grid-inset) - var(--clock-overflow-margin));
+  width: calc(100% - 2 * var(--clock-grid-inset) + 2 * var(--clock-overflow-margin));
+  height: calc(100% - 2 * var(--clock-grid-inset) + 2 * var(--clock-overflow-margin));
+  z-index: 5;
+  display: block;
+  pointer-events: none;
 }
 
 .clock-digital-underlay {
