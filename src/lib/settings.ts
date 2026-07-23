@@ -1,5 +1,6 @@
 import Cookies from "js-cookie";
 import defaultSettings from "../config/settings.json";
+import { ensureBookmarkIds, flattenGroups } from "@/features/bookmarks/lib/tree";
 
 const SETTINGS_COOKIE_KEY = "settings";
 const SETTINGS_LOCAL_STORAGE_KEY = "startup-page.settings";
@@ -51,9 +52,35 @@ function createSettingsEnvelope(settings, overrides = {}) {
   };
 }
 
+function normalizeBookmarkBoxCategories(bookmarkBoxCategories, nextBookmarks) {
+  const nextFlatIds = new Set(flattenGroups(nextBookmarks).map((folder) => folder.id));
+  const topLevelIds = nextBookmarks.map((group) => group.id);
+
+  const entries = Array.isArray(bookmarkBoxCategories) ? bookmarkBoxCategories : [];
+
+  return entries.map((entry, boxIndex) => {
+    // Already migrated to an id from a previous run — keep it if it's still valid.
+    if (typeof entry === "string") {
+      return nextFlatIds.has(entry) ? entry : topLevelIds[boxIndex] || topLevelIds[0] || null;
+    }
+
+    // Legacy shape: a top-level array index into the bookmark array. Merge and
+    // id-backfill both preserve top-level order/length, so the same index into
+    // `nextBookmarks` still points at the same folder.
+    const legacyIndex = Number(entry);
+    const migratedId = Number.isInteger(legacyIndex) ? topLevelIds[legacyIndex] : undefined;
+    return migratedId || topLevelIds[boxIndex] || topLevelIds[0] || null;
+  });
+}
+
 function normalizeSettingsShape(settings) {
   const mergedSettings = mergeSettings(defaultSettings, settings);
   const decorativeVideo = mergedSettings.decorativeVideo || {};
+  const bookmark = ensureBookmarkIds(mergedSettings.bookmark);
+  const layout = {
+    ...mergedSettings.layout,
+    bookmarkBoxCategories: normalizeBookmarkBoxCategories(mergedSettings.layout?.bookmarkBoxCategories, bookmark),
+  };
 
   let urls = Array.isArray(decorativeVideo.urls)
     ? decorativeVideo.urls
@@ -68,6 +95,8 @@ function normalizeSettingsShape(settings) {
 
   return {
     ...mergedSettings,
+    bookmark,
+    layout,
     decorativeVideo: {
       ...decorativeVideo,
       urls,
@@ -77,6 +106,11 @@ function normalizeSettingsShape(settings) {
     },
   };
 }
+
+// Bookmark ids (and any other shape migrations normalizeSettingsShape applies)
+// need to exist even before a user has ever saved settings, so every "brand
+// new session" fallback below returns this instead of the raw JSON seed.
+const seedSettings = normalizeSettingsShape(defaultSettings);
 
 interface StoredSettingsRecord {
   schemaVersion: number;
@@ -118,7 +152,7 @@ function normalizeStoredRecord(record): StoredSettingsRecord | null {
 
 function parseSettings(rawSettings) {
   if (!rawSettings) {
-    return defaultSettings;
+    return seedSettings;
   }
 
   try {
@@ -130,7 +164,7 @@ function parseSettings(rawSettings) {
 
     return normalizeSettingsShape(parsed);
   } catch (_error) {
-    return defaultSettings;
+    return seedSettings;
   }
 }
 
@@ -344,7 +378,7 @@ export function readSettings() {
     return migratedCookieSettings;
   }
 
-  return defaultSettings;
+  return seedSettings;
 }
 
 export async function writeSettings(settings) {
@@ -366,10 +400,10 @@ export async function resetSettings() {
   clearSettingsFromLocalStorage();
   Cookies.remove(SETTINGS_COOKIE_KEY);
   await clearSettingsFromIndexedDb();
-  writeSettingsToLocalStorage(defaultSettings);
-  const record = await writeSettingsToIndexedDb(defaultSettings);
+  writeSettingsToLocalStorage(seedSettings);
+  const record = await writeSettingsToIndexedDb(seedSettings);
   return {
-    settings: defaultSettings,
+    settings: seedSettings,
     updatedAt: record?.updatedAt || new Date().toISOString(),
   };
 }

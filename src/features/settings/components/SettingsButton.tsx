@@ -472,49 +472,6 @@ function SettingsButton() {
     });
   };
 
-  const handleBookmarkTitleChange = (index, value) => {
-    updateSettings((prevSettings) => {
-      const bookmark = [...prevSettings.bookmark];
-      bookmark[index] = { ...bookmark[index], title: value };
-      return { ...prevSettings, bookmark };
-    });
-  };
-
-  const handleAddBookmarkCategory = () => {
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      bookmark: [
-        ...(Array.isArray(prevSettings.bookmark) ? prevSettings.bookmark : []),
-        { title: `bookmark category ${(prevSettings.bookmark || []).length + 1}`, content: [] },
-      ],
-    }));
-  };
-
-  const handleRemoveBookmarkCategory = (index) => {
-    updateSettings((prevSettings) => {
-      const bookmark = (Array.isArray(prevSettings.bookmark) ? prevSettings.bookmark : []).filter(
-        (_item, currentIndex) => currentIndex !== index
-      );
-      const currentMapping = prevSettings.layout?.bookmarkBoxCategories || [0, 1, 2, 3, 4];
-      const bookmarkBoxCategories = currentMapping.map((categoryIndex, boxIndex) => {
-        if (categoryIndex === index) {
-          return Math.min(boxIndex, Math.max(bookmark.length - 1, 0));
-        }
-
-        return categoryIndex > index ? categoryIndex - 1 : categoryIndex;
-      });
-
-      return {
-        ...prevSettings,
-        bookmark,
-        layout: {
-          ...prevSettings.layout,
-          bookmarkBoxCategories,
-        },
-      };
-    });
-  };
-
   const handleBookmarkBoxCategoryChange = (boxIndex, value) => {
     updateSettings((prevSettings) => {
       const bookmarkBoxCategories = [...(prevSettings.layout?.bookmarkBoxCategories || [0, 1, 2, 3, 4])];
@@ -527,38 +484,6 @@ function SettingsButton() {
           bookmarkBoxCategories,
         },
       };
-    });
-  };
-
-  const handleBookmarkItemChange = (index, subIndex, subKey, value) => {
-    updateSettings((prevSettings) => {
-      const bookmark = [...prevSettings.bookmark];
-      const content = [...bookmark[index].content];
-      content[subIndex] = { ...content[subIndex], [subKey]: value };
-      bookmark[index] = { ...bookmark[index], content };
-      return { ...prevSettings, bookmark };
-    });
-  };
-
-  const handleAddBookmarkItem = (index) => {
-    updateSettings((prevSettings) => {
-      const bookmark = [...prevSettings.bookmark];
-      bookmark[index] = {
-        ...bookmark[index],
-        content: [...bookmark[index].content, { name: "", url: "" }]
-      };
-      return { ...prevSettings, bookmark };
-    });
-  };
-
-  const handleRemoveBookmarkItem = (index, subIndex) => {
-    updateSettings((prevSettings) => {
-      const bookmark = [...prevSettings.bookmark];
-      bookmark[index] = {
-        ...bookmark[index],
-        content: bookmark[index].content.filter((_, currentSubIndex) => currentSubIndex !== subIndex)
-      };
-      return { ...prevSettings, bookmark };
     });
   };
 
@@ -1356,7 +1281,7 @@ function SettingsButton() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Bookmarks</CardTitle>
-                    <CardDescription>Manage bookmark categories and choose which category each dashboard box shows.</CardDescription>
+                    <CardDescription>Choose which bookmark category each dashboard box shows.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="rounded-xl border border-border bg-muted/20 p-4">
@@ -1379,64 +1304,6 @@ function SettingsButton() {
                         ))}
                       </div>
                     </div>
-
-                    {settingsState.bookmark.map((item, index) => (
-                      <div key={index} className="rounded-xl border border-border bg-muted/25 p-4">
-                        <div className="flex items-end gap-3">
-                          <div className="flex-1">
-                            <SettingField label={`Category ${index + 1} Name`}>
-                              <Input value={item.title} onChange={(event) => handleBookmarkTitleChange(index, event.target.value)} />
-                            </SettingField>
-                          </div>
-                          {settingsState.bookmark.length > 1 ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRemoveBookmarkCategory(index)}
-                            >
-                              Remove category
-                            </Button>
-                          ) : null}
-                        </div>
-                        <div className="mt-4 space-y-3">
-                          {item.content.map((content, subIndex) => (
-                            <div key={subIndex} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                              <SettingField label="Name">
-                                <Input
-                                  value={content.name}
-                                  onChange={(event) => handleBookmarkItemChange(index, subIndex, "name", event.target.value)}
-                                />
-                              </SettingField>
-                              <SettingField label="URL">
-                                <Input
-                                  value={content.url}
-                                  onChange={(event) => handleBookmarkItemChange(index, subIndex, "url", event.target.value)}
-                                />
-                              </SettingField>
-                              <div className="flex items-end">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleRemoveBookmarkItem(index, subIndex)}
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-4 flex gap-3">
-                          <Button type="button" size="sm" onClick={() => handleAddBookmarkItem(index)}>
-                            Add link
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <Button type="button" variant="outline" onClick={handleAddBookmarkCategory}>
-                      Add category
-                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>

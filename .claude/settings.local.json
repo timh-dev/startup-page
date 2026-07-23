@@ -47,7 +47,11 @@
       "Bash(npm install *)",
       "Bash(node inspect.js)",
       "Bash(lsof -ti:5183 -sTCP:LISTEN)",
-      "Bash(xargs -r kill)"
+      "Bash(xargs -r kill)",
+      "Bash(npx tsc *)",
+      "Bash(pnpm run *)",
+      "Read(//usr/local/bin/**)",
+      "Bash(nvm --version)"
     ]
   }
 }

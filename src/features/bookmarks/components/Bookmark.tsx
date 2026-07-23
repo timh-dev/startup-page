@@ -1,4 +1,5 @@
 import React from "react";
+import { HiPlus } from "react-icons/hi2";
 
 function getParsableUrl(url) {
   if (typeof url !== "string") {
@@ -141,7 +142,7 @@ export function LocalServiceStatus({ url, className = "size-3.5" }) {
   );
 }
 
-const Bookmark = ({ title, content, cardClass, onTitleClick }) => {
+const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }) => {
   const titleContent = (
     <div className="bookmark-title truncate text-center font-semibold leading-none text-primary-foreground">
       {title}
@@ -155,7 +156,20 @@ const Bookmark = ({ title, content, cardClass, onTitleClick }) => {
         "bg-primary text-primary-foreground rounded-xl col-span-1 h-36 w-36 overflow-hidden border border-border/50 shadow-lg"
       }
     >
-      <div className="bookmark-widget flex h-full flex-col">
+      <div className="bookmark-widget group/tile relative flex h-full flex-col">
+        {onQuickAdd ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onQuickAdd();
+            }}
+            className="absolute -right-1 -top-1 z-10 inline-flex size-6 items-center justify-center rounded-full border border-primary-foreground/30 bg-card text-card-foreground opacity-0 shadow-md transition hover:bg-accent hover:text-accent-foreground focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring group-hover/tile:opacity-100"
+            title="Quick add bookmark"
+          >
+            <HiPlus className="size-3.5" />
+          </button>
+        ) : null}
         <div className="bookmark-header border-b border-primary-foreground/15">
           {onTitleClick ? (
             <button

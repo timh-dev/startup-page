@@ -9,6 +9,7 @@ import { useLayoutEditStore } from "@/features/dashboard/stores/layoutEditStore"
 import ThemeProvider, { ThemeContext, type ThemeMode } from "@/components/layout/ThemeContext";
 import Toggle from "@/components/layout/ThemeToggle";
 import SettingsButton from "@/features/settings/components/SettingsButton";
+import BookmarkDialogs from "@/features/bookmarks/components/BookmarkDialogs";
 import AccountButton from "@/features/auth/AccountButton";
 import AuthBridge from "@/features/auth/AuthBridge";
 import { useIsClerkAvailable } from "@/features/auth/ClerkStatus";
@@ -186,6 +187,7 @@ function AppLayoutInner() {
       <ThemeSync />
       {isClerkAvailable && <AuthBridge />}
       <VaultNavigationActions />
+      <BookmarkDialogs />
       <nav className="vault-nav-center" aria-label="Page navigation">
         <button
           type="button"

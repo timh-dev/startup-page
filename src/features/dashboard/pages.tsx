@@ -18,6 +18,7 @@ import FeaturePanel from "@/features/dashboard/components/FeaturePanel";
 import Unsplash from "@/features/media/components/Unsplash";
 import SearchBox from "@/features/dashboard/components/Search";
 import Bookmark from "@/features/bookmarks/components/Bookmark";
+import { useBookmarkDialogStore } from "@/features/bookmarks/stores/bookmarkDialogStore";
 import ResourceVaultPreview from "@/features/resourceVault/components/ResourceVaultPreview";
 
 import desert from "@/assets/media/desert.mp4";
@@ -92,10 +93,12 @@ export default function Index() {
   const ui = settings.ui || {};
   const decorativeVideo = settings.decorativeVideo || {};
   const bookmarkGroups = Array.isArray(settings.bookmark) ? settings.bookmark : [];
-  const bookmarkBoxCategories = settings.layout?.bookmarkBoxCategories || [0, 1, 2, 3, 4];
+  const bookmarkBoxCategories = settings.layout?.bookmarkBoxCategories || [];
+  const openAddBookmarkDialog = useBookmarkDialogStore((state) => state.openAddBookmark);
   const getBookmarkGroupForBox = (boxIndex: number) =>
-    bookmarkGroups[bookmarkBoxCategories[boxIndex]] ||
-    bookmarkGroups[boxIndex] || { title: "", content: [] };
+    bookmarkGroups.find((group: any) => group.id === bookmarkBoxCategories[boxIndex]) ||
+    bookmarkGroups[boxIndex] ||
+    { id: null, title: "", content: [] };
   const gapClass = ui.gridDensity === "compact" ? "gap-y-4 gap-x-4" : "gap-y-6 gap-x-6";
   const decorativeGap = ui.gridDensity === "compact" ? 16 : 24;
   const tilePx = (ui.tileSize || 9) * 16;
@@ -157,8 +160,12 @@ export default function Index() {
     return decorativeVideoUrls[randomIndex] || desert;
   });
 
-  const openBookmarkView = (categoryIndex: number) => {
-    window.localStorage?.setItem(BOOKMARK_CATEGORY_KEY, String(categoryIndex));
+  const openBookmarkView = (categoryId: string | null) => {
+    if (categoryId) {
+      window.localStorage?.setItem(BOOKMARK_CATEGORY_KEY, categoryId);
+    } else {
+      window.localStorage?.removeItem(BOOKMARK_CATEGORY_KEY);
+    }
     navigate("/bookmarks");
   };
 
@@ -263,7 +270,8 @@ export default function Index() {
           <Bookmark
             title={group.title}
             content={group.content}
-            onTitleClick={() => openBookmarkView(bookmarkBoxCategories[boxIndex] ?? boxIndex)}
+            onTitleClick={() => openBookmarkView(group.id)}
+            onQuickAdd={group.id ? () => openAddBookmarkDialog(group.id) : undefined}
             cardClass={panel(`h-full w-full overflow-y-auto ${strongSurface}`)}
           />
         );
