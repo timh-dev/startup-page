@@ -51,7 +51,13 @@
       "Bash(npx tsc *)",
       "Bash(pnpm run *)",
       "Read(//usr/local/bin/**)",
-      "Bash(nvm --version)"
+      "Bash(nvm --version)",
+      "Bash(npx vite *)",
+      "Bash(grep -rlE \"\\(bg|text|border|ring\\)-\\(zinc|emerald|amber|sky|rose|indigo|violet|fuchsia|pink|lime|teal|cyan|slate|neutral|stone|gray|orange|yellow|green|blue|red|purple\\)-[0-9]{2,3}\" src --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(grep -rohE \"\\(bg|text|border|ring\\)-\\(zinc|emerald|amber|sky|rose|indigo|violet|fuchsia|pink|lime|teal|cyan|slate|neutral|stone|gray|orange|yellow|green|blue|red|purple\\)-[0-9]{2,3}\\(/[0-9]+\\)?\" src --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(npm run *)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5183/)"
     ]
   }
 }

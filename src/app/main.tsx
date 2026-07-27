@@ -5,6 +5,7 @@ import "@/assets/styles/index.css";
 import { hydrateSettingsFromIndexedDb } from "@/lib/settings";
 import { useSettingsStore } from "@/features/settings/stores";
 import { ClerkErrorBoundary, ClerkUnavailableProvider } from "@/features/auth/ClerkStatus";
+import { clerkAppearance } from "@/features/auth/clerkAppearance";
 
 import AppLayout from "@/components/layout/AppLayout";
 
@@ -14,7 +15,10 @@ const BookmarksPage = lazy(() => import("@/pages/BookmarksPage"));
 const ResourceVaultPage = lazy(() => import("@/pages/ResourceVaultPage"));
 const WeatherPreviewPage = lazy(() => import("@/pages/WeatherPreview"));
 
-const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+const LOCAL_ONLY = import.meta.env.VITE_LOCAL_ONLY === "true";
+// Forcing local-only ignores a real key so a dev with cloud creds pulled into
+// .env.local can still preview what a self-hosted/open-source user sees.
+const CLERK_KEY = LOCAL_ONLY ? undefined : (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined);
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element was not found.");
@@ -43,7 +47,12 @@ async function render() {
       // ClerkErrorBoundary catches invalid keys, network failures, or any other
       // Clerk init error and falls back to local-only mode automatically.
       <ClerkErrorBoundary fallback={<ClerkUnavailableProvider>{routes}</ClerkUnavailableProvider>}>
-        <ClerkProvider publishableKey={CLERK_KEY} afterSignInUrl="/#/" afterSignUpUrl="/#/">
+        <ClerkProvider
+          publishableKey={CLERK_KEY}
+          afterSignInUrl="/#/"
+          afterSignUpUrl="/#/"
+          appearance={clerkAppearance}
+        >
           {routes}
         </ClerkProvider>
       </ClerkErrorBoundary>
