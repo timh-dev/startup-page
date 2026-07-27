@@ -29,17 +29,24 @@ async function getToken(): Promise<string | null> {
   }
 }
 
-export async function pullSettingsFromCloud(): Promise<{
-  settings: Record<string, unknown>;
-  serverUpdatedAt: string;
-  clientUpdatedAt: string | null;
-} | null> {
+// Discriminated result so callers can tell "the cloud genuinely has nothing
+// yet" (status "empty", a confirmed 404) apart from "we couldn't find out"
+// (status "error" — no auth token yet, offline, no subscription, a failed
+// request). Collapsing those into a single `null` used to make an empty
+// local copy look like the correct thing to push to the cloud on a failed
+// pull, silently overwriting real synced data.
+export type PullResult =
+  | { status: "ok"; settings: Record<string, unknown>; serverUpdatedAt: string; clientUpdatedAt: string | null }
+  | { status: "empty" }
+  | { status: "error" };
+
+export async function pullSettingsFromCloud(): Promise<PullResult> {
   const token = await getToken();
-  if (!token) return null;
+  if (!token) return { status: "error" };
 
   if (!isOnline()) {
     useAuthStore.getState().setSyncStatus("offline");
-    return null;
+    return { status: "error" };
   }
 
   useAuthStore.getState().setSyncStatus("syncing");
@@ -51,13 +58,14 @@ export async function pullSettingsFromCloud(): Promise<{
     if (res.status === 404) {
       // Sync works; there's just nothing in the cloud yet.
       useAuthStore.getState().setSyncStatus("synced", new Date().toISOString());
-      return null;
+      return { status: "empty" };
     }
-    if (res.status === 402) return null;
+    if (res.status === 402) return { status: "error" };
     if (!res.ok) throw new Error(`Pull failed: ${res.status}`);
     const data = await res.json();
     useAuthStore.getState().setSyncStatus("synced", new Date().toISOString());
     return {
+      status: "ok",
       settings: data.settings,
       serverUpdatedAt: data.server_updated_at,
       clientUpdatedAt: data.client_updated_at ?? null,
@@ -66,7 +74,7 @@ export async function pullSettingsFromCloud(): Promise<{
     // Network dropped mid-request vs. a genuine server/request failure read
     // differently to the user, so tell them apart.
     useAuthStore.getState().setSyncStatus(isOnline() ? "error" : "offline");
-    return null;
+    return { status: "error" };
   }
 }
 
