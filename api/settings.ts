@@ -37,11 +37,29 @@ export async function PUT(request: Request): Promise<Response> {
       return json({ detail: "Body must include a settings object" }, 422);
     }
 
+    const incomingClientUpdatedAt = payload.client_updated_at ? new Date(payload.client_updated_at) : null;
+
+    const existing = await getDb().query.userSettings.findFirst({
+      where: eq(userSettings.userId, user.id),
+    });
+
+    // Last line of defense: never let a push silently replace existing data
+    // with something older (or something carrying no timestamp at all, e.g.
+    // a client bug pushing freshly-seeded default state). Reject instead of
+    // overwriting so the caller can reconcile.
+    if (existing) {
+      const existingTime = existing.clientUpdatedAt?.getTime() ?? 0;
+      const incomingTime = incomingClientUpdatedAt?.getTime() ?? 0;
+      if (incomingTime < existingTime) {
+        return json({ detail: "Conflict: server has newer data", ...toResponse(existing) }, 409);
+      }
+    }
+
     const values = {
       userId: user.id,
       schemaVersion: Number(payload.schema_version) || 2,
       settings: payload.settings,
-      clientUpdatedAt: payload.client_updated_at ? new Date(payload.client_updated_at) : null,
+      clientUpdatedAt: incomingClientUpdatedAt,
       serverUpdatedAt: new Date(),
     };
 

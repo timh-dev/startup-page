@@ -422,6 +422,10 @@ export async function hydrateSettingsFromIndexedDb() {
  * Pull cloud settings and reconcile with the local copy by timestamp.
  * - Cloud copy newer (or no local copy): apply cloud locally, return it.
  * - Local copy newer (offline edits): keep local, push it up, return null.
+ * - Pull failed for any reason (no token yet, offline, server error, no
+ *   subscription, ...): do nothing. Treating a failed pull as "cloud is
+ *   empty" is what let an empty local copy silently overwrite real synced
+ *   data, so a failure must never trigger a push.
  * Returns the applied settings when local state changed, otherwise null.
  */
 export async function syncSettingsFromCloud() {
@@ -432,8 +436,13 @@ export async function syncSettingsFromCloud() {
       readSettingsFromIndexedDb(),
     ]);
 
-    if (!cloudResult) {
-      // Nothing in the cloud yet — seed it with the local copy.
+    if (cloudResult.status === "error") {
+      return null;
+    }
+
+    if (cloudResult.status === "empty") {
+      // Confirmed (via 404) that there's genuinely nothing in the cloud yet
+      // — seed it with the local copy.
       if (localRecord) {
         schedulePushToCloud(localRecord.settings, localRecord.updatedAt);
       }
