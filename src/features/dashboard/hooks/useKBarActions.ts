@@ -38,28 +38,6 @@ function safeCalculate(expression) {
   }
 }
 
-const TILE_LABELS = {
-  videoTall: "Tall Video",
-  videoSmall: "Small Video",
-  search: "Search Box",
-  weather: "Weather",
-  featurePanel: "Feature Panel",
-  solarGraph: "Solar Graph",
-  vaultPreview: "Vault Preview",
-  clock: "Clock",
-  themeTools: "Theme Tools",
-  bookmark1: "Bookmark 1",
-  bookmark2: "Bookmark 2",
-  bookmark3: "Bookmark 3",
-  bookmark4: "Bookmark 4",
-  bookmark5: "Bookmark 5",
-  unsplash1: "Photo 1",
-  unsplash2: "Photo 2",
-  unsplash3: "Photo 3",
-  unsplash4: "Photo 4",
-  unsplash5: "Photo 5",
-};
-
 export default function useKBarActions() {
   const { setThemeMode, setThemePalette, setCustomThemeVars } = React.useContext(ThemeContext);
   // Subscribing to the store keeps bookmark/vault actions fresh after edits
@@ -161,58 +139,6 @@ export default function useKBarActions() {
         const input = document.getElementById("search-input");
         if (input) input.focus();
       },
-    });
-
-    // --- Feature Panel ---
-    list.push({
-      id: "feature-headlines",
-      name: "Show Headlines",
-      shortcut: [],
-      section: "Feature Panel",
-      perform: () => {
-        const s = readSettings();
-        s.featurePanel = { ...s.featurePanel, mode: "headlines" };
-        writeSettings(s).then(() => window.location.reload());
-      },
-    });
-    list.push({
-      id: "feature-windy",
-      name: "Show Windy",
-      shortcut: [],
-      section: "Feature Panel",
-      perform: () => {
-        const s = readSettings();
-        s.featurePanel = { ...s.featurePanel, mode: "windy" };
-        writeSettings(s).then(() => window.location.reload());
-      },
-    });
-    list.push({
-      id: "feature-timer",
-      name: "Show Timer",
-      shortcut: [],
-      section: "Feature Panel",
-      perform: () => {
-        const s = readSettings();
-        s.featurePanel = { ...s.featurePanel, mode: "timer" };
-        writeSettings(s).then(() => window.location.reload());
-      },
-    });
-
-    // --- Layout: Toggle tiles ---
-    Object.entries(TILE_LABELS).forEach(([id, label]) => {
-      list.push({
-        id: `toggle-${id}`,
-        name: `Toggle ${label}`,
-        shortcut: [],
-        section: "Layout",
-        perform: () => {
-          const s = readSettings();
-          const hidden = s.layout?.hiddenBoxes || {};
-          hidden[id] = !hidden[id];
-          s.layout = { ...s.layout, hiddenBoxes: hidden };
-          writeSettings(s).then(() => window.location.reload());
-        },
-      });
     });
 
     // --- Settings ---

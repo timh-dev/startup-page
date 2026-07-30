@@ -1,6 +1,5 @@
 import React from "react";
 import { HiBackward, HiForward, HiPause, HiPlay } from "react-icons/hi2";
-import { readSettings } from "@/lib/settings";
 
 const SCOPES = "user-read-currently-playing user-read-playback-state user-modify-playback-state";
 const TOKEN_KEY = "sp_access_token";
@@ -103,10 +102,7 @@ function fmtMs(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export default function SpotifyPlayer() {
-  const settings = React.useMemo(() => readSettings(), []);
-  const clientId = settings.featurePanel?.spotifyClientId;
-
+export default function SpotifyPlayer({ clientId }: { clientId?: string | null }) {
   const [track, setTrack] = React.useState(null);
   const [status, setStatus] = React.useState("init");
   const [progress, setProgress] = React.useState(0);
@@ -201,7 +197,7 @@ export default function SpotifyPlayer() {
         <div>
           <div className="text-4xl">🎵</div>
           <p className="mt-2 text-sm font-semibold text-foreground">Spotify Now Playing</p>
-          <p className="mt-1 text-xs text-muted-foreground">Add your Spotify App Client ID in Settings → Content → Feature Panel.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Add your Spotify App Client ID in this widget's settings.</p>
         </div>
       </div>
     );

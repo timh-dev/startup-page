@@ -1,5 +1,4 @@
 import React from "react";
-import { readSettings } from "@/lib/settings";
 
 function timeAgo(dateStr) {
   const s = Math.floor((Date.now() - new Date(dateStr)) / 1000);
@@ -36,9 +35,7 @@ function describeEvent(event) {
   }
 }
 
-export default function GitHubActivity() {
-  const settings = React.useMemo(() => readSettings(), []);
-  const username = settings.featurePanel?.githubUsername;
+export default function GitHubActivity({ username }: { username?: string | null }) {
   const [events, setEvents] = React.useState([]);
   const [status, setStatus] = React.useState("loading");
 
@@ -76,7 +73,7 @@ export default function GitHubActivity() {
       <div className="flex h-full w-full items-center justify-center rounded-[inherit] bg-card p-6 text-center">
         <div>
           <p className="text-sm font-semibold text-foreground">GitHub Activity</p>
-          <p className="mt-1 text-xs text-muted-foreground">Set a GitHub username in Settings → Content → Feature Panel.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Set a GitHub username in this widget's settings.</p>
         </div>
       </div>
     );

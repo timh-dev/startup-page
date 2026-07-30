@@ -4,6 +4,7 @@
   "units": "imperial",
   "unsplashCredential": null,
   "openWeatherCredential": null,
+  "widgets": [],
   "ui": {
     "themeMode": "system",
     "themePalette": "zen",

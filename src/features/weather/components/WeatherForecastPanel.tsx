@@ -1,14 +1,16 @@
 import React from "react";
-import { useWeatherStore } from "@/features/weather/stores/weatherStore";
+import { useWeatherStore, useWeatherInstance } from "@/features/weather/stores/weatherStore";
 import type { ResolvedWeather } from "@/features/weather/types/weather";
 
 interface WeatherForecastPanelProps {
   resolved: ResolvedWeather;
+  instanceId: string;
 }
 
-export function WeatherForecastPanel({ resolved }: WeatherForecastPanelProps): React.ReactElement {
+export function WeatherForecastPanel({ resolved, instanceId }: WeatherForecastPanelProps): React.ReactElement {
   const { forecastDays, rangeMin, rangeSpan, unitLabel } = resolved;
-  const { selectedDay, openWeatherCard } = useWeatherStore();
+  const { selectedDay } = useWeatherInstance(instanceId);
+  const openWeatherCard = useWeatherStore((state) => state.openWeatherCard);
   const unit = unitLabel === "F" ? "imperial" : "metric";
 
   return (
@@ -23,7 +25,7 @@ export function WeatherForecastPanel({ resolved }: WeatherForecastPanelProps): R
             key={day.date}
             type="button"
             className="weather-forecast-day flex min-w-0 flex-1 flex-col items-center"
-            onClick={() => openWeatherCard(isSelected ? null : { day, unit })}
+            onClick={() => openWeatherCard(instanceId, isSelected ? null : { day, unit })}
             aria-expanded={isSelected}
           >
             <span className="weather-forecast-name font-medium">{day.dayName}</span>

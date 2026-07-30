@@ -84,6 +84,30 @@ async function fetchAndCacheImage(imageUrl) {
   }
 }
 
+// Drops this tile's cached URL (localStorage) and cached image bytes (Cache
+// API) so its next mount fetches a fresh photo instead of reusing the old
+// one. Scoped to these exact search terms — clearing one photo tile's cache
+// doesn't touch any other tile's.
+export async function clearPhotoCache(searchTerms) {
+  if (!searchTerms?.length) return;
+  const key = buildCacheKey(searchTerms);
+  let cachedUrl = null;
+
+  try {
+    const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
+    cachedUrl = store[key]?.url ?? null;
+    delete store[key];
+    localStorage.setItem(URL_STORE_KEY, JSON.stringify(store));
+  } catch {}
+
+  if (cachedUrl && "caches" in window) {
+    try {
+      const cache = await caches.open(PHOTO_CACHE_NAME);
+      await cache.delete(cachedUrl);
+    } catch {}
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 class Unsplash extends Component {
@@ -164,7 +188,7 @@ class Unsplash extends Component {
   }
 
   async _fetchDisplayAndCache(category, searchTerms, updateDisplay) {
-    const accessKey = settings.unsplashCredential;
+    const accessKey = (settings.unsplashCredential || "").trim();
 
     if (!accessKey) {
       await this._fetchFallback(category, searchTerms, updateDisplay);

@@ -10,6 +10,7 @@ import ThemeProvider, { ThemeContext, type ThemeMode } from "@/components/layout
 import Toggle from "@/components/layout/ThemeToggle";
 import SettingsButton from "@/features/settings/components/SettingsButton";
 import BookmarkDialogs from "@/features/bookmarks/components/BookmarkDialogs";
+import WidgetConfigDialog from "@/features/dashboard/components/WidgetConfigDialog";
 import AccountButton from "@/features/auth/AccountButton";
 import AuthBridge from "@/features/auth/AuthBridge";
 import { useIsClerkAvailable } from "@/features/auth/ClerkStatus";
@@ -188,6 +189,7 @@ function AppLayoutInner() {
       {isClerkAvailable && <AuthBridge />}
       <VaultNavigationActions />
       <BookmarkDialogs />
+      <WidgetConfigDialog />
       <nav className="vault-nav-center" aria-label="Page navigation">
         <button
           type="button"

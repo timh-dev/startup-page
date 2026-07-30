@@ -7,6 +7,7 @@ interface WeatherCurrentPanelProps {
   location: string;
   source: string;
   condition: string;
+  instanceId: string;
 }
 
 export function WeatherCurrentPanel({
@@ -14,6 +15,7 @@ export function WeatherCurrentPanel({
   location,
   source,
   condition,
+  instanceId,
 }: WeatherCurrentPanelProps): React.ReactElement {
   const { temperature, unitLabel, description } = resolved;
   const openWeatherCard = useWeatherStore((state) => state.openWeatherCard);
@@ -23,7 +25,7 @@ export function WeatherCurrentPanel({
       type="button"
       className="weather-current relative z-10 flex min-h-0 flex-1 flex-col justify-between"
       data-condition={condition}
-      onClick={() => openWeatherCard(null)}
+      onClick={() => openWeatherCard(instanceId, null)}
       aria-label="Open weather details"
     >
       <div className="relative z-10 flex min-h-0 items-start justify-between gap-2">
