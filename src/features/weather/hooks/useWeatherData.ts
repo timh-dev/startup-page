@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { readSettings } from "@/lib/settings";
+import { getOrRequestLocation } from "@/lib/geolocation";
 import { useWeatherStore } from "@/features/weather/stores/weatherStore";
 import { getOpenWeatherCondition, formatWeatherDescription } from "@/features/weather/utils";
 import type { WeatherData } from "@/features/weather/types/weather";
@@ -168,50 +169,66 @@ async function fetchWeather(
   return { data: weatherData, location: current.name };
 }
 
-export function useWeatherData(): void {
-  const { setData, setError, setLocation, setCoords, setLastFetchedAt } = useWeatherStore();
+export interface WeatherOverrides {
+  lat?: number | null;
+  lon?: number | null;
+  units?: "imperial" | "metric";
+  apiKey?: string | null;
+}
+
+export function useWeatherData(instanceId: string, overrides: WeatherOverrides = {}): void {
+  const setData = useWeatherStore((state) => state.setData);
+  const setError = useWeatherStore((state) => state.setError);
+  const setLocation = useWeatherStore((state) => state.setLocation);
+  const setCoords = useWeatherStore((state) => state.setCoords);
+  const setLastFetchedAt = useWeatherStore((state) => state.setLastFetchedAt);
+
+  // Overrides are a fresh object every render from the registry wrapper, so
+  // depend on their primitive fields rather than the object identity.
+  const overrideLat = overrides.lat;
+  const overrideLon = overrides.lon;
+  const overrideUnits = overrides.units;
+  const overrideApiKey = overrides.apiKey;
 
   useEffect(() => {
-    const { data, lastFetchedAt } = useWeatherStore.getState();
-    if (lastFetchedAt && Date.now() - lastFetchedAt < WEATHER_TTL_MS && data) return;
+    const instance = useWeatherStore.getState().instances[instanceId];
+    if (instance?.lastFetchedAt && Date.now() - instance.lastFetchedAt < WEATHER_TTL_MS && instance.data) return;
 
     const settings = readSettings() as Record<string, unknown>;
-    const unit = (settings.unit as string) || (settings.units as string) || "imperial";
-    const key  = ((settings.openWeatherCredential as string) ?? "").trim();
+    const unit = overrideUnits || (settings.unit as string) || (settings.units as string) || "imperial";
+    const key = (overrideApiKey || (settings.openWeatherCredential as string) || "").trim();
 
     if (!key) {
-      setError("Add your OpenWeather API key in Settings to see weather");
+      setError(instanceId, "Add your OpenWeather API key in this widget's settings");
       return;
     }
 
     async function load(lat: number, lon: number): Promise<void> {
       try {
         const { data: weatherData, location } = await fetchWeather(lat, lon, key, unit);
-        setData(weatherData);
-        setLastFetchedAt(Date.now());
-        setLocation(location);
-        setCoords(lat, lon);
+        setData(instanceId, weatherData);
+        setLastFetchedAt(instanceId, Date.now());
+        setLocation(instanceId, location);
+        setCoords(instanceId, lat, lon);
       } catch (err) {
-        setError((err as Error).message || "Could not load weather");
+        setError(instanceId, (err as Error).message || "Could not load weather");
       }
     }
 
-    const lat = settings.latitude as number | undefined;
-    const lon = settings.longitude as number | undefined;
+    const lat = overrideLat ?? (settings.latitude as number | undefined);
+    const lon = overrideLon ?? (settings.longitude as number | undefined);
 
     if (lat && lon) {
       void load(lat, lon);
       return;
     }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => void load(pos.coords.latitude, pos.coords.longitude),
-        () => setError("Location unavailable — set coordinates in Settings"),
-        { timeout: 8000, maximumAge: 600000 }
-      );
-    } else {
-      setError("Geolocation not supported");
-    }
-  }, [setData, setError, setLocation, setCoords, setLastFetchedAt]);
+    void getOrRequestLocation().then((coords) => {
+      if (coords) {
+        void load(coords.lat, coords.lon);
+      } else {
+        setError(instanceId, "Location unavailable — set coordinates in this widget's settings");
+      }
+    });
+  }, [instanceId, overrideLat, overrideLon, overrideUnits, overrideApiKey, setData, setError, setLocation, setCoords, setLastFetchedAt]);
 }

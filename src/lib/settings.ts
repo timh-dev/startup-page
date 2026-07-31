@@ -52,6 +52,147 @@ function createSettingsEnvelope(settings, overrides = {}) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Legacy fixed-tile → widget-instance migration
+//
+// Before the grid-native widget system, the dashboard was a fixed catalog of
+// string tile ids (order/size/hidden lived in `layout.*`, and per-tile config
+// was scattered across `unsplash.unsplashBoxN`, `layout.bookmarkBoxCategories`,
+// and `featurePanel.*`). This reproduces that exact dashboard as a
+// `widgets: WidgetInstance[]` array the first time it's seen — both for a
+// genuinely brand-new install (nothing saved yet, so every legacy field is
+// just its settings.json default) and for a real pre-widgets saved record.
+// Runs at most once per record: see the `widgets` presence check in
+// normalizeSettingsShape. Legacy fields are left in place afterward (unread,
+// harmless) rather than deleted, in case of an early rollback.
+// ---------------------------------------------------------------------------
+
+const LEGACY_TILE_ORDER = [
+  "videoTall", "videoSmall", "search", "bookmark1", "weather", "unsplash2",
+  "bookmark2", "featurePanel", "unsplash3", "bookmark3", "solarGraph",
+  "bookmark4", "bookmark5", "unsplash4", "unsplash5", "vaultPreview", "clock",
+];
+
+const LEGACY_TILE_SIZES = {
+  videoTall: "tall", videoSmall: "small", search: "wide", bookmark1: "small",
+  weather: "wide", unsplash2: "small", bookmark2: "small", featurePanel: "feature",
+  unsplash3: "small", bookmark3: "small", solarGraph: "large", bookmark4: "small",
+  bookmark5: "small", unsplash4: "small", unsplash5: "small", vaultPreview: "small",
+  clock: "small",
+};
+
+// Mirrors FeaturePanel's old ALL_MODES order/keys.
+const LEGACY_FEATURE_MODE_ORDER = [
+  "windy", "weather", "headlines", "airQuality", "timer", "wikipedia", "rss", "github", "spotify", "unsplash",
+];
+
+function buildLegacyFeatureStackItems(featurePanel, mergedSettings) {
+  const enabledKeys = Array.isArray(featurePanel?.enabledModes) && featurePanel.enabledModes.length
+    ? featurePanel.enabledModes
+    : LEGACY_FEATURE_MODE_ORDER;
+  // "weather" is always included, mirroring the old force-include rule.
+  const modes = LEGACY_FEATURE_MODE_ORDER.filter((key) => enabledKeys.includes(key) || key === "weather");
+
+  return modes.map((key) => {
+    switch (key) {
+      case "windy":
+        return { id: "legacy-stack-windy", type: "iframe", size: "small", config: { preset: "windy", url: "" } };
+      case "weather":
+        return { id: "legacy-stack-weather", type: "weather", size: "small", config: { variant: "detail" } };
+      case "headlines":
+        return { id: "legacy-stack-headlines", type: "headlines", size: "small", config: {} };
+      case "airQuality":
+        return { id: "legacy-stack-airQuality", type: "airQuality", size: "small", config: {} };
+      case "timer":
+        return { id: "legacy-stack-timer", type: "timer", size: "small", config: {} };
+      case "wikipedia":
+        return { id: "legacy-stack-wikipedia", type: "wikipedia", size: "small", config: {} };
+      case "rss":
+        return { id: "legacy-stack-rss", type: "rss", size: "small", config: { feedUrl: featurePanel?.rssFeedUrl ?? null } };
+      case "github":
+        return { id: "legacy-stack-github", type: "github", size: "small", config: { username: featurePanel?.githubUsername ?? null } };
+      case "spotify":
+        return { id: "legacy-stack-spotify", type: "spotify", size: "small", config: { clientId: featurePanel?.spotifyClientId ?? null } };
+      case "unsplash":
+        return {
+          id: "legacy-stack-unsplash6",
+          type: "photo",
+          size: "small",
+          config: { searchTerms: mergedSettings.unsplash?.unsplashBox6 ?? [] },
+        };
+      default:
+        return null;
+    }
+  }).filter(Boolean);
+}
+
+function synthesizeWidgetsFromLegacy(mergedSettings) {
+  const layout = mergedSettings.layout || {};
+  const hidden = layout.hiddenBoxes || {};
+  const sizes = layout.sizes || {};
+  const savedOrder = Array.isArray(layout.order) ? layout.order : [];
+  const known = savedOrder.filter((id) => LEGACY_TILE_ORDER.includes(id));
+  const missing = LEGACY_TILE_ORDER.filter((id) => !known.includes(id));
+  const order = known.length ? [...known, ...missing] : [...LEGACY_TILE_ORDER];
+
+  const bookmarkBoxCategories = layout.bookmarkBoxCategories || [];
+  const bookmarkGroups = Array.isArray(mergedSettings.bookmark) ? mergedSettings.bookmark : [];
+  const getBookmarkGroupId = (boxIndex) =>
+    bookmarkGroups.find((group) => group.id === bookmarkBoxCategories[boxIndex])?.id
+    ?? bookmarkGroups[boxIndex]?.id
+    ?? bookmarkGroups[0]?.id
+    ?? null;
+
+  const decorativeVideoUrl = Array.isArray(mergedSettings.decorativeVideo?.urls)
+    ? mergedSettings.decorativeVideo.urls[0] || ""
+    : "";
+  const videoZoom = mergedSettings.decorativeVideo?.zoom ?? 1.6;
+  const videoOffsetX = mergedSettings.decorativeVideo?.offsetX ?? 0;
+  const videoOffsetY = mergedSettings.decorativeVideo?.offsetY ?? 0;
+
+  const widgets = [];
+
+  for (const id of order) {
+    if (hidden[id]) continue;
+    const size = sizes[id] || LEGACY_TILE_SIZES[id] || "small";
+
+    if (id === "featurePanel") {
+      widgets.push({
+        id: "legacy-featurePanel",
+        type: "stack",
+        size,
+        config: {},
+        items: buildLegacyFeatureStackItems(mergedSettings.featurePanel, mergedSettings),
+      });
+    } else if (id.startsWith("bookmark")) {
+      const boxIndex = Number(id.replace("bookmark", "")) - 1;
+      widgets.push({ id: `legacy-${id}`, type: "bookmark", size, config: { groupId: getBookmarkGroupId(boxIndex) } });
+    } else if (id.startsWith("unsplash")) {
+      const boxKey = `unsplashBox${id.replace("unsplash", "")}`;
+      widgets.push({ id: `legacy-${id}`, type: "photo", size, config: { searchTerms: mergedSettings.unsplash?.[boxKey] ?? [] } });
+    } else if (id === "videoTall" || id === "videoSmall") {
+      widgets.push({
+        id: `legacy-${id}`,
+        type: "video",
+        size,
+        config: { url: decorativeVideoUrl, zoom: videoZoom, offsetX: videoOffsetX, offsetY: videoOffsetY },
+      });
+    } else if (id === "weather") {
+      widgets.push({ id: "legacy-weather", type: "weather", size, config: { variant: "compact" } });
+    } else if (id === "search") {
+      widgets.push({ id: "legacy-search", type: "search", size, config: {} });
+    } else if (id === "solarGraph") {
+      widgets.push({ id: "legacy-solarGraph", type: "solarGraph", size, config: {} });
+    } else if (id === "vaultPreview") {
+      widgets.push({ id: "legacy-vaultPreview", type: "vault", size, config: {} });
+    } else if (id === "clock") {
+      widgets.push({ id: "legacy-clock", type: "clock", size, config: {} });
+    }
+  }
+
+  return widgets;
+}
+
 function normalizeBookmarkBoxCategories(bookmarkBoxCategories, nextBookmarks) {
   const nextFlatIds = new Set(flattenGroups(nextBookmarks).map((folder) => folder.id));
   const topLevelIds = nextBookmarks.map((group) => group.id);
@@ -74,6 +215,14 @@ function normalizeBookmarkBoxCategories(bookmarkBoxCategories, nextBookmarks) {
 }
 
 function normalizeSettingsShape(settings) {
+  // The one deliberate bootstrap call (`normalizeSettingsShape(defaultSettings)`,
+  // below) is the only place `settings` can be this exact reference — every
+  // real saved/imported/cloud-pulled record is a different object, even if it
+  // happens to be content-identical. That's what lets a brand-new install and
+  // a genuinely pre-`widgets` saved record share one migration path below,
+  // while never re-synthesizing over a record that already has `widgets`
+  // (even a legitimately emptied one).
+  const isBootstrapSeed = settings === defaultSettings;
   const mergedSettings = mergeSettings(defaultSettings, settings);
   const decorativeVideo = mergedSettings.decorativeVideo || {};
   const bookmark = ensureBookmarkIds(mergedSettings.bookmark);
@@ -81,6 +230,10 @@ function normalizeSettingsShape(settings) {
     ...mergedSettings.layout,
     bookmarkBoxCategories: normalizeBookmarkBoxCategories(mergedSettings.layout?.bookmarkBoxCategories, bookmark),
   };
+
+  if (isBootstrapSeed || !Array.isArray(settings?.widgets)) {
+    mergedSettings.widgets = synthesizeWidgetsFromLegacy({ ...mergedSettings, bookmark });
+  }
 
   let urls = Array.isArray(decorativeVideo.urls)
     ? decorativeVideo.urls

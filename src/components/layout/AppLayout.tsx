@@ -10,12 +10,14 @@ import ThemeProvider, { ThemeContext, type ThemeMode } from "@/components/layout
 import Toggle from "@/components/layout/ThemeToggle";
 import SettingsButton from "@/features/settings/components/SettingsButton";
 import BookmarkDialogs from "@/features/bookmarks/components/BookmarkDialogs";
+import WidgetConfigDialog from "@/features/dashboard/components/WidgetConfigDialog";
 import AccountButton from "@/features/auth/AccountButton";
 import AuthBridge from "@/features/auth/AuthBridge";
 import { useIsClerkAvailable } from "@/features/auth/ClerkStatus";
 import CommandPalette from "@/components/layout/CommandPalette";
 import useKBarActions from "@/features/dashboard/hooks/useKBarActions";
 import DashboardPage from "@/features/dashboard/pages";
+import { useQuickAddStore } from "@/features/resourceVault/stores/quickAddStore";
 
 function KBarWrapper({ children }: { children: React.ReactNode }) {
   useKBarActions();
@@ -52,6 +54,19 @@ function VaultNavigationActions() {
         shortcut: ["2"],
         section: "Navigation",
         perform: () => navigate("/"),
+      },
+      {
+        id: "quick-add-resource",
+        name: "Add a Resource",
+        shortcut: ["a"],
+        section: "Navigation",
+        // Set the flag before navigating — VaultGlassView (whether it's
+        // already mounted or about to mount) opens its composer as soon as
+        // it observes this, from any page in the dashboard.
+        perform: () => {
+          useQuickAddStore.getState().requestQuickAdd();
+          navigate("/resources");
+        },
       },
     ],
     [navigate],
@@ -188,6 +203,7 @@ function AppLayoutInner() {
       {isClerkAvailable && <AuthBridge />}
       <VaultNavigationActions />
       <BookmarkDialogs />
+      <WidgetConfigDialog />
       <nav className="vault-nav-center" aria-label="Page navigation">
         <button
           type="button"

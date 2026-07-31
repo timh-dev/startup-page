@@ -1,13 +1,17 @@
 import path from "node:path"
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import localApiDevPlugin from './scripts/vite-api-dev-plugin.mjs'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: "https://timothypholmes.github.io/startup-page/",
   plugins: [
     react(),
-  ],
+    // Dev-only: lets plain `pnpm dev` exercise simple api/*.ts endpoints
+    // without the Vercel CLI. Never runs during `vite build`.
+    command === "serve" && localApiDevPlugin(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
@@ -30,4 +34,4 @@ export default defineConfig({
       },
     },
   }
-})
+}))

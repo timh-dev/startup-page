@@ -1,11 +1,5 @@
 import React, { useContext, useState } from "react";
 import { HiOutlineCog } from "react-icons/hi2";
-import { ALL_MODES as ALL_FEATURE_MODES } from "@/features/dashboard/components/FeaturePanel";
-import {
-  DEFAULT_SEARCH_ENGINES,
-  SEARCH_ICON_OPTIONS,
-  getSearchEngineIcon,
-} from "@/features/dashboard/searchEngines";
 
 import { ThemeContext } from "@/components/layout/ThemeContext";
 import { Button } from "@/components/ui/button";
@@ -20,7 +14,7 @@ import {
   IMAGE_FILTER_DEFAULTS,
   IMAGE_FILTER_DEFINITIONS,
 } from "@/lib/image-filters";
-import { settingsNavItems, visibilityOptions } from "@/features/settings/constants";
+import { settingsNavItems } from "@/features/settings/constants";
 import {
   BUILT_IN_PALETTES,
   getSwatchesFromCustomTheme,
@@ -112,7 +106,6 @@ function SettingsButton() {
   const [customThemeCSS, setCustomThemeCSS] = useState("");
   const [customThemeError, setCustomThemeError] = useState("");
   const fileInputRef = React.useRef(null);
-  const [newTopicInputs, setNewTopicInputs] = useState({});
 
   const refreshStorageDiagnostics = React.useCallback(async () => {
     const nextDiagnostics = await getStorageDiagnostics();
@@ -149,13 +142,6 @@ function SettingsButton() {
     setSettingsState((prevSettings) => updater(prevSettings));
   };
 
-  const handleTopLevelChange = (key, value) => {
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      [key]: value
-    }));
-  };
-
   const handleUiChange = (key, value) => {
     updateSettings((prevSettings) => ({
       ...prevSettings,
@@ -163,26 +149,6 @@ function SettingsButton() {
         ...prevSettings.ui,
         [key]: value
       }
-    }));
-  };
-
-  const handleNewsChange = (key, value) => {
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      news: {
-        ...prevSettings.news,
-        [key]: value,
-      },
-    }));
-  };
-
-  const handleTimerChange = (key, value) => {
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      timer: {
-        ...prevSettings.timer,
-        [key]: value,
-      },
     }));
   };
 
@@ -236,24 +202,6 @@ function SettingsButton() {
         decorativeVideo: {
           ...decorativeVideo,
           urls: urls.length ? urls : [""],
-        },
-      };
-    });
-  };
-
-  const handleDecorativeVideoChange = (key, value) => {
-    setSettingsState((prev) => {
-      const decorativeVideo = prev.decorativeVideo || {};
-
-      return {
-        ...prev,
-        decorativeVideo: {
-          ...decorativeVideo,
-          urls: getDecorativeVideoUrlsForEdit(decorativeVideo).slice(0, 10),
-          zoom: decorativeVideo.zoom ?? decorativeVideo.tall?.zoom ?? 1.6,
-          offsetX: decorativeVideo.offsetX ?? decorativeVideo.tall?.offsetX ?? 0,
-          offsetY: decorativeVideo.offsetY ?? decorativeVideo.tall?.offsetY ?? 0,
-          [key]: value,
         },
       };
     });
@@ -368,123 +316,6 @@ function SettingsButton() {
         },
       },
     }));
-  };
-
-  const handleHiddenBoxChange = (boxId, checked) => {
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      layout: {
-        ...prevSettings.layout,
-        hiddenBoxes: {
-          ...prevSettings.layout.hiddenBoxes,
-          [boxId]: !checked
-        }
-      }
-    }));
-  };
-
-  const handleAddUnsplashTopic = (key) => {
-    const value = (newTopicInputs[key] || "").trim();
-    if (!value) return;
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      unsplash: {
-        ...prevSettings.unsplash,
-        [key]: [...(prevSettings.unsplash[key] || []), value],
-      },
-    }));
-    setNewTopicInputs((prev) => ({ ...prev, [key]: "" }));
-  };
-
-  const handleRemoveUnsplashTopic = (key, index) => {
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      unsplash: {
-        ...prevSettings.unsplash,
-        [key]: prevSettings.unsplash[key].filter((_, i) => i !== index),
-      },
-    }));
-  };
-
-  const handleFeaturePanelChange = (key, value) => {
-    updateSettings((prevSettings) => ({
-      ...prevSettings,
-      featurePanel: {
-        ...prevSettings.featurePanel,
-        [key]: value,
-      },
-    }));
-  };
-
-  const handleFeaturePanelModeToggle = (modeKey, checked) => {
-    updateSettings((prevSettings) => {
-      const current = prevSettings.featurePanel?.enabledModes ?? ALL_FEATURE_MODES.map((m) => m.key);
-      const next = checked ? [...current, modeKey] : current.filter((k) => k !== modeKey);
-      return {
-        ...prevSettings,
-        featurePanel: { ...prevSettings.featurePanel, enabledModes: next },
-      };
-    });
-  };
-
-  const getSearchEnginesForEdit = (prevSettings) =>
-    Array.isArray(prevSettings.search?.engines) && prevSettings.search.engines.length
-      ? prevSettings.search.engines
-      : DEFAULT_SEARCH_ENGINES;
-
-  const handleSearchEngineChange = (index, key, value) => {
-    updateSettings((prevSettings) => {
-      const engines = getSearchEnginesForEdit(prevSettings).map((engine, currentIndex) =>
-        currentIndex === index ? { ...engine, [key]: value } : engine
-      );
-      return { ...prevSettings, search: { ...prevSettings.search, engines } };
-    });
-  };
-
-  const handleAddSearchEngine = () => {
-    updateSettings((prevSettings) => {
-      const engines = [
-        ...getSearchEnginesForEdit(prevSettings),
-        { id: `engine-${Date.now()}`, name: "", url: "", icon: "search" },
-      ];
-      return { ...prevSettings, search: { ...prevSettings.search, engines } };
-    });
-  };
-
-  const handleRemoveSearchEngine = (index) => {
-    updateSettings((prevSettings) => {
-      const engines = getSearchEnginesForEdit(prevSettings).filter(
-        (_engine, currentIndex) => currentIndex !== index
-      );
-      return { ...prevSettings, search: { ...prevSettings.search, engines } };
-    });
-  };
-
-  const handleMoveSearchEngine = (index, direction) => {
-    updateSettings((prevSettings) => {
-      const engines = [...getSearchEnginesForEdit(prevSettings)];
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= engines.length) {
-        return prevSettings;
-      }
-      [engines[index], engines[nextIndex]] = [engines[nextIndex], engines[index]];
-      return { ...prevSettings, search: { ...prevSettings.search, engines } };
-    });
-  };
-
-  const handleBookmarkBoxCategoryChange = (boxIndex, value) => {
-    updateSettings((prevSettings) => {
-      const bookmarkBoxCategories = [...(prevSettings.layout?.bookmarkBoxCategories || [0, 1, 2, 3, 4])];
-      bookmarkBoxCategories[boxIndex] = Number(value);
-
-      return {
-        ...prevSettings,
-        layout: {
-          ...prevSettings.layout,
-          bookmarkBoxCategories,
-        },
-      };
-    });
   };
 
   const handleReset = async () => {
@@ -868,29 +699,6 @@ function SettingsButton() {
                     })}
                   </CardContent>
                 </Card>
-              </TabsContent>
-
-              <TabsContent value="layout" className="mt-0 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Visible Modules</CardTitle>
-                    <CardDescription>Turn tiles on or off while keeping the current grid structure intact.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 md:grid-cols-2">
-                    {visibilityOptions.map((option) => {
-                      const isVisible = !settingsState.layout?.hiddenBoxes?.[option.id];
-                      return (
-                        <div key={option.id} className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
-                          <div>
-                            <p className="font-medium">{option.label}</p>
-                            <p className="text-sm text-muted-foreground">{isVisible ? "Currently visible" : "Currently hidden"}</p>
-                          </div>
-                          <Switch checked={isVisible} onCheckedChange={(checked) => handleHiddenBoxChange(option.id, checked)} />
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
 
                 <Card>
                   <CardHeader>
@@ -921,60 +729,9 @@ function SettingsButton() {
               <TabsContent value="content" className="mt-0 space-y-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Location and API Settings</CardTitle>
-                    <CardDescription>Core values used by weather and photo modules.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
-                    <SettingField label="Latitude">
-                      <Input
-                        value={settingsState.latitude ?? ""}
-                        onChange={(event) => handleTopLevelChange("latitude", event.target.value === "" ? null : Number(event.target.value))}
-                      />
-                    </SettingField>
-                    <SettingField label="Longitude">
-                      <Input
-                        value={settingsState.longitude ?? ""}
-                        onChange={(event) => handleTopLevelChange("longitude", event.target.value === "" ? null : Number(event.target.value))}
-                      />
-                    </SettingField>
-                    <SettingField label="Units">
-                      <select
-                        className="h-9 w-full rounded-md border border-input bg-card px-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                        value={settingsState.units ?? "imperial"}
-                        onChange={(event) => handleTopLevelChange("units", event.target.value)}
-                      >
-                        <option value="imperial">Imperial (°F, mph)</option>
-                        <option value="metric">Metric (°C, km/h)</option>
-                      </select>
-                    </SettingField>
-                    <SettingField label="OpenWeather Key">
-                      <Input
-                        value={settingsState.openWeatherCredential ?? ""}
-                        onChange={(event) => handleTopLevelChange("openWeatherCredential", event.target.value || null)}
-                      />
-                    </SettingField>
-                    <SettingField label="Unsplash Access Key" description="Use the Access Key, not the Secret Key." className="md:col-span-2">
-                      <Input
-                        value={settingsState.unsplashCredential ?? ""}
-                        onChange={(event) => handleTopLevelChange("unsplashCredential", event.target.value || null)}
-                      />
-                    </SettingField>
-                    <SettingField label="Default Timer Minutes">
-                      <Input
-                        value={settingsState.timer?.focusMinutes ?? 25}
-                        onChange={(event) =>
-                          handleTimerChange("focusMinutes", event.target.value === "" ? 25 : Number(event.target.value))
-                        }
-                      />
-                    </SettingField>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
                     <CardTitle>Decorative Video</CardTitle>
                     <CardDescription>
-                      Add up to 10 looping MP4 links. One is chosen at random on load, and both tiles look into the same shared scene.
+                      Add up to 10 looping MP4 links. Video widgets on the dashboard pick a random one by default — click a video widget in edit mode to pin a specific URL or adjust its zoom/offset.
                     </CardDescription>
                   </CardHeader>
 
@@ -1025,287 +782,9 @@ function SettingsButton() {
                         ))}
                       </div>
                     </div>
-
-                    <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Move and scale the underlying shared video. The box positions stay fixed, but what you see through them changes together.
-                      </p>
-
-                      <RangeControl
-                        label="Zoom"
-                        value={
-                          settingsState.decorativeVideo?.zoom ??
-                          settingsState.decorativeVideo?.tall?.zoom ??
-                          1.6
-                        }
-                        min={1}
-                        max={3}
-                        step={0.05}
-                        onChange={(value) => handleDecorativeVideoChange("zoom", value)}
-                      />
-
-                      <RangeControl
-                        label="Horizontal Offset"
-                        value={
-                          settingsState.decorativeVideo?.offsetX ??
-                          settingsState.decorativeVideo?.tall?.offsetX ??
-                          0
-                        }
-                        min={-180}
-                        max={180}
-                        step={1}
-                        onChange={(value) => handleDecorativeVideoChange("offsetX", value)}
-                      />
-
-                      <RangeControl
-                        label="Vertical Offset"
-                        value={
-                          settingsState.decorativeVideo?.offsetY ??
-                          settingsState.decorativeVideo?.tall?.offsetY ??
-                          0
-                        }
-                        min={-180}
-                        max={180}
-                        step={1}
-                        onChange={(value) => handleDecorativeVideoChange("offsetY", value)}
-                      />
-                    </div>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Feature Panel</CardTitle>
-                    <CardDescription>Choose which modes appear in the rotating feature panel and provide credentials for services that need them.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-foreground">Enabled Modes</p>
-                      <div className="grid gap-2 md:grid-cols-2">
-                        {ALL_FEATURE_MODES.map((mode) => {
-                          const enabledModes = settingsState.featurePanel?.enabledModes ?? ALL_FEATURE_MODES.map((m) => m.key);
-                          const enabled = enabledModes.includes(mode.key);
-                          return (
-                            <div key={mode.key} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-                              <p className="text-sm font-medium">{mode.label}</p>
-                              <Switch checked={enabled} onCheckedChange={(checked) => handleFeaturePanelModeToggle(mode.key, checked)} />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <p className="text-xs font-medium text-foreground">Credentials &amp; Config</p>
-                      <SettingField label="GitHub Username" description="Used by the GitHub Activity mode.">
-                        <Input
-                          value={settingsState.featurePanel?.githubUsername ?? ""}
-                          placeholder="e.g. torvalds"
-                          onChange={(e) => handleFeaturePanelChange("githubUsername", e.target.value || null)}
-                        />
-                      </SettingField>
-                      <SettingField label="RSS Feed URL" description="Any valid RSS or Atom feed URL.">
-                        <Input
-                          value={settingsState.featurePanel?.rssFeedUrl ?? ""}
-                          placeholder="https://example.com/feed.xml"
-                          onChange={(e) => handleFeaturePanelChange("rssFeedUrl", e.target.value || null)}
-                        />
-                      </SettingField>
-                      <SettingField label="Spotify App Client ID" description="Create an app at developer.spotify.com and add this page's URL as a redirect URI.">
-                        <Input
-                          value={settingsState.featurePanel?.spotifyClientId ?? ""}
-                          placeholder="e.g. 1a2b3c4d5e6f7890..."
-                          onChange={(e) => handleFeaturePanelChange("spotifyClientId", e.target.value || null)}
-                        />
-                      </SettingField>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Search Engines</CardTitle>
-                    <CardDescription>
-                      Customize the buttons in the search box. Each engine needs a name, an icon, and a search URL that the typed query is appended to (e.g. <code>https://duckduckgo.com/?q=</code>). The first engine is selected by default.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {(settingsState.search?.engines?.length
-                      ? settingsState.search.engines
-                      : DEFAULT_SEARCH_ENGINES
-                    ).map((engine, index, engines) => {
-                      const EngineIcon = getSearchEngineIcon(engine.icon);
-                      return (
-                        <div key={engine.id ?? index} className="rounded-xl border border-border bg-muted/25 p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                              <span className="flex size-7 items-center justify-center rounded-full border border-border/60 bg-card">
-                                <EngineIcon className="size-4" aria-hidden="true" />
-                              </span>
-                              <p className="text-sm font-medium">{engine.name || "Untitled engine"}</p>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleMoveSearchEngine(index, -1)}
-                                disabled={index === 0}
-                                aria-label="Move engine up"
-                              >
-                                ↑
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleMoveSearchEngine(index, 1)}
-                                disabled={index === engines.length - 1}
-                                aria-label="Move engine down"
-                              >
-                                ↓
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRemoveSearchEngine(index)}
-                              >
-                                Remove
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                            <SettingField label="Name">
-                              <Input
-                                value={engine.name}
-                                placeholder="e.g. YouTube"
-                                onChange={(event) => handleSearchEngineChange(index, "name", event.target.value)}
-                              />
-                            </SettingField>
-                            <SettingField label="Search URL">
-                              <Input
-                                value={engine.url}
-                                placeholder="https://example.com/search?q="
-                                onChange={(event) => handleSearchEngineChange(index, "url", event.target.value)}
-                              />
-                            </SettingField>
-                            <SettingField label="Icon">
-                              <select
-                                className="h-9 w-full rounded-md border border-input bg-card px-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                                value={engine.icon || "search"}
-                                onChange={(event) => handleSearchEngineChange(index, "icon", event.target.value)}
-                              >
-                                {SEARCH_ICON_OPTIONS.map((option) => (
-                                  <option key={option.key} value={option.key}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </SettingField>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <Button type="button" variant="outline" onClick={handleAddSearchEngine}>
-                      Add engine
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Headline Source</CardTitle>
-                    <CardDescription>Controls the rotating hero headlines in the large feature panel.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
-                    <SettingField label="Subreddit">
-                      <Input
-                        value={settingsState.news?.subreddit ?? "worldnews"}
-                        onChange={(event) => handleNewsChange("subreddit", event.target.value || "worldnews")}
-                      />
-                    </SettingField>
-                    <SettingField label="Rotation Seconds">
-                      <Input
-                        value={settingsState.news?.rotationSeconds ?? 8}
-                        onChange={(event) =>
-                          handleNewsChange("rotationSeconds", event.target.value === "" ? 8 : Number(event.target.value))
-                        }
-                      />
-                    </SettingField>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Unsplash Topics</CardTitle>
-                    <CardDescription>Keywords for each rotating image tile. Add or remove individual topics.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {Object.keys(settingsState.unsplash).map((key, boxIndex) => {
-                      const topics = settingsState.unsplash[key] || [];
-                      const inputValue = newTopicInputs[key] || "";
-                      return (
-                        <div key={key} className="space-y-2">
-                          <Label className="text-xs font-medium text-foreground">Photo tile {boxIndex + 1}</Label>
-                          <div className="flex min-h-10 flex-wrap gap-2 rounded-lg border border-border bg-muted/20 p-3">
-                            {topics.map((topic, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs text-accent-foreground">
-                                {topic}
-                                <button
-                                  type="button"
-                                  className="ml-1 leading-none opacity-60 hover:opacity-100"
-                                  onClick={() => handleRemoveUnsplashTopic(key, i)}
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                          <div className="flex gap-2">
-                            <Input
-                              value={inputValue}
-                              placeholder="Add topic…"
-                              onChange={(e) => setNewTopicInputs((prev) => ({ ...prev, [key]: e.target.value }))}
-                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddUnsplashTopic(key); } }}
-                            />
-                            <Button type="button" variant="outline" onClick={() => handleAddUnsplashTopic(key)}>
-                              Add
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Bookmarks</CardTitle>
-                    <CardDescription>Choose which bookmark category each dashboard box shows.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="rounded-xl border border-border bg-muted/20 p-4">
-                      <p className="text-sm font-medium text-foreground">Dashboard box categories</p>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        {[0, 1, 2, 3, 4].map((boxIndex) => (
-                          <SettingField key={boxIndex} label={`Bookmark Box ${boxIndex + 1}`}>
-                            <select
-                              className="h-9 w-full rounded-md border border-input bg-card px-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                              value={(settingsState.layout?.bookmarkBoxCategories || [0, 1, 2, 3, 4])[boxIndex] ?? 0}
-                              onChange={(event) => handleBookmarkBoxCategoryChange(boxIndex, event.target.value)}
-                            >
-                              {settingsState.bookmark.map((category, categoryIndex) => (
-                                <option key={`${category.title}-${categoryIndex}`} value={categoryIndex}>
-                                  {category.title || `Category ${categoryIndex + 1}`}
-                                </option>
-                              ))}
-                            </select>
-                          </SettingField>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
             </div>
 

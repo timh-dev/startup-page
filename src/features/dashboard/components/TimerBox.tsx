@@ -1,6 +1,5 @@
 import React from "react";
 import { HiPause, HiPlay, HiStop, HiPencil } from "react-icons/hi2";
-import { readSettings, writeSettings } from "@/lib/settings";
 
 const PRESETS = [5, 15, 25, 50];
 
@@ -121,9 +120,13 @@ function TapeRibbon({ remaining, totalSeconds, running }) {
   );
 }
 
-export default function TimerBox() {
-  const settings    = React.useMemo(() => readSettings(), []);
-  const defaultMins = Math.max(Number(settings.timer?.focusMinutes || 25), 1);
+interface TimerBoxProps {
+  focusMinutes?: number | null;
+  onFocusMinutesChange?: (minutes: number) => void;
+}
+
+export default function TimerBox({ focusMinutes, onFocusMinutesChange }: TimerBoxProps = {}) {
+  const defaultMins = Math.max(Number(focusMinutes || 25), 1);
 
   const [totalSeconds, setTotalSeconds] = React.useState(defaultMins * 60);
   const [remaining,    setRemaining]    = React.useState(defaultMins * 60);
@@ -156,7 +159,7 @@ export default function TimerBox() {
       setTotalSeconds(total);
       setRemaining(total);
       setRunning(false);
-      void writeSettings({ ...readSettings(), timer: { focusMinutes: m } });
+      onFocusMinutesChange?.(m);
     }
     setEditing(false);
   };

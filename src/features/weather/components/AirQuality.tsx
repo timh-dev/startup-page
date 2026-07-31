@@ -1,5 +1,5 @@
 import React from "react";
-import { readSettings } from "@/lib/settings";
+import { getOrRequestLocation } from "@/lib/geolocation";
 
 const AQI_LEVELS = [
   { max: 50,       label: "Good",                              color: "#22c55e", textClass: "text-green-400",  bgClass: "bg-green-500/15"  },
@@ -15,7 +15,6 @@ function getLevel(aqi) {
 }
 
 export default function AirQuality() {
-  const settings = React.useMemo(() => readSettings(), []);
   const [data, setData] = React.useState(null);
   const [status, setStatus] = React.useState("loading");
 
@@ -42,16 +41,14 @@ export default function AirQuality() {
       }
     }
 
-    if (settings.latitude) {
-      load(settings.latitude, settings.longitude);
-    } else if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (p) => load(p.coords.latitude, p.coords.longitude),
-        () => setStatus("location-error")
-      );
-    } else {
-      setStatus("location-error");
-    }
+    void getOrRequestLocation().then((coords) => {
+      if (cancelled) return;
+      if (coords) {
+        load(coords.lat, coords.lon);
+      } else {
+        setStatus("location-error");
+      }
+    });
 
     return () => { cancelled = true; };
   }, []);

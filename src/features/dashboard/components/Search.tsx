@@ -6,11 +6,15 @@ import {
   normalizeSearchEngines,
 } from "@/features/dashboard/searchEngines";
 
-export default function SearchBox() {
+interface SearchBoxProps {
+  engines?: unknown;
+}
+
+export default function SearchBox({ engines: configEngines }: SearchBoxProps = {}) {
   const storedEngines = useSettingsStore((state) => state.settings.search?.engines);
   const engines = React.useMemo(
-    () => normalizeSearchEngines(storedEngines),
-    [storedEngines],
+    () => normalizeSearchEngines(configEngines ?? storedEngines),
+    [configEngines, storedEngines],
   );
 
   const [activeEngineId, setActiveEngineId] = React.useState(engines[0]?.id);

@@ -57,7 +57,10 @@
       "Bash(grep -rohE \"\\(bg|text|border|ring\\)-\\(zinc|emerald|amber|sky|rose|indigo|violet|fuchsia|pink|lime|teal|cyan|slate|neutral|stone|gray|orange|yellow|green|blue|red|purple\\)-[0-9]{2,3}\\(/[0-9]+\\)?\" src --include=\"*.tsx\" --include=\"*.ts\")",
       "Bash(npm run *)",
       "Read(//tmp/**)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5183/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5183/)",
+      "Bash(pnpm typecheck *)",
+      "WebFetch(domain:commons.wikimedia.org)",
+      "Bash(sips -Z 800 cotopaxi.jpg --out cotopaxi_preview.jpg)"
     ]
   }
 }

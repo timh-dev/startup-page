@@ -1,5 +1,4 @@
 import React from "react";
-import { readSettings } from "@/lib/settings";
 import { fetchRssFeed } from "@/lib/rss";
 
 function timeAgo(dateStr) {
@@ -10,9 +9,7 @@ function timeAgo(dateStr) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-export default function RSSFeed() {
-  const settings = React.useMemo(() => readSettings(), []);
-  const feedUrl = settings.featurePanel?.rssFeedUrl;
+export default function RSSFeed({ feedUrl }: { feedUrl?: string | null }) {
   const [feed, setFeed] = React.useState(null);
   const [items, setItems] = React.useState([]);
   const [status, setStatus] = React.useState("loading");
@@ -42,7 +39,7 @@ export default function RSSFeed() {
       <div className="rss-feed flex h-full w-full items-center justify-center rounded-[inherit] bg-card text-center">
         <div>
           <p className="rss-title font-semibold text-foreground">RSS Feed</p>
-          <p className="rss-subtitle text-muted-foreground">Set an RSS feed URL in Settings, Content, Feature Panel.</p>
+          <p className="rss-subtitle text-muted-foreground">Set an RSS feed URL in this widget's settings.</p>
         </div>
       </div>
     );

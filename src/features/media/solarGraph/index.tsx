@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { readSettings } from '@/lib/settings';
+import { getOrRequestLocation } from '@/lib/geolocation';
 import { useSettingsStore } from '@/features/settings/stores';
 import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour } from './solarMath';
 import { renderSky } from './renderSky';
@@ -138,14 +139,10 @@ export default function SolarGraph() {
       );
 
       // Refine with real geolocation if no saved coordinates.
-      if (!settings.latitude && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            state.solar = calculateSolarContext(pos.coords.latitude, pos.coords.longitude);
-          },
-          () => { /* already running with fallback */ },
-          { timeout: 8000, maximumAge: 600000 }
-        );
+      if (!settings.latitude) {
+        void getOrRequestLocation().then((coords) => {
+          if (coords) state.solar = calculateSolarContext(coords.lat, coords.lon);
+        });
       }
     }
 

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { WiDaySunny, WiCloud, WiRain, WiSprinkle, WiSnow, WiThunderstorm, WiFog } from "react-icons/wi";
 import VolumetricCloudscape from "@/features/media/components/VolumetricCloudscape";
-import { useWeatherStore } from "@/features/weather/stores/weatherStore";
+import { useWeatherStore, useWeatherInstance } from "@/features/weather/stores/weatherStore";
+import { useWeatherData, type WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
 import { getOpenWeatherCondition, getOpenWeatherCoverage, getOpenWeatherVisualProfile, getCloudFraction, resolveWeather } from "@/features/weather/utils";
 import { sunElevation } from "@/features/media/solarGraph/solarMath";
 import type { HourlyForecastPoint } from "@/features/weather/types/weather";
@@ -158,15 +159,31 @@ function buildHourlySeries(hours: HourlyForecastPoint[]): HourlySample[] {
   return series;
 }
 
+interface WeatherDayDetailProps {
+  instanceId: string;
+  overrides?: WeatherOverrides;
+}
+
 // Always-available card (like Timer, Windy, etc.) rather than a modal you
 // open/close — defaults to today's forecast, and remembers whichever day
-// was last picked from the forecast bar until the user picks another.
-export default function WeatherDayDetail(): React.ReactElement {
-  const { data, clockTime, selectedDay, lat, lon } = useWeatherStore();
+// was last picked from the forecast bar until the user picks another. Fetches
+// its own data independently (not assumed to share a WeatherBox elsewhere),
+// so it works whether it's the "detail" variant of a weather widget on its
+// own or opened from a compact WeatherBox's day-detail dialog.
+export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDetailProps): React.ReactElement {
+  useWeatherData(instanceId, overrides);
+  const { data, selectedDay, lat, lon } = useWeatherInstance(instanceId);
+  const clockTime = useWeatherStore((state) => state.clockTime);
+  const tickClock = useWeatherStore((state) => state.tickClock);
   // Hooks must run unconditionally on every render, so these come before the
   // early "no data yet" returns below rather than after.
   const [activeMetricKey, setActiveMetricKey] = useState<MetricKey>("humidity");
   const [selectedHourTime, setSelectedHourTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(tickClock, 10 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [tickClock]);
 
   if (!data) {
     return (

@@ -74,10 +74,15 @@ function normalizeArticle(item) {
   };
 }
 
-export default function HeadlinesHero() {
+interface HeadlinesHeroProps {
+  subreddit?: string | null;
+  rotationSeconds?: number | null;
+}
+
+export default function HeadlinesHero({ subreddit: subredditOverride, rotationSeconds: rotationOverride }: HeadlinesHeroProps = {}) {
   const settings = React.useMemo(() => readSettings(), []);
-  const subreddit = settings.news?.subreddit || "worldnews";
-  const rotationSeconds = Math.max(Number(settings.news?.rotationSeconds || 8), 4);
+  const subreddit = subredditOverride || settings.news?.subreddit || "worldnews";
+  const rotationSeconds = Math.max(Number(rotationOverride || settings.news?.rotationSeconds || 8), 4);
   const [articles, setArticles] = React.useState([]);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [status, setStatus] = React.useState("loading");
