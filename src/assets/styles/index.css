@@ -2346,118 +2346,18 @@
   vertical-align: baseline;
 }
 
-.read-view {
-  background: var(--background);
-  color: var(--foreground);
-}
-
-.read-panel {
-  width: 100%;
-  min-height: 0;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--foreground);
-  box-shadow: none;
-  padding: 0;
-}
-
-.read-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 5rem;
-  gap: 0.75rem;
-  margin-bottom: 0;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-  padding-bottom: 1.25rem;
-}
-
-.read-panel-header h1 {
-  font-family: var(--font-serif);
-  font-size: clamp(1.05rem, 2vw, 1.35rem);
-  font-style: italic;
-  line-height: 1;
-}
-
-.read-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-  border-radius: 9999px;
-  color: color-mix(in oklab, var(--card-foreground) 78%, transparent);
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.read-back:hover {
-  background: color-mix(in oklab, var(--accent) 48%, transparent);
-  color: var(--card-foreground);
-}
-
-.read-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-bottom: 0.85rem;
-  padding-top: 1.25rem;
-}
-
-.read-search,
-.read-form input {
-  height: 2rem;
-  border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
-  background: color-mix(in oklab, var(--background) 76%, transparent);
-  color: var(--foreground);
-  font-size: 0.75rem;
-  outline: none;
-}
-
-.read-search {
-  width: min(15rem, 100%);
-  padding-inline: 0.75rem;
-}
-
-.read-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.38rem;
-  height: 2rem;
-  border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
-  background: color-mix(in oklab, var(--card) 72%, transparent);
-  color: color-mix(in oklab, var(--card-foreground) 76%, transparent);
-  padding-inline: 0.75rem;
-  font-size: 0.75rem;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-}
-
-.read-chip:hover,
-.read-chip-active {
-  border-color: color-mix(in oklab, var(--ring) 42%, var(--border));
-  background: color-mix(in oklab, var(--accent) 58%, transparent);
-  color: var(--accent-foreground);
-}
-
-.read-chip-muted {
-  color: color-mix(in oklab, var(--muted-foreground) 68%, transparent);
-}
-
-.read-import-message {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  color: color-mix(in oklab, var(--muted-foreground) 76%, transparent);
-  font-size: 0.75rem;
-}
-
+/* Shared tag-color utilities — used by VaultGlassView's tag dots/chips and
+   by the dashboard's ResourceVaultPreview widget card. */
 .read-tag-dot {
   width: 0.36rem;
   height: 0.36rem;
   border-radius: 9999px;
   background: var(--read-tag-color);
+}
+
+.read-tag-dot-lg {
+  width: 0.78rem;
+  height: 0.78rem;
 }
 
 .read-tag-read { --read-tag-color: #8b5cf6; }
@@ -2473,320 +2373,753 @@
 .read-tag-work { --read-tag-color: #3b82f6; }
 .read-tag-reference { --read-tag-color: #94a3b8; }
 
-.read-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1fr) auto auto auto;
-  gap: 0.5rem;
-  margin-bottom: 1.15rem;
-}
+/* --- Resource Vault: scenic background + paper card shell --- */
+/* Renders inside AppLayout (see ResourceVaultPage), so it already has the
+   app's real light/dark theme variables on <html> — the card is a plain
+   opaque surface (var(--card)) rather than a translucent/blurred glass
+   panel, so text just uses the normal --foreground/--card variables
+   directly. */
 
-.read-form input {
-  min-width: 0;
-  padding-inline: 0.65rem;
-}
-
-.read-tag-menu {
+.vault-preview-scene {
   position: relative;
-  min-width: 8.5rem;
-}
-
-.read-tag-trigger {
-  display: inline-flex;
-  align-items: center;
+  min-height: 100vh;
   width: 100%;
-  height: 2rem;
-  gap: 0.45rem;
-  border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
-  background: color-mix(in oklab, var(--card) 74%, transparent);
-  color: color-mix(in oklab, var(--card-foreground) 82%, transparent);
-  padding-inline: 0.65rem;
-  font-size: 0.78rem;
-}
-
-.read-tag-trigger-label {
-  min-width: 0;
-  flex: 1 1 auto;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   overflow: hidden;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.read-tag-popover {
+.vault-preview-scrim {
   position: absolute;
-  z-index: 40;
-  top: calc(100% + 0.35rem);
-  right: 0;
-  width: min(13.5rem, calc(100vw - 2rem));
-  border: 1px solid color-mix(in oklab, var(--border) 88%, transparent);
-  border-radius: 0.7rem;
-  background: color-mix(in oklab, var(--popover) 96%, var(--background));
-  box-shadow: 0 1.2rem 3rem color-mix(in oklab, black 24%, transparent);
-  padding: 0.32rem;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.08) 32%, rgba(0, 0, 0, 0.28) 100%);
+  pointer-events: none;
 }
 
-.read-tag-option {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  width: 100%;
-  min-height: 2.25rem;
-  gap: 0.52rem;
-  border-radius: 0.38rem;
-  color: color-mix(in oklab, var(--popover-foreground) 72%, transparent);
-  padding: 0.28rem 0.45rem;
-  font-size: 0.82rem;
-  text-align: left;
-  transition: background 0.18s ease, color 0.18s ease;
-}
-
-.read-tag-option:hover,
-.read-tag-option-active {
-  background: color-mix(in oklab, var(--accent) 58%, transparent);
-  color: var(--accent-foreground);
-}
-
-.read-tag-option-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.read-tag-shortcut {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.45rem;
-  height: 1.35rem;
-  border-radius: 0.34rem;
-  background: color-mix(in oklab, var(--muted) 72%, transparent);
-  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.read-tag-dot-lg {
-  width: 0.78rem;
-  height: 0.78rem;
-}
-
-.read-form > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  height: 2rem;
-  border: 1px solid color-mix(in oklab, var(--border) 84%, transparent);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  padding-inline: 0.75rem;
-  font-size: 0.75rem;
-}
-
-.read-form > .read-form-secondary {
-  background: color-mix(in oklab, var(--card) 72%, transparent);
-  color: color-mix(in oklab, var(--card-foreground) 82%, transparent);
-}
-
-.read-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-  background: color-mix(in oklab, var(--muted) 46%, transparent);
-  padding: 0.25rem;
-}
-
-.read-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  min-width: 6rem;
-  height: 2.1rem;
-  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.read-tab span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 9999px;
-  background: color-mix(in oklab, var(--background) 72%, transparent);
-  font-size: 0.68rem;
-  letter-spacing: 0;
-}
-
-.read-tab-active {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.read-sections {
-  display: grid;
-  max-height: none;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-}
-
-.read-list {
-  display: grid;
-  gap: 0.42rem;
-}
-
-.read-item {
+.vault-preview-stage {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
   display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  width: 100%;
-  min-width: 0;
-  min-height: 1.65rem;
-  overflow: hidden;
-  font-size: 0.96rem;
-}
-
-.read-status-dot {
-  display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  transform: translateY(-0.02rem);
+  padding: 3.5rem 1.5rem;
 }
 
-.read-item-main {
-  flex: 0 1 auto;
-  min-width: 0;
+.vault-preview-paper {
+  position: relative;
+  isolation: isolate;
+  width: min(94vw, 72rem);
+  max-height: 86vh;
+  border-radius: 1rem;
   overflow: hidden;
-  color: var(--card-foreground);
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: linear-gradient(
+    158deg,
+    color-mix(in oklab, var(--card) 92%, white 8%) 0%,
+    var(--card) 42%,
+    color-mix(in oklab, var(--card) 90%, black 10%) 100%
+  );
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 60px color-mix(in oklab, var(--foreground) 8%, transparent),
+    0 14px 30px -14px rgba(0, 0, 0, 0.35),
+    0 40px 80px -24px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-sans);
+  color: var(--foreground);
 }
 
-.read-item-title {
-  font-weight: 700;
+.dark .vault-preview-paper {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 60px color-mix(in oklab, var(--foreground) 5%, transparent),
+    0 14px 32px -14px rgba(0, 0, 0, 0.55),
+    0 40px 90px -20px rgba(0, 0, 0, 0.75);
 }
 
-.read-item-description {
-  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
-  font-weight: 400;
-}
-
-.read-item-separator {
-  margin-left: 0.42rem;
-  margin-right: 0.34rem;
-  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
-  font-size: 1.18em;
-  font-weight: 700;
-  line-height: 0;
-}
-
-.read-item-rule {
+/* Actual paper fiber grain (feTurbulence + feDiffuseLighting, defined once
+   in ResourceVaultPage), not a flat tint — this is what reads as "paper"
+   rather than just a plain colored card. */
+.vault-preview-paper::before {
   content: "";
-  flex: 1 100 1rem;
-  min-width: 0.75rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--muted-foreground) 13%, transparent);
-  transform: translateY(-0.22rem);
+  position: absolute;
+  inset: 0;
+  filter: url(#vault-paper-fibers);
+  mix-blend-mode: multiply;
+  opacity: 0.22;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.read-item-date {
-  flex: 0 0 auto;
-  color: color-mix(in oklab, var(--muted-foreground) 78%, transparent);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
+.vault-preview-paper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  filter: url(#vault-paper-fibers-fine);
+  mix-blend-mode: multiply;
+  opacity: 0.14;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.read-item-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.18rem;
-  opacity: 0;
-  transition: opacity 0.18s ease;
+.dark .vault-preview-paper::before {
+  mix-blend-mode: soft-light;
+  opacity: 0.16;
 }
 
-.read-item:hover .read-item-actions,
-.read-item:focus-within .read-item-actions,
-.read-item-actions-confirming {
-  opacity: 1;
+.dark .vault-preview-paper::after {
+  mix-blend-mode: soft-light;
+  opacity: 0.1;
 }
 
-.read-item-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.45rem;
-  height: 1.45rem;
-  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--card) 58%, transparent);
-  color: color-mix(in oklab, var(--muted-foreground) 80%, transparent);
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-}
-
-.read-item-action:hover {
-  border-color: color-mix(in oklab, var(--ring) 42%, var(--border));
-  background: color-mix(in oklab, var(--accent) 58%, transparent);
-  color: var(--accent-foreground);
-}
-
-.read-delete-confirm {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.35rem;
-  margin-left: 0.16rem;
-}
-
-.read-delete-confirm-button {
-  border-color: color-mix(in oklab, var(--destructive) 48%, var(--border));
-  color: var(--destructive);
-}
-
-.read-remember-delete {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: color-mix(in oklab, var(--muted-foreground) 78%, transparent);
-  font-size: 0.68rem;
-  white-space: nowrap;
-}
-
-.read-remember-delete input {
-  width: 0.82rem;
-  height: 0.82rem;
-  accent-color: var(--primary);
-}
-
-.read-empty {
-  color: color-mix(in oklab, var(--muted-foreground) 76%, transparent);
-  font-size: 0.8rem;
+.vault-preview-paper-scroll {
+  position: relative;
+  z-index: 1;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 2.25rem 2.5rem 2rem;
 }
 
 @media (max-width: 720px) {
-  .read-panel {
-    max-height: none;
+  .vault-preview-paper-scroll {
+    padding: 1.5rem 1.25rem 1.25rem;
+    max-height: 90vh;
   }
 
-  .read-form {
-    grid-template-columns: 1fr;
+  .vault-preview-paper {
+    border-radius: 0.85rem;
+    max-height: 90vh;
+  }
+}
+
+/* --- VaultGlassView: cleaned-up vault UI, grouped by date --- */
+
+.vg-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.vg-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+}
+
+.vg-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+  margin-bottom: 0.2rem;
+}
+
+.vg-title {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+  line-height: 1.1;
+}
+
+.vg-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  border-radius: 9999px;
+  color: color-mix(in oklab, var(--card-foreground) 78%, transparent);
+  background: color-mix(in oklab, var(--card) 40%, transparent);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.vg-back:hover {
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+  color: var(--card-foreground);
+}
+
+.vg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vg-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+  height: 2.15rem;
+  padding-inline: 0.7rem;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--card) 55%, transparent);
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.85rem;
+}
+
+.vg-search input::placeholder {
+  color: color-mix(in oklab, var(--muted-foreground) 80%, transparent);
+}
+
+.vg-search button {
+  display: inline-flex;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+}
+
+.vg-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 2.15rem;
+  padding-inline: 0.6rem;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--card) 55%, transparent);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--card-foreground) 88%, transparent);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.vg-tool-btn:hover {
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+  border-color: color-mix(in oklab, var(--ring) 35%, var(--border));
+}
+
+.vg-tool-group {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.vg-tag-filter {
+  position: relative;
+}
+
+.vg-popover {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 20;
+  min-width: 11rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: 0.35rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--popover) 96%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.35);
+}
+
+.vg-popover-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.55rem;
+  font-size: 0.8rem;
+  color: var(--popover-foreground);
+  text-align: left;
+}
+
+.vg-popover-option:hover {
+  background: color-mix(in oklab, var(--accent) 60%, transparent);
+}
+
+.vg-popover-option-active {
+  background: color-mix(in oklab, var(--accent) 75%, transparent);
+  font-weight: 600;
+}
+
+.vg-count {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+}
+
+.vg-import-message {
+  margin-top: -0.6rem;
+  font-size: 0.75rem;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+}
+
+.vg-add-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  height: 2.15rem;
+  padding-inline: 0.85rem;
+  border-radius: 0.7rem;
+  border: 1px dashed color-mix(in oklab, var(--border) 80%, transparent);
+  color: color-mix(in oklab, var(--card-foreground) 80%, transparent);
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vg-add-trigger:hover {
+  background: color-mix(in oklab, var(--accent) 50%, transparent);
+  border-color: color-mix(in oklab, var(--ring) 35%, var(--border));
+  border-style: solid;
+}
+
+.vg-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  background: color-mix(in oklab, var(--card) 45%, transparent);
+}
+
+.vg-composer input {
+  height: 2.1rem;
+  padding-inline: 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--background) 70%, transparent);
+  color: var(--foreground);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.vg-composer-url-row {
+  position: relative;
+}
+
+.vg-composer-url-row .vg-composer-url {
+  padding-right: 1.9rem;
+}
+
+.vg-composer-url-spinner {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-top: -0.4rem;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+  border-top-color: var(--foreground);
+  animation: vg-spin 0.7s linear infinite;
+}
+
+@keyframes vg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vg-composer-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.vg-composer-title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.vg-tag-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.vg-tag-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 2.1rem;
+  padding-inline: 0.55rem;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--background) 70%, transparent);
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-tag-popover {
+  right: 0;
+  left: auto;
+}
+
+.vg-tag-shortcut {
+  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+}
+
+.vg-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.vg-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.1rem;
+  padding-inline: 0.85rem;
+  border-radius: 0.6rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.vg-primary-btn:hover {
+  opacity: 0.92;
+}
+
+.vg-ghost-btn {
+  height: 2.1rem;
+  padding-inline: 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.82rem;
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-ghost-btn:hover {
+  background: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+
+.vg-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  align-self: flex-start;
+  padding: 0.2rem;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--card) 45%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+}
+
+.vg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-tab span {
+  font-size: 0.68rem;
+  padding: 0 0.35rem;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--muted) 70%, transparent);
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-tab-active {
+  background: color-mix(in oklab, var(--background) 85%, transparent);
+  color: var(--foreground);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.vg-tab-active span {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.vg-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.vg-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.vg-group-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-group-label span {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.vg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.vg-item {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem 0.5rem 0.85rem;
+  border-radius: 0.6rem;
+  transition: background 0.15s ease;
+}
+
+.vg-item:hover {
+  background: color-mix(in oklab, var(--accent) 42%, transparent);
+}
+
+/* Category color lives here now — a left-edge accent instead of a small dot,
+   so the tag reads at a glance without adding another UI element. Falls
+   back to a neutral tone for unknown tags. */
+.vg-item::before {
+  content: "";
+  position: absolute;
+  left: 0.15rem;
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 3px;
+  border-radius: 9999px;
+  background: var(--read-tag-color, color-mix(in oklab, var(--muted-foreground) 45%, transparent));
+}
+
+.vg-item-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 9999px;
+  border: 1.5px solid color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+  color: var(--primary-foreground);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vg-item-check:hover {
+  border-color: color-mix(in oklab, var(--ring) 50%, var(--border));
+}
+
+.vg-item-check-done {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.vg-item-favicon {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 0.2rem;
+  object-fit: cover;
+}
+
+.vg-item-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.vg-item-rule {
+  content: "";
+  flex: 1 100 1rem;
+  min-width: 0.75rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 22%, transparent);
+  transform: translateY(-0.22rem);
+}
+
+.vg-item-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vg-item-description {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
+}
+
+.vg-item-tag {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  font-weight: 500;
+  /* --muted-foreground is a genuinely low-contrast gray by design — even at
+     near-full opacity it reads faint. Basing this on --foreground instead
+     (at partial opacity) keeps it visually secondary while staying legible
+     in both themes. */
+  color: color-mix(in oklab, var(--foreground) 62%, transparent);
+}
+
+.vg-item-date {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--foreground) 70%, transparent);
+}
+
+.vg-item-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.15rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.vg-item:hover .vg-item-actions,
+.vg-item:focus-within .vg-item-actions {
+  opacity: 1;
+}
+
+.vg-item-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.45rem;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+}
+
+.vg-item-action:hover {
+  background: color-mix(in oklab, var(--accent) 65%, transparent);
+  color: var(--card-foreground);
+}
+
+.vg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 2.75rem 1rem;
+  text-align: center;
+}
+
+.vg-empty-icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  margin-bottom: 0.4rem;
+  color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+}
+
+.vg-empty-title {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: color-mix(in oklab, var(--foreground) 80%, transparent);
+}
+
+.vg-empty-hint {
+  font-size: 0.78rem;
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+/* --- Undo-after-delete toast --- */
+
+.vg-toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: 1.75rem;
+  z-index: 50;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.vg-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.9rem;
+  border-radius: 0.65rem;
+  background: color-mix(in oklab, var(--foreground) 92%, transparent);
+  color: var(--background);
+  font-size: 0.8rem;
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  animation: vg-toast-in 0.18s ease-out;
+}
+
+.vg-toast-text {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vg-toast-undo {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.45rem;
+  font-weight: 600;
+  color: var(--background);
+  background: color-mix(in oklab, var(--background) 18%, transparent);
+}
+
+.vg-toast-undo:hover {
+  background: color-mix(in oklab, var(--background) 28%, transparent);
+}
+
+@keyframes vg-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .vg-composer-row {
+    flex-direction: column;
   }
 
-  .read-item {
-    gap: 0.38rem;
+  .vg-item {
+    flex-wrap: wrap;
   }
 
-  .read-item-actions {
+  .vg-item-actions {
     opacity: 1;
   }
 }
+
