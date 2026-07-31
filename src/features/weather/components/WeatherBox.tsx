@@ -6,7 +6,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { WeatherScene } from "./WeatherScene";
 import { WeatherCurrentPanel } from "./WeatherCurrentPanel";
 import { WeatherForecastPanel } from "./WeatherForecastPanel";
-import WeatherDayDetail from "./WeatherDayDetail";
+import WeatherFrostedCard from "./WeatherFrostedCard";
 import type { WeatherData } from "@/features/weather/types/weather";
 
 interface WeatherBoxProps {
@@ -99,9 +99,9 @@ function LiveWeatherBox({ instanceId, overrides }: { instanceId: string; overrid
     <>
       <WeatherBoxContent data={data} error={error} location={location} clockTime={clockTime} instanceId={instanceId} />
       <Dialog open={detailOpen} onOpenChange={(open) => !open && closeWeatherCard(instanceId)}>
-        <DialogContent className="max-w-2xl">
-          <div className="h-[28rem] w-full overflow-hidden rounded-2xl">
-            <WeatherDayDetail instanceId={instanceId} overrides={overrides} />
+        <DialogContent className="max-w-3xl">
+          <div className="h-[24rem] w-full overflow-hidden rounded-2xl">
+            <WeatherFrostedCard instanceId={instanceId} overrides={overrides} />
           </div>
         </DialogContent>
       </Dialog>

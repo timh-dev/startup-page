@@ -522,7 +522,7 @@ function getCloudDensity(visual: WeatherVisualProfile, cloudFraction: number): n
   return snowy ? density * 0.5 : density;
 }
 
-function getEffectiveWind(visual: WeatherVisualProfile, windSpeed: number | undefined, unit: string): number {
+export function getEffectiveWind(visual: WeatherVisualProfile, windSpeed: number | undefined, unit: string): number {
   if (windSpeed == null) return Math.max(visual.windIntensity, 0.04);
   const metersPerSecond = unit === "imperial" ? windSpeed * 0.44704 : windSpeed;
   const reported = clamp(metersPerSecond / 17, 0, 1); // ~17 m/s (38 mph) gale = full scale
