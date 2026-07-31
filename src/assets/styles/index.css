@@ -1481,7 +1481,6 @@
   --clock-grid-inset: clamp(0.35rem, 3.2cqw, 0.62rem);
   --clock-hole-radius: clamp(0.095rem, min(1.42cqw, 2.08cqh), 0.17rem);
   --clock-grid-step: clamp(0.36rem, min(5.25cqw, 6.9cqh), 0.62rem);
-  --clock-overflow-margin: clamp(1.5rem, 20cqw, 4.5rem);
 }
 
 .clock-widget {
@@ -1555,16 +1554,6 @@
   pointer-events: none;
 }
 
-.clock-digital-canvas {
-  position: absolute;
-  inset: calc(var(--clock-grid-inset) - var(--clock-overflow-margin));
-  width: calc(100% - 2 * var(--clock-grid-inset) + 2 * var(--clock-overflow-margin));
-  height: calc(100% - 2 * var(--clock-grid-inset) + 2 * var(--clock-overflow-margin));
-  z-index: 5;
-  display: block;
-  pointer-events: none;
-}
-
 .clock-hand {
   position: absolute;
   left: 50%;
@@ -1590,6 +1579,139 @@
   height: 46%;
   width: clamp(0.18rem, 2.4cqw, 0.32rem);
   background: var(--destructive);
+}
+
+/* --- Plain clock face (default digital mode): city + GMT offset, a "now"
+   spine, and the big time readout. Pure theme-var colors so it recolors
+   with whatever palette is active. --- */
+
+.clock-plain {
+  position: absolute;
+  inset: 0;
+  --clock-pad: clamp(0.9rem, 8cqw, 1.6rem);
+  padding: var(--clock-pad);
+  text-align: left;
+  color: var(--foreground);
+}
+
+/* The shared positioning reference for both the line (::before) and the dot
+   (a descendant, via .clock-plain-spine) — same width, same horizontal
+   origin, so a given --clock-now-x resolves to the same pixel position for
+   both instead of the dot silently being measured against a different
+   (padding-excluded) box than the line. */
+.clock-plain-inner {
+  position: relative;
+  /* Own stacking context so the "line behind text, dot above it" layering
+     below stays contained here, instead of z-index comparisons leaking out
+     to .clock-widget's own background. */
+  isolation: isolate;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Vertical red line. Negative top/bottom insets (by exactly the card's own
+   padding) extend it past .clock-plain-inner's box to the true card edges,
+   while its horizontal position stays relative to .clock-plain-inner —
+   matching the dot's reference frame exactly. */
+.clock-plain-inner::before {
+  content: "";
+  position: absolute;
+  left: var(--clock-now-x, 50%);
+  top: calc(-1 * var(--clock-pad));
+  bottom: calc(-1 * var(--clock-pad));
+  width: 1px;
+  /* Same lighter red as the dot's own halo ring, for consistency. */
+  background: color-mix(in oklab, var(--destructive) 18%, transparent);
+  z-index: 0;
+}
+
+.clock-plain-top,
+.clock-plain-spine,
+.clock-plain-bottom {
+  position: relative;
+  z-index: 1;
+}
+
+.clock-plain-top {
+  flex: 0 0 auto;
+}
+
+.clock-plain-bottom {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.3rem, 2cqh, 0.5rem);
+}
+
+.clock-plain-date {
+  font-weight: 700;
+  font-size: clamp(1rem, 11cqw, 1.5rem);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clock-plain-offset {
+  margin-top: 0.2em;
+  font-size: clamp(0.68rem, 5.5cqw, 0.85rem);
+  color: var(--muted-foreground);
+}
+
+.clock-plain-spine {
+  flex: 1 1 auto;
+  min-height: clamp(1rem, 12cqh, 2.5rem);
+}
+
+.clock-plain-dot {
+  position: absolute;
+  left: var(--clock-now-x, 50%);
+  top: 38%;
+  width: clamp(0.5rem, 3.2cqw, 0.7rem);
+  height: clamp(0.5rem, 3.2cqw, 0.7rem);
+  border-radius: 9999px;
+  background: var(--destructive);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--destructive) 18%, transparent);
+  transform: translate(-50%, -50%);
+}
+
+.clock-plain-time {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+}
+
+.clock-plain-time-value {
+  font-weight: 700;
+  font-size: clamp(1.6rem, 17cqw, 2.6rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-plain-time-meridiem {
+  font-weight: 600;
+  font-size: clamp(0.9rem, 9cqw, 1.3rem);
+  color: var(--muted-foreground);
+}
+
+.clock-plain-rule {
+  height: 1px;
+  background: color-mix(in oklab, var(--border) 75%, transparent);
+}
+
+.clock-plain-ticks {
+  display: flex;
+  font-size: clamp(0.6rem, 5cqw, 0.75rem);
+  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-plain-ticks span {
+  flex: 1;
+  text-align: center;
 }
 
 .headlines-hero,
