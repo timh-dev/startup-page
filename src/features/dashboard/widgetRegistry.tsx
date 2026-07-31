@@ -44,7 +44,7 @@ import { StackWidget } from "@/features/dashboard/components/StackWidget";
 
 import Bookmark from "@/features/bookmarks/components/Bookmark";
 import { useBookmarkDialogStore } from "@/features/bookmarks/stores/bookmarkDialogStore";
-import ResourceVaultPreview from "@/features/resourceVault/components/ResourceVaultPreview";
+import VaultLauncher from "@/features/resourceVault/components/VaultLauncher";
 import Unsplash, { clearPhotoCache } from "@/features/media/components/Unsplash";
 import { WeatherBox } from "@/features/weather/components/WeatherBox";
 import WeatherDayDetail from "@/features/weather/components/WeatherDayDetail";
@@ -447,11 +447,9 @@ function VideoConfigFields({ config, onChange }: { config: VideoConfig; onChange
 // ---- vault ------------------------------------------------------------------
 
 function VaultRender({ cardClass }: { instance: WidgetInstance; cardClass?: string }) {
-  const readItems = useSettingsStore((state) => state.settings.readItems);
-  const navigate = useNavigate();
   return (
     <div className={cardClass}>
-      <ResourceVaultPreview items={readItems} onOpen={() => navigate("/resources")} />
+      <VaultLauncher />
     </div>
   );
 }
@@ -588,9 +586,9 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   },
   {
     type: "vault",
-    label: "Resource vault",
+    label: "Vault",
     icon: HiOutlineArchiveBox,
-    defaultSize: "small",
+    defaultSize: "large",
     makeDefaultConfig: () => ({}),
     Render: VaultRender,
   },

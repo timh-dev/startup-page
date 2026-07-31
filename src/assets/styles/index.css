@@ -1988,70 +1988,6 @@
   opacity: 0.88;
 }
 
-.vault-preview {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  flex-direction: column;
-  gap: clamp(0.3rem, 3cqh, 0.55rem);
-  padding: clamp(0.55rem, 4.5cqh, 0.8rem);
-  color: var(--primary-foreground);
-  text-align: left;
-}
-
-.vault-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: clamp(0.62rem, 5cqh, 0.8rem);
-  font-weight: 800;
-  line-height: 1;
-}
-
-.vault-preview-list {
-  display: grid;
-  min-height: 0;
-  gap: clamp(0.08rem, 0.9cqh, 0.18rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 0.15rem;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--primary-foreground) 28%, transparent) transparent;
-}
-
-.vault-preview-list::-webkit-scrollbar {
-  width: 0.28rem;
-}
-
-.vault-preview-list::-webkit-scrollbar-thumb {
-  border-radius: 9999px;
-  background: color-mix(in oklab, var(--primary-foreground) 28%, transparent);
-}
-
-.vault-preview-item {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: clamp(0.25rem, 2.4cqw, 0.42rem);
-  color: color-mix(in oklab, var(--primary-foreground) 88%, transparent);
-  font-size: clamp(0.48rem, 4.2cqh, 0.64rem);
-  line-height: 1.12;
-}
-
-.vault-preview-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vault-preview-empty {
-  color: color-mix(in oklab, var(--primary-foreground) 62%, transparent);
-  font-size: clamp(0.55rem, 4.5cqh, 0.7rem);
-}
-
 .bookmark-vault {
   background: var(--background);
   color: var(--foreground);
@@ -2469,7 +2405,7 @@
 }
 
 /* Shared tag-color utilities — used by VaultGlassView's tag dots/chips and
-   by the dashboard's ResourceVaultPreview widget card. */
+   by the dashboard's VaultLauncher widget card. */
 .read-tag-dot {
   width: 0.36rem;
   height: 0.36rem;
@@ -3270,5 +3206,245 @@
   .vg-item-actions {
     opacity: 1;
   }
+}
+
+/* --- Vault items: snippets/commands/templates/expansions/prompts/docs --- */
+
+.vault-kind-code { --read-tag-color: #6366f1; }
+.vault-kind-template { --read-tag-color: #8b5cf6; }
+
+.vg-subtype-picker {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.vg-subtype-option {
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-subtype-option:hover {
+  background: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+
+.vg-subtype-option-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.vg-composer-body-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vg-ghost-btn-sm {
+  height: 1.7rem;
+  padding-inline: 0.55rem;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+}
+
+.vg-markdown-preview {
+  min-height: 4.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--background) 70%, transparent);
+  color: var(--foreground);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.vg-markdown-preview :is(h1, h2, h3) {
+  font-weight: 700;
+  margin: 0.5rem 0 0.3rem;
+}
+
+.vg-markdown-preview h1 { font-size: 1.1rem; }
+.vg-markdown-preview h2 { font-size: 1.02rem; }
+.vg-markdown-preview h3 { font-size: 0.94rem; }
+
+.vg-markdown-preview p {
+  margin: 0.4rem 0;
+}
+
+.vg-markdown-preview ul,
+.vg-markdown-preview ol {
+  margin: 0.4rem 0;
+  padding-left: 1.3rem;
+}
+
+.vg-markdown-preview ul { list-style: disc; }
+.vg-markdown-preview ol { list-style: decimal; }
+
+.vg-markdown-preview code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+  background: color-mix(in oklab, var(--muted) 70%, transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82em;
+}
+
+.vg-markdown-preview pre {
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.5rem;
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  overflow-x: auto;
+}
+
+.vg-markdown-preview pre code {
+  padding: 0;
+  background: none;
+}
+
+.vg-markdown-preview a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.vg-composer-textarea {
+  min-height: 4.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--background) 70%, transparent);
+  color: var(--foreground);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  width: 100%;
+  resize: vertical;
+}
+
+.vg-composer-textarea-mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+}
+
+.vg-lang-input {
+  flex: 0 0 auto;
+  width: 7rem;
+}
+
+.vg-item-meta-chip {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  background: color-mix(in oklab, var(--muted) 70%, transparent);
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.vg-item-body-mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.vg-section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+}
+
+.vg-section-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.vg-section-tab:hover {
+  background: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+
+.vg-section-tab-active {
+  background: color-mix(in oklab, var(--accent) 70%, transparent);
+  color: var(--foreground);
+}
+
+/* --- Vault launcher: homepage widget tile grid --- */
+
+.vault-launcher {
+  display: flex;
+  height: 100%;
+  padding: 0.6rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  background: color-mix(in oklab, var(--card) 92%, black 8%);
+}
+
+.vault-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: min-content;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.vault-launcher-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 0;
+  min-height: 3.6rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.7rem;
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+  color: color-mix(in oklab, var(--card-foreground) 92%, transparent);
+  transition: background 0.15s ease;
+}
+
+.vault-launcher-tile:hover {
+  background: color-mix(in oklab, var(--foreground) 12%, transparent);
+}
+
+.vault-launcher-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 9999px;
+  color: var(--read-tag-color, currentColor);
+  background: color-mix(in oklab, var(--read-tag-color, var(--muted-foreground)) 18%, transparent);
+}
+
+.vault-launcher-tile-label {
+  width: 100%;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: left;
+  overflow-wrap: break-word;
+}
+
+.vault-launcher-tile-accent {
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in oklab, var(--card-foreground) 75%, transparent);
+}
+
+.vault-launcher-add {
+  position: relative;
+}
+
+.vault-launcher-add .vault-launcher-tile {
+  width: 100%;
 }
 

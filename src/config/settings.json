@@ -221,6 +221,7 @@
     "focusMinutes": 25
   },
   "readItems": [],
+  "vaultItems": [],
   "customThemes": [],
   "unsplash": {
     "unsplashBox1": ["chicago", "miami", "new york", "seattle", "austin"],

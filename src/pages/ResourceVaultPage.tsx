@@ -1,9 +1,21 @@
 /*eslint-disable*/
-import { useNavigate } from "react-router-dom";
+import React from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { HiOutlineBookOpen } from "react-icons/hi2";
 import { useSettingsStore } from "@/features/settings/stores";
 import VaultGlassView from "@/features/resourceVault/components/VaultGlassView";
-import { normalizeResourceVaultItems } from "@/features/resourceVault/utils";
+import VaultItemsSection from "@/features/resourceVault/components/VaultItemsSection";
+import { normalizeResourceVaultItems, normalizeVaultItems } from "@/features/resourceVault/utils";
+import { VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
+import { useQuickAddStore, type VaultSection } from "@/features/resourceVault/stores/quickAddStore";
+import type { VaultItem } from "@/features/resourceVault/types";
 import vaultPreviewBg from "@/assets/media/vault-preview-bg.jpg";
+
+const VALID_SECTIONS: VaultSection[] = ["links", ...VAULT_KIND_ORDER];
+
+function isValidSection(value: unknown): value is VaultSection {
+  return VALID_SECTIONS.includes(value as VaultSection);
+}
 
 // Fiber-grain texture for the paper card (see .vault-preview-paper::before /
 // ::after) — feTurbulence gives the irregular fiber noise, feDiffuseLighting
@@ -34,12 +46,21 @@ function PaperFiberFilters() {
 // wiring or back/theme controls.
 export default function ResourceVaultPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const settings = useSettingsStore((state) => state.settings);
   const persistSettingsToStore = useSettingsStore((state) => state.persistSettings);
+
+  const routedSection = (location.state as { section?: unknown } | null)?.section;
+  const routedFocusSearch = Boolean((location.state as { focusSearch?: unknown } | null)?.focusSearch);
+  const [activeSection, setActiveSection] = React.useState<VaultSection>(
+    isValidSection(routedSection) ? routedSection : "links",
+  );
 
   const persistSettings = async (nextSettings: any) => {
     await persistSettingsToStore(nextSettings);
   };
+
+  // --- Links (readItems) ---------------------------------------------------
 
   const handleAddReadItem = async (item: any) => {
     const current = useSettingsStore.getState().settings;
@@ -128,6 +149,78 @@ export default function ResourceVaultPage() {
     URL.revokeObjectURL(url);
   };
 
+  // --- Vault items (snippets/commands/templates/expansions/prompts/docs) ---
+
+  const handleAddVaultItem = async (item: Partial<VaultItem>) => {
+    const current = useSettingsStore.getState().settings;
+    const items = Array.isArray(current.vaultItems) ? current.vaultItems : [];
+    const now = new Date().toISOString();
+    const nextItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      ...item,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await persistSettings({ ...current, vaultItems: [nextItem, ...items] });
+  };
+
+  const handleUpdateVaultItem = async (itemId: string, nextItem: Partial<VaultItem>) => {
+    const current = useSettingsStore.getState().settings;
+    const items = Array.isArray(current.vaultItems) ? current.vaultItems : [];
+    await persistSettings({
+      ...current,
+      vaultItems: items.map((item: any) =>
+        item.id === itemId
+          ? { ...item, ...nextItem, updatedAt: new Date().toISOString() }
+          : item,
+      ),
+    });
+  };
+
+  const handleDeleteVaultItem = async (itemId: string) => {
+    const current = useSettingsStore.getState().settings;
+    const items = Array.isArray(current.vaultItems) ? current.vaultItems : [];
+    await persistSettings({
+      ...current,
+      vaultItems: items.filter((item: any) => item.id !== itemId),
+    });
+  };
+
+  const handleImportVaultItems = async (items: any) => {
+    const current = useSettingsStore.getState().settings;
+    const existing = Array.isArray(current.vaultItems) ? current.vaultItems : [];
+    const incoming = normalizeVaultItems(items);
+    const existingIds = new Set(existing.map((item: any) => item.id));
+    const deduped = incoming.filter((item) => !existingIds.has(item.id));
+    await persistSettings({ ...current, vaultItems: [...deduped, ...existing] });
+  };
+
+  const handleExportVaultItems = (kind: VaultItem["kind"]) => {
+    const current = useSettingsStore.getState().settings;
+    const items = normalizeVaultItems(current.vaultItems, kind);
+    const payload = {
+      version: 1,
+      kind,
+      exportedAt: new Date().toISOString(),
+      items,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    anchor.href = url;
+    anchor.download = `startup-page-vault-${kind}-${date}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const quickAddPending = useQuickAddStore((state) => state.pending && state.section === activeSection);
+  const consumeQuickAdd = useQuickAddStore((state) => state.consumeQuickAdd);
+
   return (
     <div
       className="vault-preview-scene"
@@ -139,16 +232,63 @@ export default function ResourceVaultPage() {
       <div className="vault-preview-stage">
         <div className="vault-preview-paper">
           <div className="vault-preview-paper-scroll">
-            <VaultGlassView
-              items={settings.readItems}
-              onBack={() => navigate("/")}
-              onAddItem={handleAddReadItem}
-              onExportItems={handleExportReadItems}
-              onImportItems={handleImportReadItems}
-              onToggleItem={handleToggleReadItem}
-              onUpdateItem={handleUpdateReadItem}
-              onDeleteItem={handleDeleteReadItem}
-            />
+            <div className="vg-section-tabs" role="tablist" aria-label="Vault section">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSection === "links"}
+                className={`vg-section-tab ${activeSection === "links" ? "vg-section-tab-active" : ""}`}
+                onClick={() => setActiveSection("links")}
+              >
+                <HiOutlineBookOpen className="size-4" />
+                Links
+              </button>
+              {VAULT_KIND_ORDER.map((kind) => {
+                const def = VAULT_KIND_DEFS[kind];
+                const Icon = def.icon;
+                return (
+                  <button
+                    type="button"
+                    key={kind}
+                    role="tab"
+                    aria-selected={activeSection === kind}
+                    className={`vg-section-tab ${activeSection === kind ? "vg-section-tab-active" : ""}`}
+                    onClick={() => setActiveSection(kind)}
+                  >
+                    <Icon className="size-4" />
+                    {def.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeSection === "links" ? (
+              <VaultGlassView
+                items={settings.readItems}
+                onBack={() => navigate("/")}
+                onAddItem={handleAddReadItem}
+                onExportItems={handleExportReadItems}
+                onImportItems={handleImportReadItems}
+                onToggleItem={handleToggleReadItem}
+                onUpdateItem={handleUpdateReadItem}
+                onDeleteItem={handleDeleteReadItem}
+                autoFocusSearch={routedFocusSearch}
+              />
+            ) : (
+              <VaultItemsSection
+                kind={activeSection}
+                items={settings.vaultItems}
+                onBack={() => navigate("/")}
+                onAddItem={handleAddVaultItem}
+                onUpdateItem={handleUpdateVaultItem}
+                onDeleteItem={handleDeleteVaultItem}
+                onExportItems={() => handleExportVaultItems(activeSection)}
+                onImportItems={handleImportVaultItems}
+                quickAddPending={quickAddPending}
+                onQuickAddConsumed={consumeQuickAdd}
+                autoFocusSearch={routedFocusSearch}
+              />
+            )}
           </div>
         </div>
       </div>
