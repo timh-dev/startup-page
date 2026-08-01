@@ -25,6 +25,7 @@ export type WidgetType =
   | "clock"
   | "search"
   | "weather"
+  | "weatherV2"
   | "bookmark"
   | "photo"
   | "vault"

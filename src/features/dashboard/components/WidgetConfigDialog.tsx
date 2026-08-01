@@ -47,7 +47,9 @@ function StackItemRow({
 
   const changeType = (type: WidgetType) => {
     const nextDef = getWidgetType(type);
-    onChange({ ...item, type, config: nextDef.makeDefaultConfig() });
+    const allowedSizes = nextDef.allowedSizes ?? TILE_SIZE_OPTIONS.map((option) => option.key);
+    const size = allowedSizes.includes(item.size) ? item.size : nextDef.defaultSize;
+    onChange({ ...item, type, size, config: nextDef.makeDefaultConfig() });
   };
 
   return (
@@ -115,12 +117,15 @@ export default function WidgetConfigDialog(): React.ReactElement {
   const def = getWidgetType(draft.type);
   const ConfigFields = def.ConfigFields;
   const isNew = dialog.kind === "new";
+  const sizeOptions = TILE_SIZE_OPTIONS.filter((option) => (def.allowedSizes ?? TILE_SIZE_OPTIONS.map((o) => o.key)).includes(option.key));
 
   const changeType = (type: WidgetType) => {
     const nextDef = getWidgetType(type);
     setDraft((prev) => {
       if (!prev) return prev;
-      const next: WidgetInstance = { ...prev, type, config: nextDef.makeDefaultConfig() };
+      const allowedSizes = nextDef.allowedSizes ?? TILE_SIZE_OPTIONS.map((option) => option.key);
+      const size = allowedSizes.includes(prev.size) ? prev.size : nextDef.defaultSize;
+      const next: WidgetInstance = { ...prev, type, size, config: nextDef.makeDefaultConfig() };
       if (type === "stack") next.items = prev.items || [];
       else delete next.items;
       return next;
@@ -191,9 +196,10 @@ export default function WidgetConfigDialog(): React.ReactElement {
                 id="widget-size"
                 value={draft.size}
                 onChange={(event) => changeSize(event.target.value as TileSize)}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                disabled={sizeOptions.length <= 1}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
               >
-                {TILE_SIZE_OPTIONS.map((option) => (
+                {sizeOptions.map((option) => (
                   <option key={option.key} value={option.key}>{option.title} ({option.label})</option>
                 ))}
               </select>

@@ -18,39 +18,12 @@ import {
   HiXMark,
 } from "react-icons/hi2";
 import { DEFAULT_READ_TAGS, READ_TAG_COLORS } from "@/features/resourceVault/constants";
-import { normalizeResourceVaultItems } from "@/features/resourceVault/utils";
+import { formatItemDate, groupItemsByDate, normalizeResourceVaultItems } from "@/features/resourceVault/utils";
 import { useQuickAddStore } from "@/features/resourceVault/stores/quickAddStore";
 
 const UNDO_DELETE_DELAY_MS = 5000;
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
-
-function formatItemDate(value: string | null | undefined) {
-  const date = value ? new Date(value) : new Date();
-  const month = date.toLocaleString(undefined, { month: "short" }).toUpperCase();
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${month} ${day}`;
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
-function groupLabelFor(iso: string | null | undefined, now: Date) {
-  const target = new Date(iso || now.toISOString());
-  const diffDays = Math.round((startOfDay(now) - startOfDay(target)) / 86400000);
-
-  if (diffDays <= 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays > 1 && diffDays < 7) return target.toLocaleDateString(undefined, { weekday: "long" });
-
-  const sameYear = target.getFullYear() === now.getFullYear();
-  return target.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: sameYear ? undefined : "numeric",
-  });
-}
 
 interface VaultItemRowProps {
   item: any;
@@ -64,6 +37,38 @@ interface VaultItemRowProps {
 // description doesn't re-render the rest of the list.
 function VaultItemRow({ item, onToggle, onEdit, onDelete }: VaultItemRowProps) {
   const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
+  const manuallySetRef = React.useRef(false);
+  const titleRef = React.useRef<HTMLSpanElement>(null);
+  const descriptionRef = React.useRef<HTMLButtonElement>(null);
+
+  // Auto-expand the description onto its own line when the collapsed single
+  // line would truncate either the title or the description — but never
+  // auto-collapse it back (that would fight a user's manual toggle and can
+  // oscillate, since measuring while already expanded reads as "fits").
+  React.useLayoutEffect(() => {
+    if (descriptionExpanded || manuallySetRef.current || !item.description) {
+      return undefined;
+    }
+
+    const checkOverflow = () => {
+      const titleOverflows = titleRef.current ? titleRef.current.scrollWidth > titleRef.current.clientWidth + 1 : false;
+      const descriptionOverflows = descriptionRef.current
+        ? descriptionRef.current.scrollWidth > descriptionRef.current.clientWidth + 1
+        : false;
+      if (titleOverflows || descriptionOverflows) {
+        setDescriptionExpanded(true);
+      }
+    };
+
+    checkOverflow();
+    window.addEventListener("resize", checkOverflow);
+    return () => window.removeEventListener("resize", checkOverflow);
+  }, [descriptionExpanded, item.title, item.description]);
+
+  const toggleDescription = () => {
+    manuallySetRef.current = true;
+    setDescriptionExpanded((current) => !current);
+  };
 
   return (
     <li
@@ -83,15 +88,16 @@ function VaultItemRow({ item, onToggle, onEdit, onDelete }: VaultItemRowProps) {
         rel={item.url ? "noreferrer" : undefined}
         className={`vg-item-main ${!item.url ? "pointer-events-none" : ""}`}
       >
-        <span className={`vg-item-title ${item.status === "done" ? "line-through opacity-55" : ""}`}>
+        <span ref={titleRef} className={`vg-item-title ${item.status === "done" ? "line-through opacity-55" : ""}`}>
           {item.title}
         </span>
       </a>
       {item.description && (
         <button
+          ref={descriptionRef}
           type="button"
           className={`vg-item-description ${descriptionExpanded ? "vg-item-description-expanded" : ""}`}
-          onClick={() => setDescriptionExpanded((current) => !current)}
+          onClick={toggleDescription}
           title={descriptionExpanded ? "Click to collapse" : "Click to show the full description"}
         >
           {item.description}
@@ -122,26 +128,6 @@ function VaultItemRow({ item, onToggle, onEdit, onDelete }: VaultItemRowProps) {
   );
 }
 
-function groupItemsByDate(items: any[], statusKey: string) {
-  const now = new Date();
-  const groups: Array<{ label: string; items: any[] }> = [];
-  const indexByLabel = new Map<string, number>();
-
-  for (const item of items) {
-    const dateValue = statusKey === "done" ? item.completedAt || item.createdAt : item.createdAt;
-    const label = groupLabelFor(dateValue, now);
-
-    if (!indexByLabel.has(label)) {
-      indexByLabel.set(label, groups.length);
-      groups.push({ label, items: [] });
-    }
-
-    groups[indexByLabel.get(label) as number].items.push(item);
-  }
-
-  return groups;
-}
-
 interface VaultGlassViewProps {
   items: unknown;
   onAddItem: (item: any) => void;
@@ -151,6 +137,7 @@ interface VaultGlassViewProps {
   onImportItems: (items: any[]) => Promise<void>;
   onToggleItem: (id: string) => void;
   onUpdateItem: (id: string, item: any) => void;
+  autoFocusSearch?: boolean;
 }
 
 export default function VaultGlassView({
@@ -162,8 +149,10 @@ export default function VaultGlassView({
   onImportItems,
   onToggleItem,
   onUpdateItem,
+  autoFocusSearch,
 }: VaultGlassViewProps) {
   const importInputRef = React.useRef<HTMLInputElement>(null);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [query, setQuery] = React.useState("");
   const [activeTag, setActiveTag] = React.useState("All");
   const [activeStatus, setActiveStatus] = React.useState("todo");
@@ -186,7 +175,7 @@ export default function VaultGlassView({
     tag: "Read",
   });
 
-  const quickAddPending = useQuickAddStore((state) => state.pending);
+  const quickAddPending = useQuickAddStore((state) => state.pending && state.section === "links");
   const consumeQuickAdd = useQuickAddStore((state) => state.consumeQuickAdd);
 
   React.useEffect(() => {
@@ -205,6 +194,12 @@ export default function VaultGlassView({
       Object.values(deleteTimersRef.current).forEach(clearTimeout);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (autoFocusSearch) {
+      searchInputRef.current?.focus();
+    }
+  }, [autoFocusSearch]);
 
   const normalizedItems = React.useMemo(() => (
     (Array.isArray(items) ? items : []).filter((item: any) => !pendingDeleteIds.has(item.id))
@@ -245,7 +240,9 @@ export default function VaultGlassView({
   const doneItems = visibleItems.filter((item: any) => item.status === "done");
   const activeItems = activeStatus === "todo" ? todoItems : doneItems;
   const groups = React.useMemo(
-    () => groupItemsByDate(activeItems, activeStatus),
+    () => groupItemsByDate(activeItems, (item: any) => (
+      activeStatus === "done" ? item.completedAt || item.createdAt : item.createdAt
+    )),
     [activeItems, activeStatus],
   );
 
@@ -466,6 +463,7 @@ export default function VaultGlassView({
         <label className="vg-search">
           <HiMagnifyingGlass className="size-4" />
           <input
+            ref={searchInputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search resources..."

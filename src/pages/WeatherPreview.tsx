@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { HiArrowLeft } from "react-icons/hi2";
 import { WeatherBox } from "@/features/weather/components/WeatherBox";
+import WeatherFrostedCard from "@/features/weather/components/WeatherFrostedCard";
 import { getCloudCoverRange } from "@/features/weather/utils";
 import type { WeatherCondition, WeatherData } from "@/features/weather/types/weather";
 
@@ -299,8 +300,13 @@ export default function WeatherPreviewPage() {
             </span>
           </label>
         </div>
-        <div className="h-[min(74vh,34rem)] w-[min(92vw,42rem)] overflow-hidden rounded-3xl shadow-2xl shadow-black/40">
-          <WeatherBox data={previewData} location="Weather Preview" clockTime={clockTime} />
+        <div className="flex flex-wrap items-start justify-center gap-5">
+          <div className="h-[min(74vh,34rem)] w-[min(92vw,42rem)] overflow-hidden rounded-3xl shadow-2xl shadow-black/40">
+            <WeatherBox data={previewData} location="Weather Preview" clockTime={clockTime} />
+          </div>
+          <div className="h-[min(42vh,20rem)] w-[min(92vw,44rem)] overflow-hidden rounded-3xl shadow-2xl shadow-black/40">
+            <WeatherFrostedCard data={previewData} clockTime={clockTime} />
+          </div>
         </div>
       </div>
     </div>

@@ -14,6 +14,8 @@
     "tileSize": 9,
     "bookmarkPillSize": 3.25,
     "showDecorativeMedia": true,
+    "vaultEnabled": true,
+    "bookmarksEnabled": true,
     "imageEffects": {
       "enabledFilters": {
         "paperTexture": false,
@@ -221,6 +223,7 @@
     "focusMinutes": 25
   },
   "readItems": [],
+  "vaultItems": [],
   "customThemes": [],
   "unsplash": {
     "unsplashBox1": ["chicago", "miami", "new york", "seattle", "austin"],

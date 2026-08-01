@@ -16,6 +16,7 @@ import {
   HiOutlineNewspaper,
   HiOutlinePhoto,
   HiOutlineRss,
+  HiOutlineSparkles,
   HiOutlineSquares2X2,
   HiOutlineVideoCamera,
 } from "react-icons/hi2";
@@ -44,10 +45,11 @@ import { StackWidget } from "@/features/dashboard/components/StackWidget";
 
 import Bookmark from "@/features/bookmarks/components/Bookmark";
 import { useBookmarkDialogStore } from "@/features/bookmarks/stores/bookmarkDialogStore";
-import ResourceVaultPreview from "@/features/resourceVault/components/ResourceVaultPreview";
+import VaultLauncher from "@/features/resourceVault/components/VaultLauncher";
 import Unsplash, { clearPhotoCache } from "@/features/media/components/Unsplash";
 import { WeatherBox } from "@/features/weather/components/WeatherBox";
 import WeatherDayDetail from "@/features/weather/components/WeatherDayDetail";
+import WeatherFrostedCard from "@/features/weather/components/WeatherFrostedCard";
 import AirQuality from "@/features/weather/components/AirQuality";
 import type { WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
 
@@ -64,6 +66,8 @@ export interface WidgetTypeDef {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   defaultSize: "small" | "wide" | "tall" | "large" | "feature";
+  /** Sizes this widget can be set to. Omit to allow all 5 (today's default for every existing widget). */
+  allowedSizes?: Array<"small" | "wide" | "tall" | "large" | "feature">;
   makeDefaultConfig: () => Record<string, unknown>;
   Render: React.ComponentType<{ instance: WidgetInstance; cardClass?: string }>;
   ConfigFields?: React.ComponentType<{ config: Record<string, unknown>; onChange: (next: Record<string, unknown>) => void }>;
@@ -273,6 +277,68 @@ function WeatherConfigFields({ config, onChange }: { config: WeatherConfig; onCh
   );
 }
 
+// ---- weatherV2 (frosted-glass hourly card) ---------------------------------
+
+interface WeatherV2Config {
+  lat?: number | null;
+  lon?: number | null;
+  units?: "imperial" | "metric" | null;
+  openWeatherKey?: string | null;
+}
+
+function WeatherV2Render({ instance, cardClass }: { instance: WidgetInstance; cardClass?: string }) {
+  const config = instance.config as WeatherV2Config;
+  const overrides = weatherOverridesFrom(config);
+  return (
+    <div className={cardClass}>
+      <WeatherFrostedCard instanceId={instance.id} overrides={overrides} />
+    </div>
+  );
+}
+
+function WeatherV2ConfigFields({ config, onChange }: { config: WeatherV2Config; onChange: (next: WeatherV2Config) => void }) {
+  return (
+    <div className="grid gap-3">
+      <p className="text-xs text-muted-foreground">
+        Leave location/key blank to use the app-wide values from Settings → Content.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <TextField
+          id="weather-v2-lat"
+          label="Latitude"
+          value={config.lat != null ? String(config.lat) : ""}
+          onChange={(value) => onChange({ ...config, lat: value === "" ? null : Number(value) })}
+        />
+        <TextField
+          id="weather-v2-lon"
+          label="Longitude"
+          value={config.lon != null ? String(config.lon) : ""}
+          onChange={(value) => onChange({ ...config, lon: value === "" ? null : Number(value) })}
+        />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="weather-v2-units">Units</Label>
+        <select
+          id="weather-v2-units"
+          value={config.units || ""}
+          onChange={(event) => onChange({ ...config, units: (event.target.value || null) as WeatherV2Config["units"] })}
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          <option value="">App default</option>
+          <option value="imperial">Imperial (°F, mph)</option>
+          <option value="metric">Metric (°C, km/h)</option>
+        </select>
+      </div>
+      <TextField
+        id="weather-v2-key"
+        label="OpenWeather API key (optional override)"
+        value={config.openWeatherKey || ""}
+        onChange={(value) => onChange({ ...config, openWeatherKey: value || null })}
+      />
+    </div>
+  );
+}
+
 // ---- bookmark ---------------------------------------------------------------
 
 function BookmarkRender({ instance, cardClass }: { instance: WidgetInstance; cardClass?: string }) {
@@ -447,11 +513,9 @@ function VideoConfigFields({ config, onChange }: { config: VideoConfig; onChange
 // ---- vault ------------------------------------------------------------------
 
 function VaultRender({ cardClass }: { instance: WidgetInstance; cardClass?: string }) {
-  const readItems = useSettingsStore((state) => state.settings.readItems);
-  const navigate = useNavigate();
   return (
     <div className={cardClass}>
-      <ResourceVaultPreview items={readItems} onOpen={() => navigate("/resources")} />
+      <VaultLauncher />
     </div>
   );
 }
@@ -569,6 +633,16 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     ConfigFields: WeatherConfigFields as unknown as WidgetTypeDef["ConfigFields"],
   },
   {
+    type: "weatherV2",
+    label: "Weather (Frosted)",
+    icon: HiOutlineSparkles,
+    defaultSize: "feature",
+    allowedSizes: ["feature"],
+    makeDefaultConfig: () => ({}),
+    Render: WeatherV2Render,
+    ConfigFields: WeatherV2ConfigFields as unknown as WidgetTypeDef["ConfigFields"],
+  },
+  {
     type: "bookmark",
     label: "Bookmark folder",
     icon: HiOutlineBookmark,
@@ -588,9 +662,9 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   },
   {
     type: "vault",
-    label: "Resource vault",
+    label: "Vault",
     icon: HiOutlineArchiveBox,
-    defaultSize: "small",
+    defaultSize: "large",
     makeDefaultConfig: () => ({}),
     Render: VaultRender,
   },

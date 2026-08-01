@@ -620,6 +620,35 @@ function SettingsButton() {
 
                 <Card>
                   <CardHeader>
+                    <CardTitle>Features</CardTitle>
+                    <CardDescription>Turn off a dedicated page and its nav icon/shortcut — dashboard widgets keep working either way.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium">Resource Vault</p>
+                        <p className="text-sm text-muted-foreground">The Resource Vault page and its nav icon/shortcut.</p>
+                      </div>
+                      <Switch
+                        checked={settingsState.ui?.vaultEnabled ?? true}
+                        onCheckedChange={(checked) => handleUiChange("vaultEnabled", checked)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium">Bookmarks</p>
+                        <p className="text-sm text-muted-foreground">The Bookmarks page and its nav icon/shortcut.</p>
+                      </div>
+                      <Switch
+                        checked={settingsState.ui?.bookmarksEnabled ?? true}
+                        onCheckedChange={(checked) => handleUiChange("bookmarksEnabled", checked)}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
                     <CardTitle>Image Effects</CardTitle>
                     <CardDescription>
                       Enable one or more filters for photo tiles. When multiple filters are enabled, each image tile picks one at random.
