@@ -31,23 +31,25 @@ function KBarWrapper({ children }: { children: React.ReactNode }) {
 
 function VaultNavigationActions() {
   const navigate = useNavigate();
+  const vaultEnabled = useSettingsStore((state) => state.settings.ui?.vaultEnabled ?? true);
+  const bookmarksEnabled = useSettingsStore((state) => state.settings.ui?.bookmarksEnabled ?? true);
 
   const actions = React.useMemo(
     () => [
-      {
+      ...(bookmarksEnabled ? [{
         id: "open-bookmark-vault",
         name: "Open Bookmark Vault",
         shortcut: ["3"],
         section: "Navigation",
         perform: () => navigate("/bookmarks"),
-      },
-      {
+      }] : []),
+      ...(vaultEnabled ? [{
         id: "open-resource-vault",
         name: "Open Resource Vault",
         shortcut: ["1"],
         section: "Navigation",
         perform: () => navigate("/resources"),
-      },
+      }] : []),
       {
         id: "show-dashboard",
         name: "Show Dashboard",
@@ -55,7 +57,7 @@ function VaultNavigationActions() {
         section: "Navigation",
         perform: () => navigate("/"),
       },
-      {
+      ...(vaultEnabled ? [{
         id: "quick-add-resource",
         name: "Add a Resource",
         shortcut: ["a"],
@@ -67,9 +69,9 @@ function VaultNavigationActions() {
           useQuickAddStore.getState().requestQuickAdd();
           navigate("/resources");
         },
-      },
+      }] : []),
     ],
-    [navigate],
+    [navigate, vaultEnabled, bookmarksEnabled],
   );
 
   useRegisterActions(actions, [actions]);
@@ -113,6 +115,8 @@ function AppLayoutInner() {
   const isClerkAvailable = useIsClerkAvailable();
   const navigate = useNavigate();
   const location = useLocation();
+  const vaultEnabled = useSettingsStore((state) => state.settings.ui?.vaultEnabled ?? true);
+  const bookmarksEnabled = useSettingsStore((state) => state.settings.ui?.bookmarksEnabled ?? true);
 
   const isResources = location.pathname === "/resources";
   const isBookmarks = location.pathname === "/bookmarks";
@@ -130,6 +134,17 @@ function AppLayoutInner() {
     }
   }, [isDashboard, editingLayout, setLayoutEditing]);
 
+  // A feature can be turned off from Settings while its page is open (or via
+  // a stale deep link/back-button) — bounce back to the dashboard instead of
+  // leaving a disabled page on screen.
+  React.useEffect(() => {
+    if (isResources && !vaultEnabled) {
+      navigate("/");
+    } else if (isBookmarks && !bookmarksEnabled) {
+      navigate("/");
+    }
+  }, [isResources, isBookmarks, vaultEnabled, bookmarksEnabled, navigate]);
+
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -144,7 +159,7 @@ function AppLayoutInner() {
       }
 
       if (!event.metaKey && !event.ctrlKey && !event.altKey) {
-        if (event.key === "1") {
+        if (event.key === "1" && vaultEnabled) {
           event.preventDefault();
           navigate("/resources");
           return;
@@ -154,7 +169,7 @@ function AppLayoutInner() {
           navigate("/");
           return;
         }
-        if (event.key === "3") {
+        if (event.key === "3" && bookmarksEnabled) {
           event.preventDefault();
           navigate("/bookmarks");
           return;
@@ -164,7 +179,7 @@ function AppLayoutInner() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, isDashboard]);
+  }, [navigate, isDashboard, vaultEnabled, bookmarksEnabled]);
 
   const handleWheel = React.useCallback(
     (event: React.WheelEvent) => {
@@ -179,7 +194,7 @@ function AppLayoutInner() {
       if (event.deltaX > 0) {
         if (isResources) {
           navigate("/");
-        } else if (!isBookmarks) {
+        } else if (!isBookmarks && bookmarksEnabled) {
           navigate("/bookmarks");
         }
         return;
@@ -187,11 +202,11 @@ function AppLayoutInner() {
 
       if (isBookmarks) {
         navigate("/");
-      } else if (!isResources) {
+      } else if (!isResources && vaultEnabled) {
         navigate("/resources");
       }
     },
-    [navigate, isResources, isBookmarks],
+    [navigate, isResources, isBookmarks, vaultEnabled, bookmarksEnabled],
   );
 
   return (
@@ -205,17 +220,19 @@ function AppLayoutInner() {
       <BookmarkDialogs />
       <WidgetConfigDialog />
       <nav className="vault-nav-center" aria-label="Page navigation">
-        <button
-          type="button"
-          className={`vault-nav-button ${isResources ? "vault-nav-button-active" : ""}`}
-          onClick={() => navigate("/resources")}
-          title="Open Resource Vault (1)"
-          aria-label="Resource Vault"
-          aria-current={isResources ? "page" : undefined}
-        >
-          <HiArchiveBox className="size-4" />
-          <span className="vault-nav-number">1</span>
-        </button>
+        {vaultEnabled && (
+          <button
+            type="button"
+            className={`vault-nav-button ${isResources ? "vault-nav-button-active" : ""}`}
+            onClick={() => navigate("/resources")}
+            title="Open Resource Vault (1)"
+            aria-label="Resource Vault"
+            aria-current={isResources ? "page" : undefined}
+          >
+            <HiArchiveBox className="size-4" />
+            <span className="vault-nav-number">1</span>
+          </button>
+        )}
         <button
           type="button"
           className={`vault-nav-button ${isDashboard ? "vault-nav-button-active" : ""}`}
@@ -227,17 +244,19 @@ function AppLayoutInner() {
           <HiHome className="size-4" />
           <span className="vault-nav-number">2</span>
         </button>
-        <button
-          type="button"
-          className={`vault-nav-button ${isBookmarks ? "vault-nav-button-active" : ""}`}
-          onClick={() => navigate("/bookmarks")}
-          title="Open Bookmark Vault (3)"
-          aria-label="Bookmark Vault"
-          aria-current={isBookmarks ? "page" : undefined}
-        >
-          <HiBookmark className="size-4" />
-          <span className="vault-nav-number">3</span>
-        </button>
+        {bookmarksEnabled && (
+          <button
+            type="button"
+            className={`vault-nav-button ${isBookmarks ? "vault-nav-button-active" : ""}`}
+            onClick={() => navigate("/bookmarks")}
+            title="Open Bookmark Vault (3)"
+            aria-label="Bookmark Vault"
+            aria-current={isBookmarks ? "page" : undefined}
+          >
+            <HiBookmark className="size-4" />
+            <span className="vault-nav-number">3</span>
+          </button>
+        )}
       </nav>
       <div className="fixed right-5 top-5 z-40 flex items-center gap-3 text-foreground drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
         {isDashboard && (
