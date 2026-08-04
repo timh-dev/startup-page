@@ -23,15 +23,49 @@ const BLOCKED_HOSTNAME_PATTERNS = [
   /^192\.168\./,
 ];
 
-function isBlockedHostname(hostname: string): boolean {
+export function isBlockedHostname(hostname: string): boolean {
   return BLOCKED_HOSTNAME_PATTERNS.some((pattern) => pattern.test(hostname));
 }
 
-function faviconUrlFor(url: URL): string {
+export function faviconUrlFor(url: URL): string {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(url.hostname)}&sz=64`;
 }
 
-function decodeEntities(value: string): string {
+const YOUTUBE_HOSTNAMES = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
+
+export function isYoutubeUrl(url: URL): boolean {
+  return YOUTUBE_HOSTNAMES.has(url.hostname.toLowerCase());
+}
+
+// YouTube serves a generic "<video/channel name> - YouTube" title and its
+// canned channel-description boilerplate in the static <head> to
+// non-browser requests — the real per-video title/description only get
+// rendered client-side (into ytInitialData) after JS runs, which this
+// scraper never does. oEmbed is YouTube's own unauthenticated JSON endpoint
+// for exactly this: given a watch/short URL it returns the real video
+// title (no description field, so we surface the channel name instead of
+// inventing one). Falls back to the generic scrape below (same as any
+// other site) if the URL isn't a real video (e.g. a channel/home page) or
+// oEmbed itself fails.
+export async function fetchYoutubeOembed(
+  target: URL,
+): Promise<{ title: string | null; description: string | null } | null> {
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(target.toString())}&format=json`;
+    const response = await fetch(oembedUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data?.title) return null;
+    return {
+      title: data.title,
+      description: data.author_name ? `Video by ${data.author_name}` : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function decodeEntities(value: string): string {
   return value
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -41,7 +75,7 @@ function decodeEntities(value: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-function extractTitle(html: string): string | null {
+export function extractTitle(html: string): string | null {
   const ogMatch =
     html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
@@ -58,7 +92,7 @@ function extractTitle(html: string): string | null {
   return null;
 }
 
-function extractDescription(html: string): string | null {
+export function extractDescription(html: string): string | null {
   const ogMatch =
     html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i) ||
     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i);
@@ -96,6 +130,15 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (isBlockedHostname(target.hostname)) {
       throw new HttpError(422, "That host can't be previewed");
+    }
+
+    if (isYoutubeUrl(target)) {
+      const oembed = await fetchYoutubeOembed(target);
+      if (oembed) {
+        return json({ title: oembed.title, description: oembed.description, faviconUrl: faviconUrlFor(target) });
+      }
+      // Not a real video (channel/home page) or oEmbed itself failed — fall
+      // through to the generic scrape below, same as any other site.
     }
 
     const response = await fetch(target.toString(), {
