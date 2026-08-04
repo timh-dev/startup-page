@@ -19,11 +19,19 @@ interface AuthStore {
   syncStatus: SyncStatus;
   lastSyncedAt: string | null;
   isOnline: boolean;
+  // Top-level settings keys (e.g. "widgets", "bookmark") that were edited
+  // differently on two devices between syncs and had to be auto-resolved
+  // rather than cleanly merged — see syncSettingsFromCloud. Cleared the next
+  // time a sync completes with nothing left to resolve.
+  lastMergeKeys: string[] | null;
+  lastMergeAt: string | null;
   setAuthState: (state: { clerkUserId: string | null; isSignedIn: boolean; isLoaded: boolean }) => void;
   setSubscriptionStatus: (status: SubscriptionStatus, periodEnd?: string | null) => void;
   setSyncStatus: (status: SyncStatus, at?: string | null) => void;
   setOnline: (online: boolean) => void;
   hasSyncAccess: () => boolean;
+  setMergeInfo: (keys: string[]) => void;
+  clearMergeInfo: () => void;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -34,6 +42,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   subscriptionPeriodEnd: null,
   syncStatus: "idle",
   lastSyncedAt: null,
+  lastMergeKeys: null,
+  lastMergeAt: null,
   isOnline: typeof navigator === "undefined" ? true : navigator.onLine,
 
   setAuthState: (state) => set(state),
@@ -50,4 +60,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const { isSignedIn, subscriptionStatus } = get();
     return isSignedIn && subscriptionStatus === "active";
   },
+
+  setMergeInfo: (keys) => set({ lastMergeKeys: keys, lastMergeAt: new Date().toISOString() }),
+  clearMergeInfo: () => set({ lastMergeKeys: null, lastMergeAt: null }),
 }));

@@ -9,6 +9,10 @@ const SETTINGS_SCHEMA_VERSION = 2;
 const SETTINGS_STORE_NAME = "settings";
 const BACKUPS_STORE_NAME = "settings-backups";
 const SETTINGS_RECORD_KEY = "workspace-settings";
+// The last settings snapshot both this device and the cloud agreed on — the
+// three-way-merge base in syncSettingsFromCloud. Lives in the same store as
+// SETTINGS_RECORD_KEY (just a different key), so it needs no schema bump.
+const SYNCED_SNAPSHOT_RECORD_KEY = "workspace-settings-last-synced";
 const BACKUP_LIMIT = 10;
 const SETTINGS_EXPORT_FORMAT = "startup-page-settings";
 const SETTINGS_MAX_IMPORT_BYTES = 2 * 1024 * 1024;
@@ -17,7 +21,21 @@ function isPlainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function mergeSettings(defaultValue, savedValue) {
+export function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => deepEqual(item, b[i]));
+  }
+  if (typeof a === "object") {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    return aKeys.length === bKeys.length && aKeys.every((key) => Object.prototype.hasOwnProperty.call(b, key) && deepEqual(a[key], b[key]));
+  }
+  return false;
+}
+
+export function mergeSettings(defaultValue, savedValue) {
   if (Array.isArray(defaultValue)) {
     if (!Array.isArray(savedValue)) {
       return defaultValue;
@@ -214,7 +232,7 @@ function normalizeBookmarkBoxCategories(bookmarkBoxCategories, nextBookmarks) {
   });
 }
 
-function normalizeSettingsShape(settings) {
+export function normalizeSettingsShape(settings) {
   // The one deliberate bootstrap call (`normalizeSettingsShape(defaultSettings)`,
   // below) is the only place `settings` can be this exact reference — every
   // real saved/imported/cloud-pulled record is a different object, even if it
@@ -427,6 +445,44 @@ async function writeSettingsToIndexedDb(settings) {
   return record;
 }
 
+async function readSyncedSnapshotFromIndexedDb(): Promise<StoredSettingsRecord | null> {
+  const db = await getIndexedDb();
+  if (!db) {
+    return null;
+  }
+
+  return new Promise<StoredSettingsRecord | null>((resolve, reject) => {
+    const transaction = db.transaction(SETTINGS_STORE_NAME, "readonly");
+    const request = transaction.objectStore(SETTINGS_STORE_NAME).get(SYNCED_SNAPSHOT_RECORD_KEY);
+
+    request.onsuccess = () => resolve(normalizeStoredRecord(request.result));
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function writeSyncedSnapshotToIndexedDb(settings, updatedAt: string) {
+  const db = await getIndexedDb();
+  if (!db) {
+    return;
+  }
+
+  const record = { schemaVersion: SETTINGS_SCHEMA_VERSION, updatedAt, settings };
+
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(SETTINGS_STORE_NAME, "readwrite");
+    transaction.objectStore(SETTINGS_STORE_NAME).put(record, SYNCED_SNAPSHOT_RECORD_KEY);
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+/** Called after a push the server actually accepted, so the next sync's merge diffs against what's really up there. */
+export async function markSyncedSnapshot(settings, updatedAt: string) {
+  await writeSyncedSnapshotToIndexedDb(normalizeSettingsShape(settings), updatedAt);
+}
+
 async function clearSettingsFromIndexedDb() {
   const db = await getIndexedDb();
   if (!db) {
@@ -572,9 +628,61 @@ export async function hydrateSettingsFromIndexedDb() {
 }
 
 /**
- * Pull cloud settings and reconcile with the local copy by timestamp.
- * - Cloud copy newer (or no local copy): apply cloud locally, return it.
- * - Local copy newer (offline edits): keep local, push it up, return null.
+ * Three-way merge, per top-level settings key, of `local` and `cloud` against
+ * their last common `base`. A key changed on only one side just takes that
+ * side's value; a key changed *differently* on both sides is a real conflict
+ * (reported in `conflictKeys`) resolved by whichever side is newer.
+ * `localHasUniqueChanges` tells the caller whether the merge result needs to
+ * be pushed back up (local had something the cloud doesn't have yet).
+ * Pure and side-effect-free so it can be unit tested directly.
+ */
+export function mergeSettingsSnapshots(
+  base: Record<string, unknown>,
+  local: Record<string, unknown>,
+  cloud: Record<string, unknown>,
+  cloudUpdatedAt: number,
+  localUpdatedAt: number,
+): { merged: Record<string, unknown>; conflictKeys: string[]; localHasUniqueChanges: boolean } {
+  const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(cloud)]);
+  const merged: Record<string, unknown> = {};
+  const conflictKeys: string[] = [];
+  let localHasUniqueChanges = false;
+
+  for (const key of keys) {
+    const baseVal = base[key];
+    const localVal = local[key];
+    const cloudVal = cloud[key];
+    const localChanged = !deepEqual(localVal, baseVal);
+    const cloudChanged = !deepEqual(cloudVal, baseVal);
+
+    if (localChanged && cloudChanged && !deepEqual(localVal, cloudVal)) {
+      conflictKeys.push(key);
+      merged[key] = cloudUpdatedAt >= localUpdatedAt ? cloudVal : localVal;
+    } else if (cloudChanged) {
+      merged[key] = cloudVal;
+    } else {
+      merged[key] = localVal;
+      if (localChanged) localHasUniqueChanges = true;
+    }
+  }
+
+  return { merged, conflictKeys, localHasUniqueChanges };
+}
+
+/**
+ * Pull cloud settings and reconcile with the local copy.
+ * - No local copy yet, or no synced-snapshot base to diff against (first
+ *   sync ever on this device): whole-blob compare by timestamp, same as
+ *   before — cloud wins if newer, otherwise local wins and gets pushed up.
+ * - Otherwise: three-way merge against the last snapshot both sides agreed
+ *   on (see markSyncedSnapshot), per top-level settings key (`widgets`,
+ *   `bookmark`, `vaultItems`, ...). A key changed on only one side just
+ *   takes that side's value, so e.g. editing the layout on desktop and
+ *   bookmarks on a phone — while each was offline or between syncs — no
+ *   longer has one whole copy clobber the other. Only a key edited
+ *   *differently* on both sides is a real conflict; those fall back to
+ *   newer-wins and get surfaced via useAuthStore's setMergeInfo so it's not
+ *   silent.
  * - Pull failed for any reason (no token yet, offline, server error, no
  *   subscription, ...): do nothing. Treating a failed pull as "cloud is
  *   empty" is what let an empty local copy silently overwrite real synced
@@ -584,9 +692,11 @@ export async function hydrateSettingsFromIndexedDb() {
 export async function syncSettingsFromCloud() {
   try {
     const { pullSettingsFromCloud, schedulePushToCloud } = await import("@/lib/cloudSync");
-    const [cloudResult, localRecord] = await Promise.all([
+    const { useAuthStore } = await import("@/features/auth/stores");
+    const [cloudResult, localRecord, syncedSnapshot] = await Promise.all([
       pullSettingsFromCloud(),
       readSettingsFromIndexedDb(),
+      readSyncedSnapshotFromIndexedDb(),
     ]);
 
     if (cloudResult.status === "error") {
@@ -598,24 +708,59 @@ export async function syncSettingsFromCloud() {
       // — seed it with the local copy.
       if (localRecord) {
         schedulePushToCloud(localRecord.settings, localRecord.updatedAt);
+        void writeSyncedSnapshotToIndexedDb(localRecord.settings, localRecord.updatedAt);
       }
       return null;
     }
 
-    const cloudUpdatedAt =
-      Date.parse(cloudResult.clientUpdatedAt || cloudResult.serverUpdatedAt || "") || 0;
+    const cloudSettings = normalizeSettingsShape(cloudResult.settings);
+    const cloudUpdatedAt = Date.parse(cloudResult.clientUpdatedAt || cloudResult.serverUpdatedAt || "") || 0;
     const localUpdatedAt = localRecord ? Date.parse(localRecord.updatedAt) || 0 : 0;
 
-    if (cloudUpdatedAt >= localUpdatedAt) {
-      const normalized = normalizeSettingsShape(cloudResult.settings);
-      writeSettingsToLocalStorage(normalized);
-      void writeSettingsToIndexedDb(normalized);
-      return normalized;
+    if (!localRecord || !syncedSnapshot) {
+      if (cloudUpdatedAt >= localUpdatedAt) {
+        writeSettingsToLocalStorage(cloudSettings);
+        void writeSettingsToIndexedDb(cloudSettings);
+        void writeSyncedSnapshotToIndexedDb(cloudSettings, cloudResult.serverUpdatedAt || new Date().toISOString());
+        return cloudSettings;
+      }
+      // Local wins — sync it up instead of clobbering offline edits.
+      schedulePushToCloud(localRecord.settings, localRecord.updatedAt);
+      void writeSyncedSnapshotToIndexedDb(localRecord.settings, localRecord.updatedAt);
+      return null;
     }
 
-    // Local wins — sync it up instead of clobbering offline edits.
-    schedulePushToCloud(localRecord.settings, localRecord.updatedAt);
-    return null;
+    const localSettings = localRecord.settings;
+    const { merged, conflictKeys, localHasUniqueChanges } = mergeSettingsSnapshots(
+      syncedSnapshot.settings,
+      localSettings,
+      cloudSettings,
+      cloudUpdatedAt,
+      localUpdatedAt,
+    );
+
+    const normalizedMerged = normalizeSettingsShape(merged);
+    const mergedDiffersFromLocal = !deepEqual(normalizedMerged, localSettings);
+
+    let updatedAt = localRecord.updatedAt;
+    if (mergedDiffersFromLocal) {
+      writeSettingsToLocalStorage(normalizedMerged);
+      const record = await writeSettingsToIndexedDb(normalizedMerged);
+      updatedAt = record?.updatedAt || new Date().toISOString();
+    }
+    void writeSyncedSnapshotToIndexedDb(normalizedMerged, updatedAt);
+
+    if (localHasUniqueChanges || conflictKeys.length) {
+      schedulePushToCloud(normalizedMerged, updatedAt);
+    }
+
+    if (conflictKeys.length) {
+      useAuthStore.getState().setMergeInfo(conflictKeys);
+    } else {
+      useAuthStore.getState().clearMergeInfo();
+    }
+
+    return mergedDiffersFromLocal ? normalizedMerged : null;
   } catch {
     return null;
   }

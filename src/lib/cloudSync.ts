@@ -107,6 +107,10 @@ async function executePush(push: { settings: Record<string, unknown>; updatedAt:
     });
     if (res.ok) {
       useAuthStore.getState().setSyncStatus("synced", new Date().toISOString());
+      // The server just accepted this exact copy, so it becomes the next
+      // three-way-merge base (dynamic import avoids settings <-> cloudSync
+      // becoming a static circular import).
+      void import("@/lib/settings").then(({ markSyncedSnapshot }) => markSyncedSnapshot(push.settings, push.updatedAt));
     } else {
       useAuthStore.getState().setSyncStatus("error");
     }
