@@ -86,15 +86,5 @@
     "vite": "^8.1.5",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^3.2.7"
-  },
-  "pnpm": {
-    "allowBuilds": {
-      "@clerk/shared": true,
-      "esbuild": true
-    },
-    "onlyBuiltDependencies": [
-      "@clerk/shared",
-      "esbuild"
-    ]
   }
 }
