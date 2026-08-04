@@ -97,6 +97,14 @@ export function findBookmarkGroup(groups: any[], bookmarkId: string): any {
   return null;
 }
 
+// map()/filter() always allocate a new array, even when nothing inside
+// changed — so comparing their result to the input by `===` is always false.
+// This checks the thing that actually matters: are the elements themselves
+// (by reference) the same, in the same order.
+function sameElements(a: any[], b: any[]): boolean {
+  return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
 // Recursively rebuilds the tree, replacing the folder matching `id` with
 // `updater(group)`. Every ancestor on the path is shallow-cloned; unrelated
 // branches keep their original reference.
@@ -105,7 +113,7 @@ export function updateGroup(groups: any[], id: string, updater: (group: any) => 
     if (group?.id === id) return updater(group);
     const children = Array.isArray(group?.children) ? group.children : [];
     const nextChildren = updateGroup(children, id, updater);
-    return nextChildren === children ? group : { ...group, children: nextChildren };
+    return sameElements(nextChildren, children) ? group : { ...group, children: nextChildren };
   });
 }
 
@@ -115,7 +123,7 @@ export function removeGroup(groups: any[], id: string): any[] {
     .map((group) => {
       const children = Array.isArray(group?.children) ? group.children : [];
       const nextChildren = removeGroup(children, id);
-      return nextChildren === children ? group : { ...group, children: nextChildren };
+      return sameElements(nextChildren, children) ? group : { ...group, children: nextChildren };
     });
 }
 

@@ -53,6 +53,23 @@ function formatRelativeTime(iso: string | null): string | null {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+const MERGE_KEY_LABELS: Record<string, string> = {
+  widgets: "your dashboard layout",
+  bookmark: "your bookmarks",
+  vaultItems: "your vault",
+  readItems: "your reading list",
+  ui: "your appearance settings",
+  decorativeVideo: "your background video",
+  layout: "your dashboard layout",
+};
+
+function formatMergeKeys(keys: string[]): string {
+  const labels = keys.map((key) => MERGE_KEY_LABELS[key] || key);
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
 function getInitials(name: string | null | undefined, email: string): string {
   const trimmed = (name ?? "").trim();
   if (trimmed) {
@@ -165,6 +182,7 @@ export default function AccountButton() {
   const subscriptionStatus = useAuthStore((s) => s.subscriptionStatus);
   const syncStatus = useAuthStore((s) => s.syncStatus);
   const lastSyncedAt = useAuthStore((s) => s.lastSyncedAt);
+  const lastMergeKeys = useAuthStore((s) => s.lastMergeKeys);
   const isOnline = useAuthStore((s) => s.isOnline);
   const hasSyncAccess = useAuthStore((s) => s.hasSyncAccess);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -284,6 +302,11 @@ export default function AccountButton() {
               {subscriptionStatus === "past_due" && (
                 <p className="mt-2 text-xs text-red-500">
                   Payment failed — update your card to keep syncing.
+                </p>
+              )}
+              {hasAccess && syncStatus === "synced" && lastMergeKeys && lastMergeKeys.length > 0 && (
+                <p className="mt-2 text-xs text-amber-600">
+                  Another device changed {formatMergeKeys(lastMergeKeys)} at the same time — kept the most recent edit for {lastMergeKeys.length === 1 ? "it" : "each"}.
                 </p>
               )}
             </div>
