@@ -58,7 +58,11 @@ function isIPv4(host) {
 
 function isIPv6(host) {
 
-  return /^[0-9a-f:]+$/i.test(host) && host.includes(":");
+  // URL.hostname keeps the brackets around an IPv6 literal (e.g. "[::1]"),
+  // which the bare address regex below doesn't account for.
+  const stripped = host.replace(/^\[|\]$/g, "");
+
+  return /^[0-9a-f:]+$/i.test(stripped) && stripped.includes(":");
 
 }
 
