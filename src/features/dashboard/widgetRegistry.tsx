@@ -39,17 +39,10 @@ import TimerBox from "@/features/dashboard/components/TimerBox";
 import WikipediaToD from "@/features/dashboard/components/WikipediaToD";
 import RSSFeed from "@/features/dashboard/components/RSSFeed";
 import GitHubActivity from "@/features/dashboard/components/GitHubActivity";
-import SpotifyPlayer from "@/features/dashboard/components/SpotifyPlayer";
 import { IframeWidget, IframeConfigFields, type IframeWidgetConfig } from "@/features/dashboard/components/IframeWidget";
-import { StackWidget } from "@/features/dashboard/components/StackWidget";
 
 import Bookmark from "@/features/bookmarks/components/Bookmark";
 import { useBookmarkDialogStore } from "@/features/bookmarks/stores/bookmarkDialogStore";
-import VaultLauncher from "@/features/resourceVault/components/VaultLauncher";
-import Unsplash, { clearPhotoCache } from "@/features/media/components/Unsplash";
-import { WeatherBox } from "@/features/weather/components/WeatherBox";
-import WeatherDayDetail from "@/features/weather/components/WeatherDayDetail";
-import WeatherFrostedCard from "@/features/weather/components/WeatherFrostedCard";
 import AirQuality from "@/features/weather/components/AirQuality";
 import type { WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
 
@@ -59,7 +52,22 @@ import { Button } from "@/components/ui/button";
 
 import desert from "@/assets/media/desert.mp4";
 
+// Split out of the eagerly-loaded dashboard bundle: each pulls in a
+// dependency (canvas/SVG scenes, a shader library, axios, a stack of other
+// widgets) that most dashboards don't need on first paint just because one
+// tile of this type exists somewhere in the layout.
 const SolarGraph = React.lazy(() => import("@/features/media/solarGraph"));
+const Unsplash = React.lazy(() => import("@/features/media/components/Unsplash"));
+const WeatherBox = React.lazy(() =>
+  import("@/features/weather/components/WeatherBox").then((m) => ({ default: m.WeatherBox })),
+);
+const WeatherDayDetail = React.lazy(() => import("@/features/weather/components/WeatherDayDetail"));
+const WeatherFrostedCard = React.lazy(() => import("@/features/weather/components/WeatherFrostedCard"));
+const SpotifyPlayer = React.lazy(() => import("@/features/dashboard/components/SpotifyPlayer"));
+const VaultLauncher = React.lazy(() => import("@/features/resourceVault/components/VaultLauncher"));
+const StackWidget = React.lazy(() =>
+  import("@/features/dashboard/components/StackWidget").then((m) => ({ default: m.StackWidget })),
+);
 
 export interface WidgetTypeDef {
   type: WidgetType;
@@ -211,13 +219,17 @@ function WeatherRender({ instance, cardClass }: { instance: WidgetInstance; card
   if (config.variant === "detail") {
     return (
       <div className={cardClass}>
-        <WeatherDayDetail instanceId={instance.id} overrides={overrides} />
+        <React.Suspense fallback={null}>
+          <WeatherDayDetail instanceId={instance.id} overrides={overrides} />
+        </React.Suspense>
       </div>
     );
   }
   return (
     <div className={cardClass}>
-      <WeatherBox instanceId={instance.id} overrides={overrides} />
+      <React.Suspense fallback={null}>
+        <WeatherBox instanceId={instance.id} overrides={overrides} />
+      </React.Suspense>
     </div>
   );
 }
@@ -291,7 +303,9 @@ function WeatherV2Render({ instance, cardClass }: { instance: WidgetInstance; ca
   const overrides = weatherOverridesFrom(config);
   return (
     <div className={cardClass}>
-      <WeatherFrostedCard instanceId={instance.id} overrides={overrides} />
+      <React.Suspense fallback={null}>
+        <WeatherFrostedCard instanceId={instance.id} overrides={overrides} />
+      </React.Suspense>
     </div>
   );
 }
@@ -395,7 +409,11 @@ function PhotoRender({ instance, cardClass }: { instance: WidgetInstance; cardCl
   // Keying on cacheBust forces a remount (and so a fresh fetch) right after
   // the cache is cleared, instead of the already-mounted instance quietly
   // keeping its in-memory photo until the next full page load.
-  return <Unsplash key={config.cacheBust ?? 0} search={config.searchTerms} cardClass={cardClass} />;
+  return (
+    <React.Suspense fallback={<div className={cardClass} />}>
+      <Unsplash key={config.cacheBust ?? 0} search={config.searchTerms} cardClass={cardClass} />
+    </React.Suspense>
+  );
 }
 
 // The Unsplash access key is one shared credential, not something that makes
@@ -409,7 +427,11 @@ function PhotoConfigFields({ config, onChange }: { config: PhotoConfig; onChange
   const value = Array.isArray(config.searchTerms) ? config.searchTerms.join(", ") : "";
 
   const clearCache = () => {
-    void clearPhotoCache(config.searchTerms || []);
+    // Dynamic import so clearing a cache doesn't drag Unsplash's axios/shader
+    // dependencies into this config panel's chunk.
+    void import("@/features/media/components/Unsplash").then(({ clearPhotoCache }) =>
+      clearPhotoCache(config.searchTerms || []),
+    );
     onChange({ ...config, cacheBust: Date.now() });
   };
 
@@ -515,7 +537,9 @@ function VideoConfigFields({ config, onChange }: { config: VideoConfig; onChange
 function VaultRender({ cardClass }: { instance: WidgetInstance; cardClass?: string }) {
   return (
     <div className={cardClass}>
-      <VaultLauncher />
+      <React.Suspense fallback={null}>
+        <VaultLauncher />
+      </React.Suspense>
     </div>
   );
 }
@@ -600,7 +624,11 @@ function IframeRender({ instance, cardClass }: { instance: WidgetInstance; cardC
 // ---- stack ----------------------------------------------------------------
 
 function StackRender({ instance, cardClass }: { instance: WidgetInstance; cardClass?: string }) {
-  return <StackWidget items={instance.items || []} cardClass={cardClass} />;
+  return (
+    <React.Suspense fallback={<div className={cardClass} />}>
+      <StackWidget items={instance.items || []} cardClass={cardClass} />
+    </React.Suspense>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -763,7 +791,11 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     defaultSize: "small",
     makeDefaultConfig: () => ({ clientId: null }),
     Render: ({ instance, cardClass }) => (
-      <div className={cardClass}><SpotifyPlayer clientId={(instance.config as any).clientId} /></div>
+      <div className={cardClass}>
+        <React.Suspense fallback={null}>
+          <SpotifyPlayer clientId={(instance.config as any).clientId} />
+        </React.Suspense>
+      </div>
     ),
     ConfigFields: SpotifyConfigFields as WidgetTypeDef["ConfigFields"],
   },
