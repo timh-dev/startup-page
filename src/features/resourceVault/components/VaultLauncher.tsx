@@ -1,11 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { HiMagnifyingGlass, HiOutlineBookOpen, HiPlus } from "react-icons/hi2";
+import { HiMagnifyingGlass, HiMapPin, HiOutlineBookOpen, HiPlus } from "react-icons/hi2";
 import { VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
 import { useQuickAddStore, type VaultSection } from "@/features/resourceVault/stores/quickAddStore";
 
 const LAUNCHER_TILES: Array<{ section: VaultSection; label: string; icon: typeof HiOutlineBookOpen; colorClass: string }> = [
   { section: "links", label: "Useful Links", icon: HiOutlineBookOpen, colorClass: "read-tag-reference" },
+  { section: "locations", label: "Locations", icon: HiMapPin, colorClass: "read-tag-travel" },
   ...VAULT_KIND_ORDER.map((kind) => ({
     section: kind as VaultSection,
     label: VAULT_KIND_DEFS[kind].label,

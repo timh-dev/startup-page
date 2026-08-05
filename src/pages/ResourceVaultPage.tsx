@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { HiOutlineBookOpen } from "react-icons/hi2";
+import { HiMapPin, HiOutlineBookOpen } from "react-icons/hi2";
 import { useSettingsStore } from "@/features/settings/stores";
 import VaultGlassView from "@/features/resourceVault/components/VaultGlassView";
 import VaultItemsSection from "@/features/resourceVault/components/VaultItemsSection";
@@ -9,9 +9,12 @@ import { normalizeResourceVaultItems, normalizeVaultItems } from "@/features/res
 import { VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
 import { useQuickAddStore, type VaultSection } from "@/features/resourceVault/stores/quickAddStore";
 import type { VaultItem } from "@/features/resourceVault/types";
+import LocationsSection from "@/features/locations/components/LocationsSection";
+import { generateLocationId, normalizeLocations } from "@/features/locations/utils";
+import type { LocationDraft } from "@/features/locations/components/LocationComposer";
 import vaultPreviewBg from "@/assets/media/vault-preview-bg.jpg";
 
-const VALID_SECTIONS: VaultSection[] = ["links", ...VAULT_KIND_ORDER];
+const VALID_SECTIONS: VaultSection[] = ["links", "locations", ...VAULT_KIND_ORDER];
 
 function isValidSection(value: unknown): value is VaultSection {
   return VALID_SECTIONS.includes(value as VaultSection);
@@ -218,6 +221,33 @@ export default function ResourceVaultPage() {
     URL.revokeObjectURL(url);
   };
 
+  // --- Locations -------------------------------------------------------
+
+  const handleAddLocation = async (draft: LocationDraft) => {
+    const current = useSettingsStore.getState().settings;
+    const existing = normalizeLocations(current.locations);
+    const now = new Date().toISOString();
+    const newLocation = { id: generateLocationId(), ...draft, createdAt: now, updatedAt: now };
+    await persistSettings({ ...current, locations: [newLocation, ...existing] });
+  };
+
+  const handleUpdateLocation = async (locationId: string, draft: LocationDraft) => {
+    const current = useSettingsStore.getState().settings;
+    const existing = normalizeLocations(current.locations);
+    await persistSettings({
+      ...current,
+      locations: existing.map((item) =>
+        item.id === locationId ? { ...item, ...draft, updatedAt: new Date().toISOString() } : item,
+      ),
+    });
+  };
+
+  const handleDeleteLocation = async (locationId: string) => {
+    const current = useSettingsStore.getState().settings;
+    const existing = normalizeLocations(current.locations);
+    await persistSettings({ ...current, locations: existing.filter((item) => item.id !== locationId) });
+  };
+
   const quickAddPending = useQuickAddStore((state) => state.pending && state.section === activeSection);
   const consumeQuickAdd = useQuickAddStore((state) => state.consumeQuickAdd);
 
@@ -242,6 +272,16 @@ export default function ResourceVaultPage() {
               >
                 <HiOutlineBookOpen className="size-4" />
                 Links
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSection === "locations"}
+                className={`vg-section-tab ${activeSection === "locations" ? "vg-section-tab-active" : ""}`}
+                onClick={() => setActiveSection("locations")}
+              >
+                <HiMapPin className="size-4" />
+                Locations
               </button>
               {VAULT_KIND_ORDER.map((kind) => {
                 const def = VAULT_KIND_DEFS[kind];
@@ -273,6 +313,15 @@ export default function ResourceVaultPage() {
                 onUpdateItem={handleUpdateReadItem}
                 onDeleteItem={handleDeleteReadItem}
                 autoFocusSearch={routedFocusSearch}
+              />
+            ) : activeSection === "locations" ? (
+              <LocationsSection
+                locations={normalizeLocations(settings.locations)}
+                googleMapsCredential={settings.googleMapsCredential || null}
+                onBack={() => navigate("/")}
+                onAddItem={handleAddLocation}
+                onUpdateItem={handleUpdateLocation}
+                onDeleteItem={handleDeleteLocation}
               />
             ) : (
               <VaultItemsSection

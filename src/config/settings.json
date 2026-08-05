@@ -4,6 +4,7 @@
   "units": "imperial",
   "unsplashCredential": null,
   "openWeatherCredential": null,
+  "googleMapsCredential": null,
   "widgets": [],
   "ui": {
     "themeMode": "system",
@@ -224,6 +225,7 @@
   },
   "readItems": [],
   "vaultItems": [],
+  "locations": [],
   "customThemes": [],
   "unsplash": {
     "unsplashBox1": ["chicago", "miami", "new york", "seattle", "austin"],

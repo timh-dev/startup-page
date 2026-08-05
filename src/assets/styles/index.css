@@ -3809,3 +3809,174 @@
   color: rgba(255, 255, 255, 0.65);
 }
 
+/* --- Locations: card grid with map + image preview, Google Earth deep link --- */
+
+.loc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: 1rem;
+}
+
+.loc-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  background: color-mix(in oklab, var(--card) 70%, transparent);
+}
+
+.loc-card-media {
+  position: relative;
+  height: 9.5rem;
+  flex: 0 0 auto;
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+}
+
+.loc-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.loc-card-media-placeholder {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+}
+
+.loc-card-media-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0) 55%);
+}
+
+.loc-card-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.3rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.loc-card:hover .loc-card-actions {
+  opacity: 1;
+}
+
+.loc-card-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 9999px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.loc-card-action:hover {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.loc-card-media-title {
+  position: absolute;
+  left: 0.8rem;
+  bottom: 0.6rem;
+  right: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+
+.loc-card-name {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.2;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.loc-card-subtitle {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+.loc-card-map {
+  width: 100%;
+  height: 8rem;
+  flex: 0 0 auto;
+  border: 0;
+  border-top: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+}
+
+.loc-card-map-placeholder {
+  padding: 0.6rem 0.9rem;
+  font-size: 0.72rem;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  background: color-mix(in oklab, var(--muted) 30%, transparent);
+}
+
+.loc-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem 0.9rem;
+}
+
+.loc-card-extract {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: color-mix(in oklab, var(--card-foreground) 82%, transparent);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.loc-card-wiki-link {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--primary) 85%, transparent);
+}
+
+.loc-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.loc-card-tag {
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  background: color-mix(in oklab, var(--muted) 70%, transparent);
+  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+.loc-card-open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  height: 2.1rem;
+  border-radius: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  transition: opacity 0.15s ease;
+}
+
+.loc-card-open-btn:hover {
+  opacity: 0.9;
+}
+

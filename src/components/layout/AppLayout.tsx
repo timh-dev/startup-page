@@ -70,6 +70,16 @@ function VaultNavigationActions() {
           navigate("/resources");
         },
       }] : []),
+      ...(vaultEnabled ? [{
+        id: "quick-add-location",
+        name: "Add a Location",
+        shortcut: ["l"],
+        section: "Navigation",
+        perform: () => {
+          useQuickAddStore.getState().requestQuickAdd("locations");
+          navigate("/resources");
+        },
+      }] : []),
     ],
     [navigate, vaultEnabled, bookmarksEnabled],
   );

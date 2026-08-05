@@ -814,6 +814,27 @@ function SettingsButton() {
                   </CardContent>
                 </Card>
 
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Google Maps</CardTitle>
+                    <CardDescription>
+                      Powers the satellite preview on Locations cards (Google's Maps Embed API — free with unlimited
+                      usage). Create a key in the Google Cloud console, enable "Maps Embed API", and paste it here.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <SettingField label="Maps Embed API key" description="Restrict the key to your domain in the Google Cloud console.">
+                      <Input
+                        value={settingsState.googleMapsCredential || ""}
+                        placeholder="AIza..."
+                        onChange={(event) =>
+                          updateSettings((prev) => ({ ...prev, googleMapsCredential: event.target.value }))
+                        }
+                      />
+                    </SettingField>
+                  </CardContent>
+                </Card>
+
               </TabsContent>
             </div>
 
