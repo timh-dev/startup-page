@@ -34,6 +34,63 @@ export const READ_TAG_COLORS: Record<string, string> = {
   Reference: "read-tag-reference",
 };
 
+export const CODE_LANGUAGES = [
+  "ts",
+  "js",
+  "py",
+  "sql",
+  "bash",
+  "go",
+  "rs",
+  "java",
+  "c",
+  "cpp",
+  "css",
+  "html",
+  "json",
+  "yaml",
+  "rb",
+  "php",
+] as const;
+
+export const CODE_LANGUAGE_LABELS: Record<string, string> = {
+  ts: "TypeScript",
+  js: "JavaScript",
+  py: "Python",
+  sql: "SQL",
+  bash: "Bash / Shell",
+  go: "Go",
+  rs: "Rust",
+  java: "Java",
+  c: "C",
+  cpp: "C++",
+  css: "CSS",
+  html: "HTML",
+  json: "JSON",
+  yaml: "YAML",
+  rb: "Ruby",
+  php: "PHP",
+};
+
+export const CODE_LANGUAGE_COLORS: Record<string, string> = {
+  ts: "code-lang-ts",
+  js: "code-lang-js",
+  py: "code-lang-py",
+  sql: "code-lang-sql",
+  bash: "code-lang-bash",
+  go: "code-lang-go",
+  rs: "code-lang-rs",
+  java: "code-lang-java",
+  c: "code-lang-c",
+  cpp: "code-lang-cpp",
+  css: "code-lang-css",
+  html: "code-lang-html",
+  json: "code-lang-json",
+  yaml: "code-lang-yaml",
+  rb: "code-lang-rb",
+  php: "code-lang-php",
+};
+
 export interface VaultKindDef {
   kind: VaultItemKind;
   label: string;
@@ -42,7 +99,6 @@ export interface VaultKindDef {
   bodyLabel: string;
   bodyPlaceholder: string;
   showLanguage: boolean;
-  languagePlaceholder?: string;
   markdown: boolean;
   emptyTitle: string;
   emptyHint: string;
@@ -59,7 +115,6 @@ export const VAULT_KIND_DEFS: Record<VaultItemKind, VaultKindDef> = {
     bodyLabel: "Code",
     bodyPlaceholder: "Paste a snippet, query, or shell command...",
     showLanguage: true,
-    languagePlaceholder: "ts, py, sql, bash...",
     markdown: false,
     emptyTitle: "No code yet",
     emptyHint: "Save a snippet, query, or command you reach for often.",

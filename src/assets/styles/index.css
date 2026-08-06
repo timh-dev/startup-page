@@ -2431,6 +2431,26 @@
 .read-tag-work { --read-tag-color: #3b82f6; }
 .read-tag-reference { --read-tag-color: #94a3b8; }
 
+/* Code vault language picker — same --read-tag-color mechanism as the tag
+   dots above, just a different palette keyed by language instead of tag. */
+.code-lang-ts { --read-tag-color: #3178c6; }
+.code-lang-js { --read-tag-color: #eab308; }
+.code-lang-py { --read-tag-color: #3776ab; }
+.code-lang-sql { --read-tag-color: #f97316; }
+.code-lang-bash { --read-tag-color: #4ade80; }
+.code-lang-go { --read-tag-color: #22d3ee; }
+.code-lang-rs { --read-tag-color: #f97362; }
+.code-lang-java { --read-tag-color: #ef4444; }
+.code-lang-c { --read-tag-color: #6366f1; }
+.code-lang-cpp { --read-tag-color: #818cf8; }
+.code-lang-css { --read-tag-color: #38bdf8; }
+.code-lang-html { --read-tag-color: #fb923c; }
+.code-lang-json { --read-tag-color: #a3a3a3; }
+.code-lang-yaml { --read-tag-color: #c084fc; }
+.code-lang-rb { --read-tag-color: #e11d48; }
+.code-lang-php { --read-tag-color: #8b5cf6; }
+.code-lang-other { --read-tag-color: #94a3b8; }
+
 /* --- Resource Vault: scenic background + paper card shell --- */
 /* Renders inside AppLayout (see ResourceVaultPage), so it already has the
    app's real light/dark theme variables on <html> — the card is a plain
@@ -3060,6 +3080,62 @@
   cursor: pointer;
 }
 
+/* Template/Code rows (VaultItemsSection) use a two-line card layout instead
+   of the single-line row Links use: body content there is prose/code, not a
+   short caption, so it needs its own line rather than competing with the
+   title for space on one row (that fight was squeezing the title down to
+   almost nothing). Scoped to .vg-item-card so it doesn't touch the Links
+   row (VaultGlassView), which shares the base .vg-item / .vg-item-title /
+   etc. classes but keeps its original single-line layout. */
+.vg-item-card {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.vg-item-top {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+/* Deliberately NOT flex-grow: the top row has no other flexible sibling to
+   fight for space with anymore (body preview lives on its own line below),
+   so growing here would just stretch the title's own box past its text,
+   leaving visible dead space between the title and the next chip/date. Size
+   to content and only shrink-to-ellipsis if the row is genuinely too
+   narrow — same as the base .vg-item-main rule; restated here for clarity
+   since this selector is what actually applies inside .vg-item-card. */
+.vg-item-card .vg-item-main {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.vg-item-title-btn {
+  display: inline-flex;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vg-item-title-btn:hover .vg-item-title {
+  text-decoration: underline dotted;
+}
+
+.vg-item-card .vg-item-description {
+  flex: none;
+  width: 100%;
+}
+
 .vg-item-tag {
   flex: 0 0 auto;
   font-size: 0.7rem;
@@ -3240,6 +3316,7 @@
 .vg-composer-body-toolbar {
   display: flex;
   justify-content: flex-end;
+  gap: 0.35rem;
 }
 
 .vg-ghost-btn-sm {
@@ -3307,6 +3384,203 @@
   text-decoration: underline;
 }
 
+/* Code item body in the preview dialog: same visual family as
+   .vg-markdown-preview pre, but its own block since code items skip
+   markdown rendering entirely and show the raw body as-is. */
+.vg-preview-code {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  background: color-mix(in oklab, var(--muted) 55%, transparent);
+  color: var(--foreground);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Prism.js token colors (see highlight.ts) — fixed hex, not theme
+   variables, same call as the read-tag- and code-lang- accent dots: this app
+   ships 7 selectable color themes and syntax colors need to keep working
+   (and stay visually distinct from each other) across all of them, so they
+   intentionally sit outside the --primary/--accent system. One Light/One
+   Dark palettes (a well-worn, high-contrast pairing) light/dark-switched via
+   the same .dark ancestor class the rest of the app's dark-mode overrides
+   use. Token class names follow Prism's own convention, grouped exactly
+   like every standard Prism theme (prism-okaidia.css etc.) groups them. */
+.vg-item-body-mono .token.comment,
+.vg-preview-code .token.comment,
+.vg-item-body-mono .token.prolog,
+.vg-preview-code .token.prolog,
+.vg-item-body-mono .token.doctype,
+.vg-preview-code .token.doctype,
+.vg-item-body-mono .token.cdata,
+.vg-preview-code .token.cdata {
+  color: #a0a1a7;
+  font-style: italic;
+}
+
+.vg-item-body-mono .token.punctuation,
+.vg-preview-code .token.punctuation {
+  color: color-mix(in oklab, var(--foreground) 65%, transparent);
+}
+
+.vg-item-body-mono .token.property,
+.vg-preview-code .token.property,
+.vg-item-body-mono .token.tag,
+.vg-preview-code .token.tag,
+.vg-item-body-mono .token.boolean,
+.vg-preview-code .token.boolean,
+.vg-item-body-mono .token.number,
+.vg-preview-code .token.number,
+.vg-item-body-mono .token.constant,
+.vg-preview-code .token.constant,
+.vg-item-body-mono .token.symbol,
+.vg-preview-code .token.symbol,
+.vg-item-body-mono .token.deleted,
+.vg-preview-code .token.deleted {
+  color: #986801;
+}
+
+.vg-item-body-mono .token.selector,
+.vg-preview-code .token.selector,
+.vg-item-body-mono .token.attr-name,
+.vg-preview-code .token.attr-name,
+.vg-item-body-mono .token.string,
+.vg-preview-code .token.string,
+.vg-item-body-mono .token.char,
+.vg-preview-code .token.char,
+.vg-item-body-mono .token.builtin,
+.vg-preview-code .token.builtin,
+.vg-item-body-mono .token.inserted,
+.vg-preview-code .token.inserted {
+  color: #50a14f;
+}
+
+.vg-item-body-mono .token.operator,
+.vg-preview-code .token.operator,
+.vg-item-body-mono .token.entity,
+.vg-preview-code .token.entity,
+.vg-item-body-mono .token.url,
+.vg-preview-code .token.url,
+.vg-item-body-mono .token.attr-value,
+.vg-preview-code .token.attr-value {
+  color: #0184bc;
+}
+
+.vg-item-body-mono .token.atrule,
+.vg-preview-code .token.atrule,
+.vg-item-body-mono .token.keyword,
+.vg-preview-code .token.keyword {
+  color: #a626a4;
+}
+
+.vg-item-body-mono .token.function,
+.vg-preview-code .token.function,
+.vg-item-body-mono .token.class-name,
+.vg-preview-code .token.class-name {
+  color: #4078f2;
+}
+
+.vg-item-body-mono .token.regex,
+.vg-preview-code .token.regex,
+.vg-item-body-mono .token.important,
+.vg-preview-code .token.important,
+.vg-item-body-mono .token.variable,
+.vg-preview-code .token.variable {
+  color: #e45649;
+}
+
+.vg-item-body-mono .token.important,
+.vg-preview-code .token.important,
+.vg-item-body-mono .token.bold,
+.vg-preview-code .token.bold {
+  font-weight: 700;
+}
+
+.vg-item-body-mono .token.italic,
+.vg-preview-code .token.italic {
+  font-style: italic;
+}
+
+.dark .vg-item-body-mono .token.comment,
+.dark .vg-preview-code .token.comment,
+.dark .vg-item-body-mono .token.prolog,
+.dark .vg-preview-code .token.prolog,
+.dark .vg-item-body-mono .token.doctype,
+.dark .vg-preview-code .token.doctype,
+.dark .vg-item-body-mono .token.cdata,
+.dark .vg-preview-code .token.cdata {
+  color: #5c6370;
+}
+
+.dark .vg-item-body-mono .token.property,
+.dark .vg-preview-code .token.property,
+.dark .vg-item-body-mono .token.tag,
+.dark .vg-preview-code .token.tag,
+.dark .vg-item-body-mono .token.boolean,
+.dark .vg-preview-code .token.boolean,
+.dark .vg-item-body-mono .token.number,
+.dark .vg-preview-code .token.number,
+.dark .vg-item-body-mono .token.constant,
+.dark .vg-preview-code .token.constant,
+.dark .vg-item-body-mono .token.symbol,
+.dark .vg-preview-code .token.symbol,
+.dark .vg-item-body-mono .token.deleted,
+.dark .vg-preview-code .token.deleted {
+  color: #d19a66;
+}
+
+.dark .vg-item-body-mono .token.selector,
+.dark .vg-preview-code .token.selector,
+.dark .vg-item-body-mono .token.attr-name,
+.dark .vg-preview-code .token.attr-name,
+.dark .vg-item-body-mono .token.string,
+.dark .vg-preview-code .token.string,
+.dark .vg-item-body-mono .token.char,
+.dark .vg-preview-code .token.char,
+.dark .vg-item-body-mono .token.builtin,
+.dark .vg-preview-code .token.builtin,
+.dark .vg-item-body-mono .token.inserted,
+.dark .vg-preview-code .token.inserted {
+  color: #98c379;
+}
+
+.dark .vg-item-body-mono .token.operator,
+.dark .vg-preview-code .token.operator,
+.dark .vg-item-body-mono .token.entity,
+.dark .vg-preview-code .token.entity,
+.dark .vg-item-body-mono .token.url,
+.dark .vg-preview-code .token.url,
+.dark .vg-item-body-mono .token.attr-value,
+.dark .vg-preview-code .token.attr-value {
+  color: #56b6c2;
+}
+
+.dark .vg-item-body-mono .token.atrule,
+.dark .vg-preview-code .token.atrule,
+.dark .vg-item-body-mono .token.keyword,
+.dark .vg-preview-code .token.keyword {
+  color: #c678dd;
+}
+
+.dark .vg-item-body-mono .token.function,
+.dark .vg-preview-code .token.function,
+.dark .vg-item-body-mono .token.class-name,
+.dark .vg-preview-code .token.class-name {
+  color: #61afef;
+}
+
+.dark .vg-item-body-mono .token.regex,
+.dark .vg-preview-code .token.regex,
+.dark .vg-item-body-mono .token.important,
+.dark .vg-preview-code .token.important,
+.dark .vg-item-body-mono .token.variable,
+.dark .vg-preview-code .token.variable {
+  color: #e06c75;
+}
+
 .vg-composer-textarea {
   min-height: 4.5rem;
   padding: 0.55rem 0.7rem;
@@ -3325,9 +3599,14 @@
   font-size: 0.8rem;
 }
 
-.vg-lang-input {
-  flex: 0 0 auto;
-  width: 7rem;
+/* Text label next to the color dot in a .vg-tag-trigger — the Links tag
+   picker only ever showed the dot (its tag names are visible elsewhere), but
+   the language picker needs the code itself ("ts", "py", ...) visible on
+   the trigger so it reads without opening the popover. */
+.vg-tag-trigger-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .vg-item-meta-chip {
@@ -3338,6 +3617,18 @@
   font-weight: 500;
   background: color-mix(in oklab, var(--muted) 70%, transparent);
   color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+}
+
+/* Language chip gets its code-lang-* color (same --read-tag-color
+   mechanism as the accent stripe) instead of the neutral gray every other
+   meta chip uses, so language is recognizable at a glance in the list. */
+.vg-item-meta-chip-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--read-tag-color, inherit);
+  background: color-mix(in oklab, var(--read-tag-color, var(--muted)) 20%, transparent);
+  font-weight: 600;
 }
 
 .vg-item-body-mono {
