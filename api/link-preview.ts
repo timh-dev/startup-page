@@ -65,6 +65,77 @@ export async function fetchYoutubeOembed(
   }
 }
 
+// Best-effort mapping from a URL to one of the vault's fixed link tags
+// (kept as plain string literals here, not imported from
+// src/features/resourceVault/constants.ts — the api/ functions are a
+// separate serverless bundle and don't share a build with src/). Hostname
+// rules are checked first since they're cheap and reliable; og:type is a
+// fallback for sites we don't special-case. Order matters: first match wins.
+const TAG_HOSTNAME_RULES: Array<{ tag: string; test: (hostname: string, pathname: string) => boolean }> = [
+  {
+    tag: "Watch",
+    test: (h) => YOUTUBE_HOSTNAMES.has(h) || /(^|\.)(vimeo\.com|twitch\.tv)$/.test(h),
+  },
+  {
+    tag: "Listen",
+    test: (h) =>
+      /(^|\.)(open\.spotify\.com|spotify\.com|soundcloud\.com|podcasts\.apple\.com|music\.youtube\.com)$/.test(h),
+  },
+  {
+    tag: "Build",
+    test: (h) => /(^|\.)(github\.com|gitlab\.com|bitbucket\.org)$/.test(h),
+  },
+  {
+    tag: "Learn",
+    test: (h) => /(^|\.)(udemy\.com|coursera\.org|edx\.org|pluralsight\.com|khanacademy\.org|frontendmasters\.com)$/.test(h),
+  },
+  {
+    tag: "Work",
+    test: (h, p) =>
+      /(^|\.)(indeed\.com|greenhouse\.io|lever\.co|ashbyhq\.com)$/.test(h) ||
+      (/(^|\.)linkedin\.com$/.test(h) && p.startsWith("/jobs")),
+  },
+  {
+    tag: "Follow",
+    test: (h, p) =>
+      /(^|\.)(twitter\.com|x\.com|instagram\.com|threads\.net)$/.test(h) ||
+      (/(^|\.)linkedin\.com$/.test(h) && p.startsWith("/in/")),
+  },
+  {
+    tag: "Travel",
+    test: (h) => /(^|\.)(airbnb\.com|booking\.com|tripadvisor\.com|expedia\.com)$/.test(h),
+  },
+  {
+    tag: "Join",
+    test: (h) => /(^|\.)(eventbrite\.com|meetup\.com|lu\.ma)$/.test(h),
+  },
+  {
+    tag: "Reference",
+    test: (h) => h.startsWith("docs.") || /(^|\.)(devdocs\.io|developer\.mozilla\.org)$/.test(h),
+  },
+];
+
+export function suggestTag(target: URL, ogType?: string | null): string | null {
+  const hostname = target.hostname.toLowerCase();
+  const pathname = target.pathname.toLowerCase();
+
+  for (const rule of TAG_HOSTNAME_RULES) {
+    if (rule.test(hostname, pathname)) {
+      return rule.tag;
+    }
+  }
+
+  if (ogType) {
+    const type = ogType.toLowerCase();
+    if (type.startsWith("video")) return "Watch";
+    if (type.startsWith("music") || type.startsWith("audio")) return "Listen";
+    if (type === "profile") return "Follow";
+    if (type === "article" || type === "blog") return "Read";
+  }
+
+  return null;
+}
+
 export function decodeEntities(value: string): string {
   return value
     .replace(/&amp;/g, "&")
@@ -111,6 +182,13 @@ export function extractDescription(html: string): string | null {
   return null;
 }
 
+export function extractOgType(html: string): string | null {
+  const match =
+    html.match(/<meta[^>]+property=["']og:type["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:type["']/i);
+  return match ? decodeEntities(match[1].trim()) : null;
+}
+
 export async function GET(request: Request): Promise<Response> {
   try {
     const rawUrl = new URL(request.url).searchParams.get("url");
@@ -135,7 +213,12 @@ export async function GET(request: Request): Promise<Response> {
     if (isYoutubeUrl(target)) {
       const oembed = await fetchYoutubeOembed(target);
       if (oembed) {
-        return json({ title: oembed.title, description: oembed.description, faviconUrl: faviconUrlFor(target) });
+        return json({
+          title: oembed.title,
+          description: oembed.description,
+          faviconUrl: faviconUrlFor(target),
+          tag: suggestTag(target),
+        });
       }
       // Not a real video (channel/home page) or oEmbed itself failed — fall
       // through to the generic scrape below, same as any other site.
@@ -156,7 +239,7 @@ export async function GET(request: Request): Promise<Response> {
 
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("html")) {
-      return json({ title: null, description: null, faviconUrl: faviconUrlFor(target) });
+      return json({ title: null, description: null, faviconUrl: faviconUrlFor(target), tag: suggestTag(target) });
     }
 
     // Stop as soon as </head> shows up — nothing we look for lives past it —
@@ -183,6 +266,7 @@ export async function GET(request: Request): Promise<Response> {
       title: extractTitle(html),
       description: extractDescription(html),
       faviconUrl: faviconUrlFor(target),
+      tag: suggestTag(target, extractOgType(html)),
     });
   } catch (err) {
     return errorResponse(err);

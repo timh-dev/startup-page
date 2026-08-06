@@ -9,11 +9,13 @@ import {
   GET,
   decodeEntities,
   extractDescription,
+  extractOgType,
   extractTitle,
   faviconUrlFor,
   fetchYoutubeOembed,
   isBlockedHostname,
   isYoutubeUrl,
+  suggestTag,
 } from "./link-preview";
 
 function htmlResponse(html: string, contentType = "text/html; charset=utf-8") {
@@ -98,6 +100,49 @@ describe("isYoutubeUrl", () => {
   });
 });
 
+describe("suggestTag", () => {
+  it("maps well-known hostnames to their tag", () => {
+    expect(suggestTag(new URL("https://www.youtube.com/watch?v=abc"))).toBe("Watch");
+    expect(suggestTag(new URL("https://youtu.be/abc"))).toBe("Watch");
+    expect(suggestTag(new URL("https://vimeo.com/12345"))).toBe("Watch");
+    expect(suggestTag(new URL("https://open.spotify.com/episode/abc"))).toBe("Listen");
+    expect(suggestTag(new URL("https://soundcloud.com/someone/track"))).toBe("Listen");
+    expect(suggestTag(new URL("https://github.com/someorg/somerepo"))).toBe("Build");
+    expect(suggestTag(new URL("https://www.udemy.com/course/x"))).toBe("Learn");
+    expect(suggestTag(new URL("https://www.airbnb.com/rooms/123"))).toBe("Travel");
+    expect(suggestTag(new URL("https://www.eventbrite.com/e/some-event"))).toBe("Join");
+    expect(suggestTag(new URL("https://docs.stripe.com/api"))).toBe("Reference");
+    expect(suggestTag(new URL("https://developer.mozilla.org/en-US/docs/Web"))).toBe("Reference");
+  });
+
+  it("distinguishes LinkedIn job postings from profiles by path", () => {
+    expect(suggestTag(new URL("https://www.linkedin.com/jobs/view/123"))).toBe("Work");
+    expect(suggestTag(new URL("https://www.linkedin.com/in/someone"))).toBe("Follow");
+  });
+
+  it("falls back to og:type when the hostname isn't recognized", () => {
+    expect(suggestTag(new URL("https://example.com/post"), "article")).toBe("Read");
+    expect(suggestTag(new URL("https://example.com/post"), "video.other")).toBe("Watch");
+    expect(suggestTag(new URL("https://example.com/post"), "music.song")).toBe("Listen");
+    expect(suggestTag(new URL("https://example.com/post"), "profile")).toBe("Follow");
+  });
+
+  it("returns null when nothing matches", () => {
+    expect(suggestTag(new URL("https://example.com/post"))).toBeNull();
+    expect(suggestTag(new URL("https://example.com/post"), "website")).toBeNull();
+  });
+});
+
+describe("extractOgType", () => {
+  it("extracts the og:type meta tag", () => {
+    expect(extractOgType(`<meta property="og:type" content="article">`)).toBe("article");
+  });
+
+  it("returns null when absent", () => {
+    expect(extractOgType("<head></head>")).toBeNull();
+  });
+});
+
 describe("faviconUrlFor", () => {
   it("builds a Google favicon URL from the hostname", () => {
     expect(faviconUrlFor(new URL("https://wanderlog.com/trip/123"))).toBe(
@@ -134,6 +179,9 @@ describe("GET /api/link-preview — popular real-world site shapes", () => {
     expect(res.status).toBe(200);
     expect(body.title).toBe("Wanderlog: Trip Planner & Itinerary App");
     expect(body.description).toBe("Plan your next trip with Wanderlog.");
+    // wanderlog.com isn't one of the hardcoded travel hostnames and this
+    // page has no og:type — no confident tag guess, so null (not "Travel").
+    expect(body.tag).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1); // no oEmbed detour for a non-YouTube host
   });
 
@@ -153,6 +201,7 @@ describe("GET /api/link-preview — popular real-world site shapes", () => {
     expect(body.title).toBe("Never Gonna Give You Up");
     expect(body.title).not.toContain("- YouTube");
     expect(body.description).toBe("Video by Rick Astley");
+    expect(body.tag).toBe("Watch");
 
     // Hit oEmbed only — never fell through to the generic HTML scrape.
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -203,6 +252,15 @@ describe("GET /api/link-preview — popular real-world site shapes", () => {
     const res = await GET(requestFor("https://example.com/heavy-page"));
     const body = await res.json();
     expect(body.title).toBe("Deep In The Head");
+  });
+
+  it("falls back to og:type to guess a tag when the hostname isn't one of the hardcoded ones", async () => {
+    fetchMock.mockResolvedValueOnce(
+      htmlResponse(`<head><title>Some Blog Post</title><meta property="og:type" content="article"></head>`),
+    );
+    const res = await GET(requestFor("https://someblog.example.com/post"));
+    const body = await res.json();
+    expect(body.tag).toBe("Read");
   });
 
   it("a non-HTML response (e.g. a direct image/PDF link) returns null title/description, not an error", async () => {

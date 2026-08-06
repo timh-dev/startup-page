@@ -174,6 +174,11 @@ export default function VaultGlassView({
     url: "",
     tag: "Read",
   });
+  // Tracks whether the current composer session's tag was chosen by the
+  // user (explicit pick, or loaded from an existing item being edited) so
+  // the link-preview auto-suggestion never clobbers a deliberate choice —
+  // same "don't overwrite what the user already set" rule as title/description.
+  const tagManuallySetRef = React.useRef(false);
 
   const quickAddPending = useQuickAddStore((state) => state.pending && state.section === "links");
   const consumeQuickAdd = useQuickAddStore((state) => state.consumeQuickAdd);
@@ -247,6 +252,7 @@ export default function VaultGlassView({
   );
 
   const pickDraftTag = React.useCallback((tag: string) => {
+    tagManuallySetRef.current = true;
     setDraft((current) => ({ ...current, tag }));
     setComposerTagMenuOpen(false);
   }, []);
@@ -296,10 +302,12 @@ export default function VaultGlassView({
   }, [composerTagMenuOpen, filterMenuOpen, pickDraftTag]);
 
   const openComposer = () => {
+    tagManuallySetRef.current = false;
     setComposerOpen(true);
   };
 
   const closeComposer = () => {
+    tagManuallySetRef.current = false;
     setComposerOpen(false);
     setComposerTagMenuOpen(false);
     setEditingItemId(null);
@@ -331,6 +339,10 @@ export default function VaultGlassView({
   };
 
   const editItem = (item: any) => {
+    // Editing an existing item means its tag was already chosen (by the
+    // user or a prior suggestion) — treat it as manually set so re-pasting
+    // the URL to refresh title/description can't silently re-tag it.
+    tagManuallySetRef.current = true;
     setEditingItemId(item.id);
     setDraft({
       title: item.title || "",
@@ -359,12 +371,14 @@ export default function VaultGlassView({
         return;
       }
       const data = await response.json();
+      const suggestedTag = DEFAULT_READ_TAGS.includes(data.tag) ? data.tag : null;
       setDraft((current) => (
         current.url.trim() === trimmed
           ? {
               ...current,
               title: current.title.trim() ? current.title : (data.title || current.title),
               description: current.description.trim() ? current.description : (data.description || current.description),
+              tag: !tagManuallySetRef.current && suggestedTag ? suggestedTag : current.tag,
             }
           : current
       ));
