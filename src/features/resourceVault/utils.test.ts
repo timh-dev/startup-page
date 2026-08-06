@@ -6,6 +6,7 @@ import {
   normalizeResourceVaultItems,
   normalizeVaultItems,
   startOfDay,
+  tidyCode,
 } from "./utils";
 
 // Noon UTC keeps the calendar day stable regardless of the running machine's
@@ -138,6 +139,29 @@ describe("normalizeVaultItems", () => {
   it("returns an empty array for unrecognized input shapes", () => {
     expect(normalizeVaultItems(null)).toEqual([]);
     expect(normalizeVaultItems("nope")).toEqual([]);
+  });
+});
+
+describe("tidyCode", () => {
+  it("strips trailing whitespace from each line", () => {
+    expect(tidyCode("const x = 1;   \nconst y = 2;\t\t")).toBe("const x = 1;\nconst y = 2;");
+  });
+
+  it("normalizes CRLF and lone CR line endings to LF", () => {
+    expect(tidyCode("a\r\nb\rc")).toBe("a\nb\nc");
+  });
+
+  it("collapses runs of 3+ blank lines down to one blank line", () => {
+    expect(tidyCode("a\n\n\n\n\nb")).toBe("a\n\nb");
+  });
+
+  it("trims leading/trailing blank lines but preserves internal indentation", () => {
+    expect(tidyCode("\n\n  def f():\n    return 1\n\n")).toBe("def f():\n    return 1");
+  });
+
+  it("leaves already-clean code untouched", () => {
+    const clean = "line one\nline two\n\nline four";
+    expect(tidyCode(clean)).toBe(clean);
   });
 });
 

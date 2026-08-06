@@ -91,6 +91,22 @@ export function normalizeVaultItems(value: unknown, kind?: VaultItemKind): Vault
     .filter((item) => (kind ? item.kind === kind : true));
 }
 
+// Whitespace-only cleanup, not a real per-language pretty-printer — the
+// Code vault holds snippets across arbitrary languages (SQL, bash, Python,
+// Makefiles, ...) so a syntax-aware formatter would need a different parser
+// per language. This just fixes the things that are always safe to fix
+// regardless of language: trailing whitespace, mixed line endings, and
+// runaway blank lines from a sloppy paste.
+export function tidyCode(source: string): string {
+  return source
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+$/, ""))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function normalizeResourceVaultItems(value: unknown) {
   const sourceItems: unknown[] = Array.isArray(value)
     ? value
