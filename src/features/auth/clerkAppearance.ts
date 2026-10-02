@@ -7,12 +7,12 @@
 export const clerkAppearance = {
   variables: {
     colorPrimary: "var(--primary)",
-    colorTextOnPrimaryBackground: "var(--primary-foreground)",
+    colorPrimaryForeground: "var(--primary-foreground)",
     colorBackground: "var(--background)",
-    colorInputBackground: "var(--background)",
-    colorInputText: "var(--foreground)",
-    colorText: "var(--foreground)",
-    colorTextSecondary: "var(--muted-foreground)",
+    colorInput: "var(--background)",
+    colorInputForeground: "var(--foreground)",
+    colorForeground: "var(--foreground)",
+    colorMutedForeground: "var(--muted-foreground)",
     colorDanger: "var(--destructive)",
     colorNeutral: "var(--foreground)",
     colorShimmer: "var(--muted)",

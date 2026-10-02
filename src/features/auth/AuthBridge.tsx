@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/react";
 import { useAuthStore } from "@/features/auth/stores";
 import { useSettingsStore } from "@/features/settings/stores";
 import { syncSettingsFromCloud } from "@/lib/settings";

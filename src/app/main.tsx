@@ -42,15 +42,15 @@ async function render() {
   let content: ReactNode;
   if (CLERK_KEY) {
     // Dynamic import keeps Clerk out of the initial bundle for self-hosted installs
-    const { ClerkProvider } = await import("@clerk/clerk-react");
+    const { ClerkProvider } = await import("@clerk/react");
     content = (
       // ClerkErrorBoundary catches invalid keys, network failures, or any other
       // Clerk init error and falls back to local-only mode automatically.
       <ClerkErrorBoundary fallback={<ClerkUnavailableProvider>{routes}</ClerkUnavailableProvider>}>
         <ClerkProvider
           publishableKey={CLERK_KEY}
-          afterSignInUrl="/#/"
-          afterSignUpUrl="/#/"
+          signInFallbackRedirectUrl="/#/"
+          signUpFallbackRedirectUrl="/#/"
           appearance={clerkAppearance}
         >
           {routes}
