@@ -78,6 +78,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10.5.4",
     "drizzle-kit": "^0.31.10",
+    "fake-indexeddb": "^6.2.6",
     "gh-pages": "^6.3.0",
     "jsdom": "^27.0.1",
     "postcss": "^8.5.22",
