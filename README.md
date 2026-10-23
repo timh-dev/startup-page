@@ -16,17 +16,23 @@
 
 - [About](#about)
 - [Installation](#installation)
-- [Configuration](#configuration)
 - [Features](#features)
-- [API Keys](#api-keys)
-- [Tech Stack](#tech-stack)
+- [API keys](#api-keys)
+- [Cloud sync](#cloud-sync)
+- [Tech stack](#tech-stack)
+- [Development](#development)
 - [Deploying](#deploying)
 
 ---
 
 ## About
 
-Modular Grid Page is a fast, customizable browser homepage built as a React app. The layout is a responsive auto-sizing tile grid. Every tile, theme, and data source is configurable through the built-in settings panel — no config files to edit by hand.
+Modular Grid Page is a browser start page: a responsive grid of widgets you
+add, size and arrange yourself, plus a bookmarks page and a resource vault.
+Everything is configured in the app; there is no config file to edit.
+
+It works fully offline in local-only mode, storing everything in the browser.
+Signing in adds cloud sync between devices.
 
 ---
 
@@ -35,116 +41,123 @@ Modular Grid Page is a fast, customizable browser homepage built as a React app.
 ```sh
 git clone https://github.com/timothypholmes/startup-page.git
 cd startup-page
-make setup
+make setup   # install dependencies and build
+make dev     # start the dev server and open the browser
 ```
 
-`make setup` installs dependencies and produces a production build. Then start the dev server:
-
-```sh
-make dev
-```
-
-### All make commands
-
-| Command | Description |
-|---------|-------------|
-| `make setup` | Install dependencies and build — run this first |
-| `make dev` | Start the Vite development server (opens browser) |
-| `make build` | Production build → `dist/` |
-| `make build-local` | Build with base path `/` for local serving |
-| `make build-vercel` | Build for Vercel deployment |
-| `make serve` | Build and serve `dist/` locally on port 8000 |
-| `make preview` | Preview the last production build |
-| `make deploy` | Deploy to GitHub Pages |
-| `make clean` | Remove `dist/` and Vite cache |
-| `make install` | Install frontend dependencies only |
-| `make help` | Print all available targets |
-
----
-
-## Configuration
-
-All settings are managed through the in-app **Settings panel** (gear icon on the dashboard). Settings are persisted in IndexedDB with a localStorage mirror, and can be exported/imported as a JSON backup file.
-
-There is no config file to edit manually.
+`make help` lists every target.
 
 ---
 
 ## Features
 
 ### Dashboard
-- **Responsive tile grid** — column count adjusts to viewport width; tile size is adjustable via a slider in Settings → Layout (7–14 rem)
-- **Tile visibility** — show or hide any tile from Settings → Layout without losing its position
-- **Command palette** — press `⌘K` / `Ctrl+K` to navigate the dashboard by keyboard (powered by kbar)
 
-### Tiles
+- **Widget grid**: add, remove, resize (small, wide, tall, large, feature) and drag to reorder. Column count follows the window width; tile size is adjustable.
+- **Command palette**: `⌘K` / `Ctrl+K` searches bookmarks, saved links and themes, runs settings actions, and handles search bangs (`!yt lofi`), quick maths and adding a link to the vault.
+- **Installable and offline-capable** (PWA).
 
-| Tile | Description |
-|------|-------------|
-| **Photo tiles** (×6) | Unsplash or Wikimedia photos, one per configurable topic list. Images are cached locally (Cache API + localStorage) for instant display on return visits. |
-| **Bookmarks** (×5) | Editable link groups with title, name, and URL per entry |
-| **Weather** | Current conditions and temperature via OpenWeather API |
-| **Solar graph** | Canvas-drawn arc showing today's sun position, twilight events, and a hover scrubber |
-| **Clock** | Live local time |
-| **Feature panel** | Cycles between Headlines (Reddit), Windy map, Pomodoro timer, and a photo tile. Arrow buttons or dots switch modes. |
-| **Decorative video** (×2) | Looping background video; tall and small viewport into the same shared scene |
-| **Search** | Multi-engine search box |
+### Widgets
 
-### Appearance
-- **Theme palettes** — several built-in palettes plus a custom theme editor (paste shadcn-compatible CSS variables)
-- **Light / Dark / System** mode
-- **Card shape** — soft, rounded, or sharp corners
-- **Image effects** — per-photo-tile GPU filters: Paper Texture, Fluted Glass, Water, Image Dithering, Halftone Dots, Halftone CMYK (via Paper Design shaders)
+| Widget | What it shows |
+|---|---|
+| Clock | Time and date, with plain, analog and year-progress faces |
+| Search | Multi-engine search box with your own engines |
+| Weather / Weather (Frosted) | Current conditions and forecast from OpenWeather, with animated sky effects |
+| Air quality | US AQI, PM2.5 and PM10 from Open-Meteo |
+| Solar graph | Today's sun path, twilight bands and a hover scrubber |
+| Photo | Unsplash photos for your topics (Wikimedia when there's no key), with optional shader effects |
+| Video | A looping background video |
+| Bookmark folder | One folder from your bookmarks |
+| Vault | Shortcuts into the resource vault |
+| Headlines | Rotating top posts from a subreddit |
+| RSS feed | Any RSS or Atom feed |
+| Wikipedia | Today's featured article |
+| GitHub activity | A user's recent public activity |
+| Spotify now playing | Playback controls for your Spotify account |
+| Timer | A focus timer |
+| Embedded page | Any page in an iframe (Windy by default) |
+| Stack | Several widgets in one tile, swiped between |
 
-### Settings panel tabs
-- **Appearance** — theme mode, palette, custom themes, grid density, card shape, decorative media toggle, image effects
-- **Layout** — tile visibility toggles, tile size slider
-- **Content** — location (lat/lng), units (imperial/metric), API keys, video URLs, video zoom/offset, headline source (subreddit + rotation speed), Unsplash topic tags per tile, bookmarks, timer duration
+### Pages
 
-Settings can be exported to a timestamped JSON file and re-imported at any time.
+- **Bookmarks** (`#/bookmarks`): nested folders, drag and drop, and import from or export to browser bookmark files.
+- **Resource vault** (`#/resources`): a reading list of links (titles fill in from the URL when signed in), code snippets with highlighting, and text templates.
 
----
+### Settings
 
-## API Keys
-
-Both keys are optional — the page works without them using fallback data sources.
-
-| Key | Where to get it | Used for |
-|-----|----------------|----------|
-| **OpenWeather API key** | [openweathermap.org](https://openweathermap.org/api) | Current weather conditions |
-| **Unsplash Access Key** | [unsplash.com/developers](https://unsplash.com/developers) | High-quality photo tiles (falls back to Wikimedia without it) |
-
-Enter keys in **Settings → Content → Location and API Settings**.
+- **Appearance**: light/dark/system mode, built-in palettes and custom themes pasted as shadcn-style CSS variables, grid density, card shape, clock format, which pages are enabled, photo effects and tile size.
+- **Data**: export everything or one area (bookmarks, widgets, vault…) to JSON, import all or part of a backup, restore one of the last 10 automatic local backups, or reset.
 
 ---
 
-## Tech Stack
+## API keys
+
+Weather needs an [OpenWeather](https://openweathermap.org/api) key; photos use
+an [Unsplash](https://unsplash.com/developers) access key if you have one and
+fall back to Wikimedia otherwise. Enter them in a weather or photo widget's
+settings.
+
+Keys are stored in this browser only. They are never synced to other devices
+or included in exports, so enter them once on each device.
+
+---
+
+## Cloud sync
+
+Signed-in users with sync access get their settings, bookmarks, widgets, vault
+and themes on every device. Edits merge item by item, so changes made on two
+devices at once both survive. See [docs/sync.md](./docs/sync.md) for how it
+works.
+
+The hosted version uses Clerk for sign-in, Stripe for the sync subscription
+and Neon Postgres for storage. Without those configured, the app runs in
+local-only mode. [docs/environments.md](./docs/environments.md) covers setup,
+environments and self-hosting (including running your own backend with the
+paywall off).
+
+---
+
+## Tech stack
 
 | Library | Role |
-|---------|------|
-| [React](https://react.dev) | UI framework |
-| [Vite](https://vitejs.dev) | Build tool and dev server |
-| [Tailwind CSS v4](https://tailwindcss.com) | Utility styling |
-| [Radix UI](https://radix-ui.com) | Accessible dialog, tabs, slider, switch primitives |
-| [shadcn-style components](https://ui.shadcn.com) | Composed UI components (Button, Card, Input, etc.) |
+|---|---|
+| [React](https://react.dev) 19 + [Vite](https://vitejs.dev) | UI and build |
+| [Tailwind CSS v4](https://tailwindcss.com), [Radix UI](https://radix-ui.com), shadcn-style components | Styling and accessible primitives |
+| [Zustand](https://zustand.docs.pmnd.rs) | State |
+| [dnd kit](https://dndkit.com) | Drag and drop |
 | [kbar](https://kbar.vercel.app) | Command palette |
-| [Paper Design Shaders](https://shaders.paper.design) | WebGL image filter effects |
-| [axios](https://axios-http.com) | Unsplash API requests |
+| [Paper Design Shaders](https://shaders.paper.design) | Photo effects |
+| [Prism](https://prismjs.com) | Code highlighting in the vault |
+| [vite-plugin-pwa](https://vite-pwa-org.netlify.app) | Offline support |
+| Vercel Functions (`/api`), [Drizzle](https://orm.drizzle.team) + [Neon](https://neon.tech), [zod](https://zod.dev) | Sync API and storage |
+| [Clerk](https://clerk.com), [Stripe](https://stripe.com) | Accounts and the sync subscription |
+
+---
+
+## Development
+
+```sh
+make dev          # Vite dev server (local-only unless Clerk keys are set)
+make dev-cloud    # full stack on :3000 via `vercel dev`
+pnpm test         # Vitest
+pnpm typecheck    # TypeScript (strict)
+```
+
+CI runs the tests, the typecheck and a build on every push and pull request.
 
 ---
 
 ## Deploying
 
+**Vercel** (full app with sync): pushing a branch creates a Preview
+deployment; merging to `main` deploys Production. Database migrations run as
+part of the build. See [docs/environments.md](./docs/environments.md).
+
 **GitHub Pages** (local-only demo, no accounts or sync):
+
 ```sh
-pnpm run deploy
+make deploy
 ```
-Update the `base` field in `vite.config.js` to match your repository name before deploying.
 
-**Vercel** (full app — optional auth, cloud sync, and billing via serverless `/api` functions):
-
-Pushing a branch creates a Preview deployment; merging to `main` deploys Production.
-Cloud features activate only when environment variables are configured — see
-[docs/environments.md](./docs/environments.md) for the complete Clerk / Stripe / Neon
-setup, per-environment variables, and self-hosting options (including running
-your own sync backend with the paywall disabled via `REQUIRE_SUBSCRIPTION=false`).
+The `base` in `vite.config.js` must match the Pages URL.

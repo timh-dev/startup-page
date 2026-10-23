@@ -3,9 +3,9 @@ import fs from "node:fs";
 
 // Runs api/*.ts Vercel-style handlers (exported GET/POST/etc, Web
 // Request/Response signature — see api/health.ts) directly inside the Vite
-// dev server, so `pnpm dev` can exercise simple auth-free endpoints (like
-// /api/link-preview) without needing the Vercel CLI. Routes that depend on
-// env vars (DATABASE_URL, Clerk, Stripe) still need `make dev-cloud`
+// dev server, so `pnpm dev` can exercise endpoints like /api/health without
+// needing the Vercel CLI. Routes that depend on env vars (DATABASE_URL,
+// Clerk, Stripe) — which is most of them — still need `make dev-cloud`
 // (vercel dev) — this only replicates filesystem routing + request/response
 // plumbing, not Vercel's actual runtime/env injection.
 //

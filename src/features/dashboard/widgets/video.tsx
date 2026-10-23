@@ -52,7 +52,7 @@ function VideoConfigFields({ config, onChange }: { config: VideoConfig; onChange
         id="video-url"
         label="Video URL (.mp4)"
         value={config.url || ""}
-        placeholder="Leave blank to use a random URL from Settings → Content"
+        placeholder="Leave blank for a random background video"
         onChange={(value) => onChange({ ...config, url: value })}
       />
       <div className="grid grid-cols-3 gap-3">
