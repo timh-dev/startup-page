@@ -760,7 +760,7 @@ export default function VolumetricCloudscape({
     let uFlash: WebGLUniformLocation | null = null;
     let uTextTex: WebGLUniformLocation | null = null;
 
-    const resolution = createAdaptiveResolution();
+    const resolution = createAdaptiveResolution({ supersample: 2, max: 4 });
 
     function resize() {
       const dpr   = resolution.scale;

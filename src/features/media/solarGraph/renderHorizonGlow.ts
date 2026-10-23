@@ -7,105 +7,120 @@ function smoothstep(edge0: number, edge1: number, x: number) {
   return t * t * (3 - 2 * t);
 }
 
-// Draw one elliptical glow layer using canvas scale transform.
-// radius is the base circle size; scaleX/scaleY stretch it into an ellipse.
-function drawEllipseGlow(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, scaleX: number, scaleY: number, stops: Array<[number, string]>) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scaleX, scaleY);
+type Stop = [offset: number, rgb: [number, number, number], alpha: number];
 
-  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-  for (const [pos, color] of stops) {
-    grad.addColorStop(pos, color);
+function gradient(ctx: CanvasRenderingContext2D, y0: number, y1: number, stops: Stop[]) {
+  const grad = ctx.createLinearGradient(0, y0, 0, y1);
+  for (const [offset, [r, g, b], alpha] of stops) {
+    grad.addColorStop(offset, `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha))})`);
   }
-
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.restore();
+  return grad;
 }
 
-// Multi-layered sunrise/sunset horizon glow with elliptical shape.
-// At horizon (elev ≈ 0): flat, wide gaussian spread along horizon.
-// As sun rises: glow narrows horizontally, grows slightly taller.
-// Sunset reverses: starts narrow/tall, flattens as sun descends.
+// Reused between frames; resized when the canvas changes.
+let layer: HTMLCanvasElement | null = null;
+
+function getLayer(pixelWidth: number, pixelHeight: number, scale: number) {
+  if (!layer) layer = document.createElement('canvas');
+  if (layer.width !== pixelWidth || layer.height !== pixelHeight) {
+    layer.width = pixelWidth;
+    layer.height = pixelHeight;
+  }
+  const lctx = layer.getContext('2d')!;
+  lctx.setTransform(scale, 0, 0, scale, 0, 0);
+  lctx.globalCompositeOperation = 'source-over';
+  lctx.clearRect(0, 0, pixelWidth / scale, pixelHeight / scale);
+  return { canvas: layer, lctx };
+}
+
+/**
+ * Atmosphere along the horizon, modelled on Earth's limb seen from orbit at
+ * sunrise/sunset: a thin cream-white line at the horizon, a cyan-to-teal-to-
+ * deep-blue band of scattered light above it, and a peach-to-rust glow
+ * bleeding below. It's brightest toward the sun and falls off along the
+ * horizon, peaks while the sun is near the horizon, fades to a faint blue
+ * airglow by day and night, and is added (not painted over) so bright areas
+ * read as light rather than paint.
+ */
 export function renderHorizonGlow(ctx: CanvasRenderingContext2D, width: number, height: number, lst: number, solar: SolarContext, horizonY: number, elev?: number) {
   if (elev === undefined) elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
   const { x: sunX } = solarToCanvas(lst, width, height, solar);
 
-  // Active within ±15° of horizon
-  if (Math.abs(elev) > 15) return;
+  // 1 with the sun on the horizon, 0 beyond ±16° (the end of twilight).
+  const t = 1 - smoothstep(0, 16, Math.abs(elev));
+  // Daylight and night keep a faint airglow so the horizon never goes dead.
+  const a = 0.18 + 0.22 * smoothstep(0, 25, elev);
 
-  const distFromHorizon = Math.abs(elev);
-  const fadeFactor = 1 - smoothstep(0, 15, distFromHorizon);
-  if (fadeFactor < 0.01) return;
+  const scale = ctx.getTransform().a || 1;
+  const { canvas: layerCanvas, lctx } = getLayer(Math.round(width * scale), Math.round(height * scale), scale);
 
-  // How far above horizon (0 at horizon, 1 at +15°)
-  const riseFactor = elev > 0 ? Math.min(1, elev / 15) : 0;
+  // Above the horizon: scattered light, cream at the limb through teal to
+  // deep blue, fading into the sky.
+  lctx.fillStyle = gradient(lctx, horizonY, 0, [
+    [0, [255, 238, 214], 0.95 * t + 0.35 * a],
+    [0.035, [214, 234, 230], 0.8 * t + 0.3 * a],
+    [0.16, [120, 182, 200], 0.6 * t + 0.24 * a],
+    [0.4, [34, 98, 134], 0.4 * t + 0.16 * a],
+    [0.72, [10, 34, 64], 0.2 * t + 0.08 * a],
+    [1, [4, 10, 24], 0],
+  ]);
+  lctx.fillRect(0, 0, width, horizonY);
 
-  // Ellipse shape:
-  // scaleX: wide at horizon (3.5), narrows as sun rises (1.0)
-  // scaleY: tall at horizon (2.5), drops off exponentially as sun rises
-  //         exp(-1 * riseFactor) gives rapid falloff: 1.0 → 0.02 over the range
-  const scaleX = 3.5 - riseFactor * 2.5;
-  const scaleY = 0.4 + 2.1 * Math.exp(-1 * riseFactor);
+  // Below the horizon: the sunlit haze, peach at the limb through orange
+  // to rust, sinking into darkness. Only around sunrise and sunset.
+  if (t > 0.01) {
+    lctx.fillStyle = gradient(lctx, horizonY, height, [
+      [0, [255, 224, 182], 0.95 * t],
+      [0.06, [253, 188, 130], 0.82 * t],
+      [0.24, [228, 130, 80], 0.58 * t],
+      [0.52, [142, 54, 32], 0.36 * t],
+      [0.82, [52, 15, 10], 0.18 * t],
+      [1, [10, 4, 4], 0],
+    ]);
+    lctx.fillRect(0, horizonY, width, height - horizonY);
+  }
 
-  const isMorning = lst < 12;
+  // The limb itself: a bright line with a soft bloom.
+  lctx.globalCompositeOperation = 'lighter';
+  for (const [lineWidth, alpha] of [[14, 0.08], [5, 0.22], [1.4, 0.9]] as const) {
+    lctx.beginPath();
+    lctx.moveTo(0, horizonY);
+    lctx.lineTo(width, horizonY);
+    lctx.lineWidth = lineWidth;
+    lctx.strokeStyle = `rgba(255, 243, 222, ${alpha * (0.35 + 0.65 * t)})`;
+    lctx.stroke();
+  }
 
-  // Color layers — multiple bands for richness
-  // Layer order: outermost (deep red/crimson) → mid (orange) → inner (gold/amber)
-  const alphaScale = fadeFactor * fadeFactor; // quadratic falloff
-  const sizeScale = Math.max(0.82, Math.min(1.45, width / 640));
+  // Fade the whole layer away from the sun along the horizon: full strength
+  // near the sun, a faint floor at the far edges.
+  lctx.globalCompositeOperation = 'destination-in';
+  const sigma = width * (0.42 + 0.2 * (1 - t));
+  const floor = 0.14;
+  const mask = lctx.createLinearGradient(0, 0, width, 0);
+  const samples = 16;
+  for (let i = 0; i <= samples; i++) {
+    const x = (i / samples) * width;
+    const weight = floor + (1 - floor) * Math.exp(-(((x - sunX) / sigma) ** 2));
+    mask.addColorStop(i / samples, `rgba(0,0,0,${weight})`);
+  }
+  lctx.fillStyle = mask;
+  lctx.fillRect(0, 0, width, height);
 
-  // Clip to above horizon
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, width, horizonY);
-  ctx.clip();
-
   ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(layerCanvas, 0, 0, width, height);
 
-  // --- Layer 1: Deep red/crimson ---
-  const outerColor = isMorning
-    ? { r: 140, g: 20, b: 10 }
-    : { r: 100, g: 10, b: 40 };
-  drawEllipseGlow(ctx, sunX, horizonY, 180 * sizeScale, scaleX * 1.2, scaleY, [
-    [0, `rgba(${outerColor.r},${outerColor.g},${outerColor.b},${0.36 * alphaScale})`],
-    [0.3, `rgba(${outerColor.r},${outerColor.g},${outerColor.b},${0.17 * alphaScale})`],
-    [0.7, `rgba(${outerColor.r},${outerColor.g},${outerColor.b},${0.05 * alphaScale})`],
-    [1, 'rgba(0,0,0,0)'],
-  ]);
-
-  // --- Layer 2: Mid — warm orange ---
-  const midColor = isMorning
-    ? { r: 230, g: 100, b: 30 }
-    : { r: 210, g: 70, b: 20 };
-  drawEllipseGlow(ctx, sunX, horizonY, 145 * sizeScale, scaleX, scaleY * 0.85, [
-    [0, `rgba(${midColor.r},${midColor.g},${midColor.b},${0.48 * alphaScale})`],
-    [0.2, `rgba(${midColor.r},${midColor.g},${midColor.b},${0.26 * alphaScale})`],
-    [0.5, `rgba(${midColor.r},${midColor.g},${midColor.b},${0.1 * alphaScale})`],
-    [1, 'rgba(0,0,0,0)'],
-  ]);
-
-  // --- Layer 3: Inner — bright gold/amber ---
-  const innerColor = isMorning
-    ? { r: 255, g: 190, b: 60 }
-    : { r: 255, g: 140, b: 40 };
-  drawEllipseGlow(ctx, sunX, horizonY, 98 * sizeScale, scaleX * 0.8, scaleY * 0.7, [
-    [0, `rgba(${innerColor.r},${innerColor.g},${innerColor.b},${0.54 * alphaScale})`],
-    [0.15, `rgba(${innerColor.r},${innerColor.g},${innerColor.b},${0.3 * alphaScale})`],
-    [0.42, `rgba(${innerColor.r},${innerColor.g},${innerColor.b},${0.1 * alphaScale})`],
-    [1, 'rgba(0,0,0,0)'],
-  ]);
-
-  // --- Layer 4: Hot core — white/yellow ---
-  drawEllipseGlow(ctx, sunX, horizonY, 58 * sizeScale, scaleX * 0.5, scaleY * 0.5, [
-    [0, `rgba(255,246,214,${0.48 * alphaScale})`],
-    [0.2, `rgba(255,224,154,${0.2 * alphaScale})`],
-    [0.52, `rgba(255,200,100,${0.06 * alphaScale})`],
-    [1, 'rgba(0,0,0,0)'],
-  ]);
-
+  // Bloom: light from a sun on the horizon bleeding across it, round rather
+  // than stretched.
+  if (t > 0.01) {
+    const radius = Math.max(width, height) * 0.42;
+    const bloom = ctx.createRadialGradient(sunX, horizonY, 0, sunX, horizonY, radius);
+    bloom.addColorStop(0, `rgba(255, 232, 196, ${0.42 * t})`);
+    bloom.addColorStop(0.18, `rgba(255, 196, 140, ${0.2 * t})`);
+    bloom.addColorStop(0.5, `rgba(214, 120, 80, ${0.07 * t})`);
+    bloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = bloom;
+    ctx.fillRect(sunX - radius, horizonY - radius, radius * 2, radius * 2);
+  }
   ctx.restore();
 }

@@ -25,6 +25,15 @@ describe("createAdaptiveResolution", () => {
     expect(createAdaptiveResolution().scale).toBe(1.5);
   });
 
+  it("supersamples above the screen density up to the cap", () => {
+    setDensity(2);
+    expect(createAdaptiveResolution({ supersample: 2, max: 4 }).scale).toBe(4);
+    setDensity(1);
+    expect(createAdaptiveResolution({ supersample: 2, max: 4 }).scale).toBe(2);
+    setDensity(3);
+    expect(createAdaptiveResolution({ supersample: 2, max: 4 }).scale).toBe(4);
+  });
+
   it("keeps full resolution while frames stay smooth", () => {
     setDensity(2);
     const resolution = createAdaptiveResolution();

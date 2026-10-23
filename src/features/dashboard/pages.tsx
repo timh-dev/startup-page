@@ -15,6 +15,8 @@ import {
   type WidgetInstance,
 } from "@/lib/dashboard-dimensions";
 import DashboardTile from "@/features/dashboard/components/DashboardTile";
+import { useRootFontSize } from "@/lib/use-root-font-size";
+import { useFitGrid } from "@/features/dashboard/hooks/useFitGrid";
 
 export default function Index() {
   const settings = useSettingsStore((state) => state.settings);
@@ -30,47 +32,24 @@ export default function Index() {
 
   const ui = settings.ui || {};
   const gapClass = ui.gridDensity === "compact" ? "gap-y-4 gap-x-4" : "gap-y-6 gap-x-6";
-  const decorativeGap = ui.gridDensity === "compact" ? 16 : 24;
-  const tilePx = (ui.tileSize || 9) * 16;
-  const minWidthFor = (n: number) => n * tilePx + (n - 1) * decorativeGap + 32;
-  const gridCss = `
-    .dashboard-grid,
-    .bookmark-page-grid {
-      --dashboard-tile-max: ${tilePx}px;
-      --dashboard-gap: ${decorativeGap}px;
-      --dashboard-inline-padding: 2rem;
-      --dashboard-tile: clamp(88px, calc((100vw - var(--dashboard-inline-padding) - var(--dashboard-gap)) / 2), var(--dashboard-tile-max));
-      grid-template-columns: repeat(2, minmax(0, var(--dashboard-tile)));
-      grid-auto-rows: var(--dashboard-tile);
-    }
-    .dashboard-grid .grid-feature-responsive {
-      grid-column: span 2 / span 2;
-    }
-    @media (min-width: ${minWidthFor(3)}px) {
-      .dashboard-grid,
-      .bookmark-page-grid {
-        --dashboard-tile: clamp(88px, calc((100vw - var(--dashboard-inline-padding) - ${decorativeGap * 2}px) / 3), var(--dashboard-tile-max));
-        grid-template-columns: repeat(3, minmax(0, var(--dashboard-tile)));
-      }
-      .dashboard-grid .grid-feature-responsive {
-        grid-column: span 3 / span 3;
-      }
-    }
-    @media (min-width: ${minWidthFor(5)}px) {
-      .dashboard-grid,
-      .bookmark-page-grid {
-        --dashboard-tile: clamp(88px, calc((100vw - var(--dashboard-inline-padding) - ${decorativeGap * 4}px) / 5), var(--dashboard-tile-max));
-        grid-template-columns: repeat(5, minmax(0, var(--dashboard-tile)));
-      }
-    }
-    @media (min-width: ${minWidthFor(7)}px) {
-      .dashboard-grid,
-      .bookmark-page-grid {
-        --dashboard-tile: clamp(88px, calc((100vw - var(--dashboard-inline-padding) - ${decorativeGap * 6}px) / 7), var(--dashboard-tile-max));
-        grid-template-columns: repeat(7, minmax(0, var(--dashboard-tile)));
-      }
-    }
-  `;
+  // Sizes follow the root font size, which scales with the window, so the
+  // grid grows on larger screens instead of leaving wide empty margins.
+  const rem = useRootFontSize();
+  const decorativeGap = Math.round(rem * (ui.gridDensity === "compact" ? 1 : 1.5));
+  const tilePx = Math.round((ui.tileSize || 9) * rem);
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const widgets: WidgetInstance[] = React.useMemo(
+    () => (Array.isArray(settings.widgets) ? settings.widgets : []),
+    [settings.widgets],
+  );
+  useFitGrid(gridRef, {
+    maxTile: tilePx,
+    minTile: Math.round(tilePx * 0.75),
+    gap: decorativeGap,
+    padding: { top: 5 * rem, bottom: 1.5 * rem, side: 2 * rem },
+    layoutKey: `${widgets.map((widget) => `${widget.id}:${widget.size}`).join(",")}|${editing}`,
+  });
+
   const radiusClass =
     ui.cardStyle === "soft"
       ? "rounded-[1.75rem]"
@@ -100,11 +79,6 @@ export default function Index() {
         return tile("overflow-hidden");
     }
   };
-
-  const widgets: WidgetInstance[] = React.useMemo(
-    () => (Array.isArray(settings.widgets) ? settings.widgets : []),
-    [settings.widgets],
-  );
 
   const persistWidgets = (updater: (widgets: WidgetInstance[]) => WidgetInstance[]) => {
     void persistSettings((prev: any) => {
@@ -141,8 +115,7 @@ export default function Index() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 pb-16 pt-24">
-      <style>{gridCss}</style>
+    <div className="flex min-h-screen items-center justify-center px-8 pb-6 pt-20">
 
       {editing && (
         <div className="fixed inset-x-0 top-16 z-40 flex justify-center px-4">
@@ -166,6 +139,7 @@ export default function Index() {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={widgets.map((instance) => instance.id)} strategy={rectSortingStrategy}>
           <div
+            ref={gridRef}
             className={`dashboard-grid grid w-fit ${gapClass} grid-flow-row-dense content-center justify-center`}
           >
             {widgets.map((instance, index) => (

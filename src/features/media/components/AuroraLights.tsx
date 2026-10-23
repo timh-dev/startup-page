@@ -197,7 +197,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
     let time: WebGLUniformLocation | null = null;
     let intensityUniform: WebGLUniformLocation | null = null;
 
-    const canvasResolution = createAdaptiveResolution();
+    const canvasResolution = createAdaptiveResolution({ supersample: 2, max: 4 });
 
     function resize() {
       const dpr = canvasResolution.scale;

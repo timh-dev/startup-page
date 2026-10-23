@@ -5,10 +5,11 @@ import { useSettingsStore } from '@/features/settings/stores';
 import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour, type SolarContext } from './solarMath';
 import { renderSky } from './renderSky';
 import { createStarField, renderStars, type Star } from './renderStars';
-import { renderCurve } from './renderCurve';
+import { getHorizonY, renderCurve } from './renderCurve';
 import { renderSun } from './renderSun';
 import { renderHorizonGlow } from './renderHorizonGlow';
 import { renderMarkers } from './renderMarkers';
+import { createAdaptiveResolution } from '@/lib/adaptive-resolution';
 
 const SWEEP_SPEED = 0.075;
 const SWEEP_INTERVAL = 22; // ms per sweep step
@@ -75,11 +76,15 @@ export default function SolarGraph() {
       startAnimation();
     }
 
+    // Supersampled: rendered at up to twice the screen's density and scaled
+    // down, for smoother curves and gradients; steps down if frames run slow.
+    const resolution = createAdaptiveResolution({ supersample: 2, max: 4 });
+
     // Resize handler
     function resize() {
       const container = canvas.parentElement;
       if (!container) return;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = resolution.scale;
       const w = container.clientWidth;
       const h = container.clientHeight;
       const nextWidth = Math.max(1, Math.round(w * dpr));
@@ -130,6 +135,7 @@ export default function SolarGraph() {
       // Main render loop — 30 fps idle, 60 fps while hovering
       function frame(timestamp: number) {
         state.animFrameId = requestAnimationFrame(frame);
+        if (resolution.sample(timestamp)) resize();
         const elapsed = timestamp - state.lastTimestamp;
         const targetMs = state.hovering ? 1000 / 60 : TARGET_FRAME_MS;
         if (elapsed < targetMs) return;
@@ -187,11 +193,12 @@ export default function SolarGraph() {
       // 2. Stars
       renderStars(ctx, w, h, state.stars, state.animationTime, effectiveLst, solar, cachedElev);
 
-      // 3. Solar curve + horizon line
-      const { horizonY } = renderCurve(ctx, w, h, solar);
-
-      // 4. Horizon glow (sunrise/sunset effects)
+      // 3. Atmosphere along the horizon (behind the curve)
+      const horizonY = getHorizonY(h, solar);
       renderHorizonGlow(ctx, w, h, effectiveLst, solar, horizonY, cachedElev);
+
+      // 4. Solar curve + horizon line
+      renderCurve(ctx, w, h, solar);
 
       // 5. Sun
       renderSun(ctx, w, h, effectiveLst, solar, horizonY, cachedElev);

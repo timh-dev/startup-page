@@ -287,13 +287,20 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
     return ratio > 1.3 ? "landscape" : ratio < 0.77 ? "portrait" : "squarish";
   }
 
-  // Without an Unsplash key: Wikimedia Commons' Featured Pictures (the
-  // community's best-rated photos), then its Quality Images, then a curated
-  // set. A plain file search turned up snapshots of road signs and hangars.
+  // Without an Unsplash key: Wikimedia Commons' best-rated photography.
+  // Topical Featured Pictures first (landscapes, mountains, lakes, cities —
+  // the general Featured set also holds historical photos and engravings),
+  // then Quality Images, then all Featured Pictures, then a curated set. A
+  // plain file search turned up snapshots of road signs and hangars.
   async _fetchFallback(category: string, searchTerms: string[], updateDisplay: boolean) {
     const { width } = targetSize(this._rootRef.current);
+    const sources = [
+      "Featured_pictures_of_landscapes|Featured_pictures_of_mountains|Featured_pictures_of_lakes|Featured_pictures_of_cityscapes",
+      "Quality_images",
+      "Featured_pictures_on_Wikimedia_Commons",
+    ];
 
-    for (const commonsCategory of ["Featured_pictures_on_Wikimedia_Commons", "Quality_images"]) {
+    for (const commonsCategory of sources) {
       try {
         const query = `${category} filetype:bitmap incategory:${commonsCategory}`;
         const response = await fetch(
