@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assembleSettings, maxTimestamp, sliceSettingsIntoDomains } from "./settingsDomains";
+import { SETTINGS_DOMAINS } from "../../shared/settingsDomains";
+import { DOMAIN_TABLE_ENTRIES, assembleSettings, maxTimestamp, sliceSettingsIntoDomains } from "./settingsDomains";
 
 describe("sliceSettingsIntoDomains / assembleSettings", () => {
   const exampleSettings = {
@@ -78,5 +79,28 @@ describe("maxTimestamp", () => {
   it("returns null when no row has that field set", () => {
     const rows = [undefined, { data: null, clientUpdatedAt: null, serverUpdatedAt: new Date() }];
     expect(maxTimestamp(rows, "clientUpdatedAt")).toBeNull();
+  });
+});
+
+describe("DOMAIN_TABLE_ENTRIES", () => {
+  it("has a table for every shared settings domain", () => {
+    expect(DOMAIN_TABLE_ENTRIES.map((entry) => entry.key).sort()).toEqual(Object.keys(SETTINGS_DOMAINS).sort());
+  });
+
+  it("slices every domain key into some table", () => {
+    const settings = Object.fromEntries(
+      Object.values(SETTINGS_DOMAINS).flatMap((domain) => domain.keys.map((key) => [key, `value-of-${key}`])),
+    );
+    const reassembled = assembleSettings(
+      Object.fromEntries(
+        Object.entries(sliceSettingsIntoDomains(settings)).map(([key, data]) => [
+          key,
+          { data, clientUpdatedAt: null, serverUpdatedAt: new Date() },
+        ]),
+      ),
+    );
+    for (const key of Object.keys(settings)) {
+      expect(reassembled[key], key).toBe(settings[key]);
+    }
   });
 });

@@ -6,25 +6,11 @@ import {
   userThemes,
   userPreferences,
 } from "./schema.js";
+import { SETTINGS_DOMAINS, type SettingsDomainId } from "../../shared/settingsDomains.js";
 
 // The settings object's top-level keys that live in the "preferences" domain
-// — everything that isn't its own dedicated table. Keep in sync with
-// src/features/settings/components/DataTab.tsx's DOMAIN_KEY_GROUPS (the
-// client-side mirror of this same mapping, used for per-domain export).
-const PREFERENCE_KEYS = [
-  "latitude",
-  "longitude",
-  "units",
-  "unsplashCredential",
-  "openWeatherCredential",
-  "ui",
-  "featurePanel",
-  "search",
-  "decorativeVideo",
-  "news",
-  "timer",
-  "unsplash",
-] as const;
+// — everything that isn't its own dedicated table.
+const PREFERENCE_KEYS = SETTINGS_DOMAINS.preferences.keys;
 
 // One entry per domain table, used to drive both the parallel GET fetch and
 // the PUT transaction's upserts generically instead of repeating six
@@ -36,7 +22,7 @@ export const DOMAIN_TABLE_ENTRIES = [
   { key: "readItems", table: userReadItems } as const,
   { key: "themes", table: userThemes } as const,
   { key: "preferences", table: userPreferences } as const,
-];
+] satisfies Array<{ key: SettingsDomainId; table: unknown }>;
 
 export type DomainKey = (typeof DOMAIN_TABLE_ENTRIES)[number]["key"];
 

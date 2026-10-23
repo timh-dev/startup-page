@@ -88,7 +88,7 @@ export function previewImportPayload(rawText: string) {
 }
 
 /** Picks only the given top-level settings keys — no default-filling, unlike normalizeSettingsShape. */
-export function pickSettingsDomain(settings: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+export function pickSettingsDomain(settings: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
   const picked: Record<string, unknown> = {};
   for (const key of keys) {
     if (settings && Object.prototype.hasOwnProperty.call(settings, key)) {

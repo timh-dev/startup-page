@@ -1,3 +1,5 @@
+import { SETTINGS_DOMAINS } from "../../../shared/settingsDomains";
+
 // Storage keys, format markers and the settings-domain grouping shared by the
 // settings modules.
 
@@ -19,23 +21,5 @@ export const BACKUP_LIMIT = 10;
 export const SETTINGS_EXPORT_FORMAT = "startup-page-settings";
 export const SETTINGS_MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
-// Mirrors the domain split in api/_lib/settingsDomains.ts (user_bookmarks,
-// user_widgets, user_vault_items, user_read_items, user_themes,
-// user_preferences) — used client-side for per-domain export and for
-// detecting which domains an imported file actually contains. Duplicated
-// rather than shared across the api/ and src/ bundles since it's a small,
-// stable list.
-export const DOMAIN_KEY_GROUPS: Record<string, { label: string; keys: string[] }> = {
-  bookmarks: { label: "Bookmarks", keys: ["bookmark"] },
-  widgets: { label: "Widgets & layout", keys: ["widgets", "layout"] },
-  vaultItems: { label: "Vault", keys: ["vaultItems"] },
-  readItems: { label: "Reading list", keys: ["readItems"] },
-  themes: { label: "Custom themes", keys: ["customThemes"] },
-  preferences: {
-    label: "Preferences",
-    keys: [
-      "latitude", "longitude", "units", "unsplashCredential", "openWeatherCredential",
-      "ui", "featurePanel", "search", "decorativeVideo", "news", "timer", "unsplash",
-    ],
-  },
-};
+// Indexable by any string so callers can look up a domain id from UI state.
+export const DOMAIN_KEY_GROUPS: Record<string, { label: string; keys: readonly string[] }> = SETTINGS_DOMAINS;

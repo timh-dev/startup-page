@@ -10,6 +10,7 @@ import {
 } from "./_lib/schema.js";
 import { getCurrentUser, requireSyncAccess } from "./_lib/auth.js";
 import { json, errorResponse } from "./_lib/http.js";
+import { MAX_SETTINGS_BYTES, settingsPutSchema } from "./_lib/settingsSchema.js";
 import {
   DOMAIN_TABLE_ENTRIES,
   assembleSettings,
@@ -62,10 +63,23 @@ export async function PUT(request: Request): Promise<Response> {
     const user = await getCurrentUser(request);
     requireSyncAccess(user);
 
-    const payload = await request.json().catch(() => null);
-    if (!payload || typeof payload !== "object" || typeof payload.settings !== "object" || payload.settings === null) {
-      return json({ detail: "Body must include a settings object" }, 422);
+    const body = await request.text();
+    if (body.length > MAX_SETTINGS_BYTES) {
+      return json({ detail: "Settings are too large to sync" }, 413);
     }
+    let raw: unknown = null;
+    try {
+      raw = JSON.parse(body);
+    } catch {
+      // Falls through to the schema error below.
+    }
+    const parsed = settingsPutSchema.safeParse(raw);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const where = issue?.path.length ? ` at ${issue.path.join(".")}` : "";
+      return json({ detail: `Invalid settings${where}: ${issue?.message ?? "malformed body"}` }, 422);
+    }
+    const payload = parsed.data;
 
     const incomingClientUpdatedAt = payload.client_updated_at ? new Date(payload.client_updated_at) : null;
 
