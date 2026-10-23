@@ -5,6 +5,20 @@
 // match production closely enough, so this file opts into the real `node`
 // environment instead of the project's default jsdom one.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpError } from "./_lib/http";
+
+// Auth and DNS are stubbed: every request is signed in unless a test says
+// otherwise, and every hostname resolves to a public address unless a test
+// maps it somewhere private.
+const { authMock, lookupMock } = vi.hoisted(() => ({ authMock: vi.fn(), lookupMock: vi.fn() }));
+vi.mock("./_lib/auth.js", () => ({ getCurrentUser: authMock }));
+vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));
+
+beforeEach(() => {
+  authMock.mockReset().mockResolvedValue({ id: "user-1" });
+  lookupMock.mockReset().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+});
+
 import {
   GET,
   decodeEntities,
@@ -296,5 +310,49 @@ describe("GET /api/link-preview — popular real-world site shapes", () => {
     fetchMock.mockRejectedValueOnce(new Error("network error"));
     const result = await fetchYoutubeOembed(new URL("https://www.youtube.com/watch?v=2QmP_adcZEY"));
     expect(result).toBeNull();
+  });
+});
+
+describe("GET /api/link-preview — access and SSRF guards", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns 401 for signed-out requests without fetching anything", async () => {
+    authMock.mockRejectedValueOnce(new HttpError(401, "Missing bearer token"));
+    const res = await GET(requestFor("https://example.org/"));
+    expect(res.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a public hostname that resolves to a private address", async () => {
+    lookupMock.mockResolvedValueOnce([{ address: "10.0.0.7", family: 4 }]);
+    const res = await GET(requestFor("https://internal.example.org/"));
+    expect(res.status).toBe(422);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a redirect that lands on a private address", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data" } }));
+    const res = await GET(requestFor("https://example.org/redirect"));
+    expect(res.status).toBe(422);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("follows a redirect to another public page", async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 301, headers: { location: "/final" } }))
+      .mockResolvedValueOnce(htmlResponse("<html><head><title>Final page</title></head></html>"));
+    const res = await GET(requestFor("https://example.org/start"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).title).toBe("Final page");
+    expect(String(fetchMock.mock.calls[1][0])).toBe("https://example.org/final");
   });
 });

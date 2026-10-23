@@ -20,6 +20,7 @@ import {
 import { DEFAULT_READ_TAGS, READ_TAG_COLORS } from "@/features/resourceVault/constants";
 import { formatItemDate, groupItemsByDate, normalizeResourceVaultItems } from "@/features/resourceVault/utils";
 import { useQuickAddStore } from "@/features/resourceVault/stores/quickAddStore";
+import { getAuthToken } from "@/lib/authToken";
 
 const UNDO_DELETE_DELAY_MS = 5000;
 
@@ -364,9 +365,18 @@ export default function VaultGlassView({
       return;
     }
 
+    // Previews need a signed-in user (the endpoint isn't an open proxy);
+    // signed out, the user just types the title themselves.
+    const token = await getAuthToken();
+    if (!token) {
+      return;
+    }
+
     setFetchingPreview(true);
     try {
-      const response = await fetch(`${API_URL}/api/link-preview?url=${encodeURIComponent(trimmed)}`);
+      const response = await fetch(`${API_URL}/api/link-preview?url=${encodeURIComponent(trimmed)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) {
         return;
       }

@@ -1,4 +1,6 @@
 import { json, errorResponse, HttpError } from "./_lib/http.js";
+import { getCurrentUser } from "./_lib/auth.js";
+import { safeFetch } from "./_lib/safeFetch.js";
 
 // Most pages put <title>/og: meta tags in the first few KB, but some (e.g.
 // YouTube stuffs ~680KB of inline script/JSON before </head> even closes)
@@ -7,11 +9,9 @@ import { json, errorResponse, HttpError } from "./_lib/http.js";
 const MAX_HTML_BYTES = 2_000_000;
 const FETCH_TIMEOUT_MS = 6000;
 
-// Casual SSRF guard: reject the obvious ways to point this at internal
-// infrastructure (localhost, private/link-local ranges, cloud metadata
-// endpoints). This is a hostname-string check, not DNS-rebinding-proof —
-// proportionate for a personal link-preview convenience, not a hardened
-// multi-tenant proxy.
+// Cheap first-pass rejection of obviously internal hostnames, before any DNS
+// lookup. The real SSRF guard is safeFetch, which checks the resolved
+// address of every hop.
 const BLOCKED_HOSTNAME_PATTERNS = [
   /^localhost$/i,
   /^127\./,
@@ -191,6 +191,9 @@ export function extractOgType(html: string): string | null {
 
 export async function GET(request: Request): Promise<Response> {
   try {
+    // Signed-in users only, so this can't be used as an open proxy.
+    await getCurrentUser(request);
+
     const rawUrl = new URL(request.url).searchParams.get("url");
     if (!rawUrl) {
       throw new HttpError(422, "Missing url parameter");
@@ -224,8 +227,7 @@ export async function GET(request: Request): Promise<Response> {
       // through to the generic scrape below, same as any other site.
     }
 
-    const response = await fetch(target.toString(), {
-      redirect: "follow",
+    const response = await safeFetch(target, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; StartupPageLinkPreview/1.0)",
         Accept: "text/html,application/xhtml+xml",

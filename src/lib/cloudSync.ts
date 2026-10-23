@@ -1,4 +1,5 @@
 import { useAuthStore } from "@/features/auth/stores";
+import { getAuthToken as getToken, getCachedAuthToken } from "@/lib/authToken";
 
 // Same-origin by default (Vercel serves /api next to the app).
 // Self-hosters pointing at a remote API can set VITE_API_URL.
@@ -8,25 +9,9 @@ const PUSH_DEBOUNCE_MS = 2000;
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingPush: { settings: Record<string, unknown>; updatedAt: string } | null = null;
 let pushInFlight = false;
-// Kept fresh on every token fetch so the pagehide flush can send synchronously
-// without awaiting Clerk (Clerk session tokens live ~60s, so it's valid).
-let cachedToken: string | null = null;
 
 function isOnline(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
-}
-
-async function getToken(): Promise<string | null> {
-  try {
-    // Clerk JS SDK exposes the active session on window.Clerk after ClerkProvider loads.
-    // Using window.Clerk avoids React hook restrictions in plain TS modules.
-    const session = (window as unknown as { Clerk?: { session?: { getToken: () => Promise<string> } } }).Clerk?.session;
-    if (!session) return null;
-    cachedToken = await session.getToken();
-    return cachedToken;
-  } catch {
-    return cachedToken;
-  }
 }
 
 // Discriminated result so callers can tell "the cloud genuinely has nothing
@@ -165,6 +150,7 @@ export function forcePushNow(): void {
  * sendBeacon can't carry the Authorization header, so it's not usable here.
  */
 function flushPendingPush(): void {
+  const cachedToken = getCachedAuthToken();
   if (!pendingPush || !cachedToken) return;
   if (pushTimer) {
     clearTimeout(pushTimer);
