@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { VaultItemKind } from "@/features/resourceVault/types";
 
-export type VaultSection = "links" | "places" | VaultItemKind;
+export type VaultSection = "links" | VaultItemKind;
 
 interface QuickAddStore {
   pending: boolean;

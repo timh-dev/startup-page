@@ -6,7 +6,6 @@ import {
   userVaultItems,
   userReadItems,
   userThemes,
-  userPlaces,
   userPreferences,
 } from "./_lib/schema.js";
 import { getCurrentUser, requireSyncAccess } from "./_lib/auth.js";
@@ -110,16 +109,15 @@ export async function PUT(request: Request): Promise<Response> {
     }
 
     // A batch, not a loop of independent requests: neon-http doesn't support
-    // interactive transactions, but .batch() sends all seven upserts as one
+    // interactive transactions, but .batch() sends all six upserts as one
     // all-or-nothing round trip, so this stays as atomic as the old single-row
     // upsert was.
-    const [bookmarksRows, widgetsRows, vaultItemsRows, readItemsRows, themesRows, placesRows, preferencesRows] = await getDb().batch([
+    const [bookmarksRows, widgetsRows, vaultItemsRows, readItemsRows, themesRows, preferencesRows] = await getDb().batch([
       upsertDomain(userBookmarks, "bookmarks"),
       upsertDomain(userWidgets, "widgets"),
       upsertDomain(userVaultItems, "vaultItems"),
       upsertDomain(userReadItems, "readItems"),
       upsertDomain(userThemes, "themes"),
-      upsertDomain(userPlaces, "places"),
       upsertDomain(userPreferences, "preferences"),
     ]);
 
@@ -129,7 +127,6 @@ export async function PUT(request: Request): Promise<Response> {
       vaultItems: vaultItemsRows[0],
       readItems: readItemsRows[0],
       themes: themesRows[0],
-      places: placesRows[0],
       preferences: preferencesRows[0],
     };
 

@@ -22,13 +22,6 @@
       "when": 1786278094077,
       "tag": "0002_drop_user_settings",
       "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1789697208466,
-      "tag": "0003_outgoing_morg",
-      "breakpoints": true
     }
   ]
 }

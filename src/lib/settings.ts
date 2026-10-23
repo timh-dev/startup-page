@@ -18,7 +18,7 @@ const SETTINGS_EXPORT_FORMAT = "startup-page-settings";
 const SETTINGS_MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
 // Mirrors the domain split in api/_lib/settingsDomains.ts (user_bookmarks,
-// user_widgets, user_vault_items, user_read_items, user_themes, user_places,
+// user_widgets, user_vault_items, user_read_items, user_themes,
 // user_preferences) — used client-side for per-domain export and for
 // detecting which domains an imported file actually contains. Duplicated
 // rather than shared across the api/ and src/ bundles since it's a small,
@@ -29,7 +29,6 @@ export const DOMAIN_KEY_GROUPS: Record<string, { label: string; keys: string[] }
   vaultItems: { label: "Vault", keys: ["vaultItems"] },
   readItems: { label: "Reading list", keys: ["readItems"] },
   themes: { label: "Custom themes", keys: ["customThemes"] },
-  places: { label: "Places", keys: ["places"] },
   preferences: {
     label: "Preferences",
     keys: [
