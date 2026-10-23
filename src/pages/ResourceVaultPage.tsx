@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { HiOutlineBookOpen } from "react-icons/hi2";
+import { HiOutlineBookOpen, HiOutlineMapPin } from "react-icons/hi2";
 import { useSettingsStore } from "@/features/settings/stores";
 import VaultGlassView from "@/features/resourceVault/components/VaultGlassView";
 import VaultItemsSection from "@/features/resourceVault/components/VaultItemsSection";
@@ -9,10 +9,13 @@ import { normalizeResourceVaultItems, normalizeVaultItems } from "@/features/res
 import { VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
 import { useQuickAddStore, type VaultSection } from "@/features/resourceVault/stores/quickAddStore";
 import type { VaultItem } from "@/features/resourceVault/types";
+import PlacesSection from "@/features/places/components/PlacesSection";
+import { normalizePlaces } from "@/features/places/utils";
+import type { Place } from "@/features/places/types";
 import PaperPageShell from "@/components/layout/PaperPageShell";
 import vaultPreviewBg from "@/assets/media/vault-preview-bg.jpg";
 
-const VALID_SECTIONS: VaultSection[] = ["links", ...VAULT_KIND_ORDER];
+const VALID_SECTIONS: VaultSection[] = ["links", "places", ...VAULT_KIND_ORDER];
 
 function isValidSection(value: unknown): value is VaultSection {
   return VALID_SECTIONS.includes(value as VaultSection);
@@ -196,6 +199,69 @@ export default function ResourceVaultPage() {
     URL.revokeObjectURL(url);
   };
 
+  // --- Places ----------------------------------------------------------
+
+  const handleAddPlace = async (place: Partial<Place>) => {
+    const current = useSettingsStore.getState().settings;
+    const items = Array.isArray(current.places) ? current.places : [];
+    const now = new Date().toISOString();
+    const nextItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      ...place,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await persistSettings({ ...current, places: [nextItem, ...items] });
+  };
+
+  const handleUpdatePlace = async (placeId: string, nextPlace: Partial<Place>) => {
+    const current = useSettingsStore.getState().settings;
+    const items = Array.isArray(current.places) ? current.places : [];
+    await persistSettings({
+      ...current,
+      places: items.map((item: any) =>
+        item.id === placeId ? { ...item, ...nextPlace, updatedAt: new Date().toISOString() } : item,
+      ),
+    });
+  };
+
+  const handleDeletePlace = async (placeId: string) => {
+    const current = useSettingsStore.getState().settings;
+    const items = Array.isArray(current.places) ? current.places : [];
+    await persistSettings({ ...current, places: items.filter((item: any) => item.id !== placeId) });
+  };
+
+  const handleImportPlaces = async (items: any) => {
+    const current = useSettingsStore.getState().settings;
+    const existing = Array.isArray(current.places) ? current.places : [];
+    const incoming = normalizePlaces(items);
+    const existingIds = new Set(existing.map((item: any) => item.id));
+    const deduped = incoming.filter((item) => !existingIds.has(item.id));
+    await persistSettings({ ...current, places: [...deduped, ...existing] });
+  };
+
+  const handleExportPlaces = () => {
+    const current = useSettingsStore.getState().settings;
+    const items = normalizePlaces(current.places);
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      items,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    anchor.href = url;
+    anchor.download = `startup-page-places-${date}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const quickAddPending = useQuickAddStore((state) => state.pending && state.section === activeSection);
   const consumeQuickAdd = useQuickAddStore((state) => state.consumeQuickAdd);
 
@@ -211,6 +277,16 @@ export default function ResourceVaultPage() {
         >
           <HiOutlineBookOpen className="size-4" />
           Links
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === "places"}
+          className={`vg-section-tab ${activeSection === "places" ? "vg-section-tab-active" : ""}`}
+          onClick={() => setActiveSection("places")}
+        >
+          <HiOutlineMapPin className="size-4" />
+          Places
         </button>
         {VAULT_KIND_ORDER.map((kind) => {
           const def = VAULT_KIND_DEFS[kind];
@@ -241,6 +317,19 @@ export default function ResourceVaultPage() {
           onToggleItem={handleToggleReadItem}
           onUpdateItem={handleUpdateReadItem}
           onDeleteItem={handleDeleteReadItem}
+          autoFocusSearch={routedFocusSearch}
+        />
+      ) : activeSection === "places" ? (
+        <PlacesSection
+          places={settings.places}
+          onBack={() => navigate("/")}
+          onAddPlace={handleAddPlace}
+          onUpdatePlace={handleUpdatePlace}
+          onDeletePlace={handleDeletePlace}
+          onExportPlaces={handleExportPlaces}
+          onImportPlaces={handleImportPlaces}
+          quickAddPending={quickAddPending}
+          onQuickAddConsumed={consumeQuickAdd}
           autoFocusSearch={routedFocusSearch}
         />
       ) : (

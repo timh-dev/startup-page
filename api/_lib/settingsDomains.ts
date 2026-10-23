@@ -4,6 +4,7 @@ import {
   userVaultItems,
   userReadItems,
   userThemes,
+  userPlaces,
   userPreferences,
 } from "./schema.js";
 
@@ -35,6 +36,7 @@ export const DOMAIN_TABLE_ENTRIES = [
   { key: "vaultItems", table: userVaultItems } as const,
   { key: "readItems", table: userReadItems } as const,
   { key: "themes", table: userThemes } as const,
+  { key: "places", table: userPlaces } as const,
   { key: "preferences", table: userPreferences } as const,
 ];
 
@@ -59,6 +61,7 @@ export function assembleSettings(rows: DomainRows): Record<string, unknown> {
     vaultItems: rows.vaultItems?.data ?? [],
     readItems: rows.readItems?.data ?? [],
     customThemes: rows.themes?.data ?? [],
+    places: rows.places?.data ?? [],
     ...((rows.preferences?.data as Record<string, unknown> | undefined) ?? {}),
   };
 }
@@ -76,6 +79,7 @@ export function sliceSettingsIntoDomains(settings: Record<string, unknown>): Rec
     vaultItems: settings.vaultItems ?? [],
     readItems: settings.readItems ?? [],
     themes: settings.customThemes ?? [],
+    places: settings.places ?? [],
     preferences,
   };
 }

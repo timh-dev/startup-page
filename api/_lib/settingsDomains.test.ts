@@ -9,6 +9,7 @@ describe("sliceSettingsIntoDomains / assembleSettings", () => {
     vaultItems: [{ id: "v1", kind: "code", title: "Snippet" }],
     readItems: [{ id: "r1", url: "https://example.com" }],
     customThemes: [{ id: "t1", name: "Custom" }],
+    places: [{ id: "p1", name: "Onibus Coffee", lat: 35.644, lng: 139.699 }],
     ui: { themeMode: "dark" },
     latitude: 40.7,
     longitude: -74,
@@ -31,6 +32,7 @@ describe("sliceSettingsIntoDomains / assembleSettings", () => {
       vaultItems: { data: sliced.vaultItems, clientUpdatedAt: null, serverUpdatedAt: new Date() },
       readItems: { data: sliced.readItems, clientUpdatedAt: null, serverUpdatedAt: new Date() },
       themes: { data: sliced.themes, clientUpdatedAt: null, serverUpdatedAt: new Date() },
+      places: { data: sliced.places, clientUpdatedAt: null, serverUpdatedAt: new Date() },
       preferences: { data: sliced.preferences, clientUpdatedAt: null, serverUpdatedAt: new Date() },
     };
 
@@ -61,6 +63,7 @@ describe("sliceSettingsIntoDomains / assembleSettings", () => {
       vaultItems: [],
       readItems: [],
       customThemes: [],
+      places: [],
     });
   });
 });

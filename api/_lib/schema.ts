@@ -52,6 +52,7 @@ export const userWidgets = domainTable("user_widgets", "{}");
 export const userVaultItems = domainTable("user_vault_items", "[]");
 export const userReadItems = domainTable("user_read_items", "[]");
 export const userThemes = domainTable("user_themes", "[]");
+export const userPlaces = domainTable("user_places", "[]");
 export const userPreferences = domainTable("user_preferences", "{}");
 
 export type UserBookmarksRow = typeof userBookmarks.$inferSelect;
@@ -59,4 +60,5 @@ export type UserWidgetsRow = typeof userWidgets.$inferSelect;
 export type UserVaultItemsRow = typeof userVaultItems.$inferSelect;
 export type UserReadItemsRow = typeof userReadItems.$inferSelect;
 export type UserThemesRow = typeof userThemes.$inferSelect;
+export type UserPlacesRow = typeof userPlaces.$inferSelect;
 export type UserPreferencesRow = typeof userPreferences.$inferSelect;

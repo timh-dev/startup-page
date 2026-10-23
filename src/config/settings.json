@@ -225,6 +225,7 @@
   "readItems": [],
   "vaultItems": [],
   "customThemes": [],
+  "places": [],
   "unsplash": {
     "unsplashBox1": ["chicago", "miami", "new york", "seattle", "austin"],
     "unsplashBox2": ["florida", "alaska", "california", "washington", "maine", "montana"],
