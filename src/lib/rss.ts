@@ -110,7 +110,7 @@ function getFeedImage(channel: Element, isAtom: boolean): string {
 function getItemImage(entry: Element, contentHtml: string): string {
   const mediaThumb = firstChild(entry, "thumbnail");
   if (mediaThumb && mediaThumb.getAttribute("url")) {
-    return decodeEntities(mediaThumb.getAttribute("url"));
+    return decodeEntities(mediaThumb.getAttribute("url") ?? "");
   }
 
   // media:content carries a `url` attribute (Atom's own <content> never does).
@@ -121,12 +121,12 @@ function getItemImage(entry: Element, contentHtml: string): string {
     const type = element.getAttribute("type") || "";
     return medium === "image" || type.startsWith("image") || IMAGE_URL_PATTERN.test(url);
   });
-  if (mediaContent) return decodeEntities(mediaContent.getAttribute("url"));
+  if (mediaContent) return decodeEntities(mediaContent.getAttribute("url") ?? "");
 
   const group = firstChild(entry, "group");
   if (group) {
     const grouped = directChildren(group, "content").find((element) => element.getAttribute("url"));
-    if (grouped) return decodeEntities(grouped.getAttribute("url"));
+    if (grouped) return decodeEntities(grouped.getAttribute("url") ?? "");
   }
 
   const enclosure = directChildren(entry, "enclosure").find((element) => {
@@ -135,7 +135,7 @@ function getItemImage(entry: Element, contentHtml: string): string {
     return type.startsWith("image") || IMAGE_URL_PATTERN.test(url);
   });
   if (enclosure && enclosure.getAttribute("url")) {
-    return decodeEntities(enclosure.getAttribute("url"));
+    return decodeEntities(enclosure.getAttribute("url") ?? "");
   }
 
   const match = typeof contentHtml === "string" ? contentHtml.match(CONTENT_IMG_PATTERN) : null;

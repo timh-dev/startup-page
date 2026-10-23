@@ -32,7 +32,7 @@ function TapeRibbon({ remaining, totalSeconds, running }) {
   const cellW   = 100 / 3;
   const minInt  = Math.floor(tapePos);
 
-  const cells = [];
+  const cells: number[] = [];
   for (let v = minInt + SPAN; v >= Math.max(0, minInt - SPAN); v--) {
     cells.push(v);
   }

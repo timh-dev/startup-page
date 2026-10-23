@@ -111,7 +111,7 @@ function dayOfYear(date) {
 // and spacing: DOM elements snap their boxes to device pixels individually,
 // which makes a ~4px dot grid look ragged; canvas doesn't snap.
 function YearClock({ now }) {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const year = now.getFullYear();
   const month = now.getMonth();
   const date = now.getDate();
@@ -120,13 +120,15 @@ function YearClock({ now }) {
   const percent = Math.round((today / totalDays) * 100);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-    const ctx = canvas.getContext("2d");
-    let frameId = null;
+    const canvasEl = canvasRef.current;
+    const context = canvasEl?.getContext("2d");
+    if (!canvasEl || !context) return undefined;
+    const canvas: HTMLCanvasElement = canvasEl;
+    const ctx: CanvasRenderingContext2D = context;
+    let frameId: number | null = null;
     let lastDraw = 0;
 
-    const draw = (timestamp) => {
+    const draw = (timestamp: number) => {
       frameId = requestAnimationFrame(draw);
       if (timestamp - lastDraw < 66) return; // ~15 fps is plenty for the pulse
       lastDraw = timestamp;

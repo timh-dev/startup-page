@@ -1,3 +1,4 @@
+import type { SolarContext } from './solarMath';
 import { sunElevation } from './solarMath';
 
 // Celestial pole position (normalized 0–1).
@@ -5,12 +6,27 @@ import { sunElevation } from './solarMath';
 const POLE_X = 0.5;
 const POLE_Y = -0.15;
 
+export interface Star {
+  angle: number;
+  dist: number;
+  size: number;
+  baseBrightness: number;
+  twinkleFreq: number;
+  twinklePhase: number;
+  twinkleAmplitude: number;
+  r: number;
+  g: number;
+  b: number;
+}
+
+type ShootingStar = ReturnType<typeof spawnShootingStar>;
+
 // Realistic star field generator.
 // Real sky: overwhelming majority of stars are dim sub-pixel pinpoints,
 // a few are moderately bright, very rare ones are prominent.
 // Uses a power-law magnitude distribution to mimic this.
-export function createStarField(count = 500) {
-  const stars = [];
+export function createStarField(count = 500): Star[] {
+  const stars: Star[] = [];
   const maxDist = 1.5;
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -53,10 +69,10 @@ export function createStarField(count = 500) {
 }
 
 // --- Shooting stars ---
-let activeShootingStars = [];
+let activeShootingStars: ShootingStar[] = [];
 let lastShootingStarCheck = 0;
 
-function spawnShootingStar(width, height) {
+function spawnShootingStar(width: number, height: number) {
   const startX = Math.random() * width;
   const startY = Math.random() * height * 0.5;
   const angle = Math.PI * 0.15 + Math.random() * Math.PI * 0.25;
@@ -77,7 +93,7 @@ function spawnShootingStar(width, height) {
   };
 }
 
-function updateAndRenderShootingStars(ctx, width, height, dt, starOpacity) {
+function updateAndRenderShootingStars(ctx: CanvasRenderingContext2D, width: number, height: number, dt: number, starOpacity: number) {
   if (starOpacity <= 0.05) {
     activeShootingStars = [];
     return;
@@ -95,7 +111,7 @@ function updateAndRenderShootingStars(ctx, width, height, dt, starOpacity) {
     activeShootingStars = activeShootingStars.slice(-4);
   }
 
-  const surviving = [];
+  const surviving: ShootingStar[] = [];
   for (const s of activeShootingStars) {
     s.life += dt;
     if (s.life >= s.maxLife) continue;
@@ -137,7 +153,7 @@ function updateAndRenderShootingStars(ctx, width, height, dt, starOpacity) {
 }
 
 // Render stars with realistic brightness, subtle twinkle, and polar rotation
-export function renderStars(ctx, width, height, stars, time, lst, solar, elev) {
+export function renderStars(ctx: CanvasRenderingContext2D, width: number, height: number, stars: Star[], time: number, lst: number, solar: SolarContext, elev?: number) {
   if (elev === undefined) elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
 
   let starOpacity = 1;

@@ -13,9 +13,12 @@ function useAnimatedCanvas(
   drawRef.current = draw;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return undefined;
+    const canvasEl = canvasRef.current;
+    const context = canvasEl?.getContext("2d");
+    if (!canvasEl || !context) return undefined;
+    // Re-bound as non-null consts so the nested functions keep the narrowing.
+    const canvas: HTMLCanvasElement = canvasEl;
+    const ctx: CanvasRenderingContext2D = context;
 
     let animationFrame = 0;
     let lastNow = performance.now();

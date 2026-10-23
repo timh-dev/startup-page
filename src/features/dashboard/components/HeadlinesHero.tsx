@@ -74,6 +74,8 @@ function normalizeArticle(item) {
   };
 }
 
+type Article = ReturnType<typeof normalizeArticle>;
+
 interface HeadlinesHeroProps {
   subreddit?: string | null;
   rotationSeconds?: number | null;
@@ -83,7 +85,7 @@ export default function HeadlinesHero({ subreddit: subredditOverride, rotationSe
   const settings = React.useMemo(() => readSettings(), []);
   const subreddit = subredditOverride || settings.news?.subreddit || "worldnews";
   const rotationSeconds = Math.max(Number(rotationOverride || settings.news?.rotationSeconds || 8), 4);
-  const [articles, setArticles] = React.useState([]);
+  const [articles, setArticles] = React.useState<Article[]>([]);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [status, setStatus] = React.useState("loading");
   const [progressKey, setProgressKey] = React.useState(0);

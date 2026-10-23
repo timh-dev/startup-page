@@ -1,3 +1,4 @@
+import type { SolarContext } from './solarMath';
 import { sunElevation, formatHour } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
@@ -15,7 +16,7 @@ const EVENT_RADIUS = {
   astronomical: 3.5,
 };
 
-function drawPill(ctx, x, y, text, fontSize) {
+function drawPill(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, fontSize: number) {
   ctx.font = `${fontSize}px sans-serif`;
   const metrics = ctx.measureText(text);
   const padX = 5;
@@ -38,7 +39,7 @@ function drawPill(ctx, x, y, text, fontSize) {
 }
 
 // Render event markers, labels, tooltip, time cursor, and current-time indicator
-export function renderMarkers(ctx, w, h, hoverHour, solar, horizonY, realLst) {
+export function renderMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, hoverHour: number, solar: SolarContext, horizonY: number, realLst: number) {
   // --- Time cursor: vertical dashed line from sun to horizon ---
   const hoverElev = sunElevation(solar.lat, solar.lng, hoverHour, solar.doy);
   const { x: sunX, y: sunY } = solarToCanvas(hoverHour, w, h, solar);

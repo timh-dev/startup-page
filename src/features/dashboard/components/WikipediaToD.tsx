@@ -1,7 +1,14 @@
 import React from "react";
 
+interface FeaturedArticle {
+  title: string;
+  extract: string;
+  thumbnail?: string;
+  url?: string;
+}
+
 export default function WikipediaToD() {
-  const [article, setArticle] = React.useState(null);
+  const [article, setArticle] = React.useState<FeaturedArticle | null>(null);
   const [status, setStatus] = React.useState("loading");
 
   React.useEffect(() => {

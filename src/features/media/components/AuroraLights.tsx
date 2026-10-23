@@ -160,18 +160,21 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
   intensityRef.current = intensity;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const gl = canvas?.getContext("webgl", {
+    const canvasEl = canvasRef.current;
+    const glContext = canvasEl?.getContext("webgl", {
       antialias: false,
       alpha: true,
       premultipliedAlpha: false,
       powerPreference: "low-power",
     });
 
-    if (!canvas || !gl) {
+    if (!canvasEl || !glContext) {
       setSupported(false);
       return undefined;
     }
+    // Re-bound as non-null consts so the nested render functions keep the narrowing.
+    const canvas: HTMLCanvasElement = canvasEl;
+    const gl: WebGLRenderingContext = glContext;
 
     let animationFrame = 0;
     const program = createProgram(gl);

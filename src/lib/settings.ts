@@ -1,6 +1,7 @@
 import Cookies from "js-cookie";
 import defaultSettings from "../config/settings.json";
 import { ensureBookmarkIds, flattenGroups } from "@/features/bookmarks/lib/tree";
+import type { WidgetInstance } from "@/lib/dashboard-dimensions";
 
 const SETTINGS_COOKIE_KEY = "settings";
 const SETTINGS_LOCAL_STORAGE_KEY = "startup-page.settings";
@@ -132,7 +133,7 @@ function buildLegacyFeatureStackItems(featurePanel, mergedSettings) {
   // "weather" is always included, mirroring the old force-include rule.
   const modes = LEGACY_FEATURE_MODE_ORDER.filter((key) => enabledKeys.includes(key) || key === "weather");
 
-  return modes.map((key) => {
+  return modes.map((key): WidgetInstance | null => {
     switch (key) {
       case "windy":
         return { id: "legacy-stack-windy", type: "iframe", size: "small", config: { preset: "windy", url: "" } };
@@ -162,7 +163,7 @@ function buildLegacyFeatureStackItems(featurePanel, mergedSettings) {
       default:
         return null;
     }
-  }).filter(Boolean);
+  }).filter((item) => item !== null);
 }
 
 function synthesizeWidgetsFromLegacy(mergedSettings) {
@@ -189,7 +190,7 @@ function synthesizeWidgetsFromLegacy(mergedSettings) {
   const videoOffsetX = mergedSettings.decorativeVideo?.offsetX ?? 0;
   const videoOffsetY = mergedSettings.decorativeVideo?.offsetY ?? 0;
 
-  const widgets = [];
+  const widgets: WidgetInstance[] = [];
 
   for (const id of order) {
     if (hidden[id]) continue;
@@ -402,7 +403,7 @@ async function readSettingsFromIndexedDb(): Promise<StoredSettingsRecord | null>
   });
 }
 
-async function countBackupsInIndexedDb() {
+async function countBackupsInIndexedDb(): Promise<number> {
   const db = await getIndexedDb();
   if (!db || !db.objectStoreNames.contains(BACKUPS_STORE_NAME)) {
     return 0;

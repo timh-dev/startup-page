@@ -1,5 +1,13 @@
 import React from "react";
 
+interface GitHubEvent {
+  id: string;
+  type: string;
+  created_at: string;
+  repo?: { name?: string };
+  payload?: Record<string, any>;
+}
+
 function timeAgo(dateStr: string) {
   const s = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (s < 60) return `${s}s ago`;
@@ -36,7 +44,7 @@ function describeEvent(event) {
 }
 
 export default function GitHubActivity({ username }: { username?: string | null }) {
-  const [events, setEvents] = React.useState([]);
+  const [events, setEvents] = React.useState<GitHubEvent[]>([]);
   const [status, setStatus] = React.useState("loading");
 
   React.useEffect(() => {

@@ -20,8 +20,9 @@ const LOCAL_ONLY = import.meta.env.VITE_LOCAL_ONLY === "true";
 // .env.local can still preview what a self-hosted/open-source user sees.
 const CLERK_KEY = LOCAL_ONLY ? undefined : (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined);
 
-const rootElement = document.getElementById("root");
-if (!rootElement) throw new Error("Root element was not found.");
+const rootLookup = document.getElementById("root");
+if (!rootLookup) throw new Error("Root element was not found.");
+const rootElement: HTMLElement = rootLookup;
 
 const routes = (
   <HashRouter>

@@ -1,5 +1,5 @@
 import React from "react";
-import { useKBar, useRegisterActions, Priority } from "kbar";
+import { useKBar, useRegisterActions, Priority, type Action } from "kbar";
 import { ThemeContext } from "@/components/layout/ThemeContext";
 import { BUILT_IN_PALETTES } from "@/lib/theme-palettes";
 import {
@@ -44,7 +44,7 @@ export default function useKBarActions() {
   const storeSettings = useSettingsStore((s) => s.settings);
 
   const actions = React.useMemo(() => {
-    const list = [];
+    const list: Action[] = [];
     const settings = storeSettings || readSettings();
     const customThemes = settings.customThemes || [];
 
@@ -182,7 +182,7 @@ export default function useKBarActions() {
 
   const dynamicActions = React.useMemo(() => {
     const query = (searchQuery || "").trim();
-    const out = [];
+    const out: Action[] = [];
 
     // Calculator: "= 340*1.08"
     if (query.startsWith("=") && query.length > 1) {

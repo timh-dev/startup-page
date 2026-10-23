@@ -1,14 +1,15 @@
+import type { SolarContext } from './solarMath';
 import { sunElevation } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
-function smoothstep(edge0, edge1, x) {
+function smoothstep(edge0: number, edge1: number, x: number) {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
 }
 
 // Draw one elliptical glow layer using canvas scale transform.
 // radius is the base circle size; scaleX/scaleY stretch it into an ellipse.
-function drawEllipseGlow(ctx, cx, cy, radius, scaleX, scaleY, stops) {
+function drawEllipseGlow(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, scaleX: number, scaleY: number, stops: Array<[number, string]>) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(scaleX, scaleY);
@@ -29,7 +30,7 @@ function drawEllipseGlow(ctx, cx, cy, radius, scaleX, scaleY, stops) {
 // At horizon (elev ≈ 0): flat, wide gaussian spread along horizon.
 // As sun rises: glow narrows horizontally, grows slightly taller.
 // Sunset reverses: starts narrow/tall, flattens as sun descends.
-export function renderHorizonGlow(ctx, width, height, lst, solar, horizonY, elev) {
+export function renderHorizonGlow(ctx: CanvasRenderingContext2D, width: number, height: number, lst: number, solar: SolarContext, horizonY: number, elev?: number) {
   if (elev === undefined) elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
   const { x: sunX } = solarToCanvas(lst, width, height, solar);
 

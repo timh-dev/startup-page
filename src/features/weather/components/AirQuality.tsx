@@ -15,7 +15,7 @@ function getLevel(aqi) {
 }
 
 export default function AirQuality() {
-  const [data, setData] = React.useState(null);
+  const [data, setData] = React.useState<{ aqi: number; pm25: string; pm10: string } | null>(null);
   const [status, setStatus] = React.useState("loading");
 
   React.useEffect(() => {

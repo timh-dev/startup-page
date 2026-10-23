@@ -145,5 +145,5 @@ export function normalizeResourceVaultItems(value: unknown) {
         completedAt,
       };
     })
-    .filter(Boolean);
+    .filter((item) => item !== null);
 }

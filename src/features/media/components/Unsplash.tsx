@@ -250,7 +250,7 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
       const pages = Object.values(data.query?.pages || {}) as WikimediaPage[];
       const imageUrls = pages
         .map((page) => page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url)
-        .filter(Boolean);
+        .filter((url): url is string => Boolean(url));
 
       const url = imageUrls.length
         ? imageUrls[Math.floor(Math.random() * imageUrls.length)]
@@ -302,7 +302,7 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
   render() {
     const settings = useSettingsStore.getState().settings;
     const filterSettings =
-      settings.ui?.imageEffects?.filterSettings?.[this.state.filterKey] || null;
+      (this.state.filterKey && settings.ui?.imageEffects?.filterSettings?.[this.state.filterKey]) || null;
     const shouldUseShader = Boolean(this.state.filterKey && filterSettings && this.state.photos);
 
     return (

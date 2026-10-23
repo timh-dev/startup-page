@@ -1,8 +1,9 @@
+import type { SolarContext } from './solarMath';
 import { sunElevation } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
 // Time-of-day atmosphere color.
-function getAtmosColor(lst, elev) {
+function getAtmosColor(lst: number, elev: number) {
   let r, g, b;
 
   if (elev < -6) {
@@ -25,7 +26,7 @@ function getAtmosColor(lst, elev) {
 }
 
 // Draw an elliptical radial gradient layer
-function drawEllipseGlow(ctx, cx, cy, radius, scaleX, scaleY, stops) {
+function drawEllipseGlow(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, scaleX: number, scaleY: number, stops: Array<[number, string]>) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(scaleX, scaleY);
@@ -44,7 +45,7 @@ function drawEllipseGlow(ctx, cx, cy, radius, scaleX, scaleY, stops) {
 
 // Render the sun with elliptical atmospheric glow that reshapes with elevation.
 // At horizon: wide & flat bloom. High sun: narrow & taller bloom.
-export function renderSun(ctx, width, height, lst, solar, horizonY, elev) {
+export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: number, lst: number, solar: SolarContext, horizonY: number, elev?: number) {
   if (elev === undefined) elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
   // Position comes from the fixed curve; the real elevation still drives
   // color temperature and glow shape below.

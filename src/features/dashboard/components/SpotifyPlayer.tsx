@@ -79,6 +79,18 @@ function disconnect() {
   [TOKEN_KEY, REFRESH_KEY, EXPIRY_KEY, VERIFIER_KEY].forEach((k) => localStorage.removeItem(k));
 }
 
+interface SpotifyPlayback {
+  is_playing: boolean;
+  progress_ms: number;
+  item: {
+    id: string;
+    name: string;
+    duration_ms: number;
+    artists?: Array<{ name: string }>;
+    album?: { name?: string; images?: Array<{ url: string }> };
+  };
+}
+
 async function getToken(clientId) {
   const stored = getStoredToken();
   if (stored) return stored;
@@ -103,10 +115,10 @@ function fmtMs(ms) {
 }
 
 export default function SpotifyPlayer({ clientId }: { clientId?: string | null }) {
-  const [track, setTrack] = React.useState(null);
+  const [track, setTrack] = React.useState<SpotifyPlayback | null>(null);
   const [status, setStatus] = React.useState("init");
   const [progress, setProgress] = React.useState(0);
-  const tickRef = React.useRef(null);
+  const tickRef = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   // Handle OAuth redirect + check stored tokens
   React.useEffect(() => {

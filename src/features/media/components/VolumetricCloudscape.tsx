@@ -619,9 +619,12 @@ export default function VolumetricCloudscape({
   propsRef.current = { coverage, phase, cloudStyle, fogIntensity, density, windSpeed, lightningIntensity, hour, locationLabel, temperatureLabel, conditionLabel };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const gl = canvas?.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power" });
-    if (!canvas || !gl) { setSupported(false); return undefined; }
+    const canvasEl = canvasRef.current;
+    const glContext = canvasEl?.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power" });
+    if (!canvasEl || !glContext) { setSupported(false); return undefined; }
+    // Re-bound as non-null consts so the nested render functions keep the narrowing.
+    const canvas: HTMLCanvasElement = canvasEl;
+    const gl: WebGLRenderingContext = glContext;
 
     let animationFrame = 0;
     const program = createProgram(gl);

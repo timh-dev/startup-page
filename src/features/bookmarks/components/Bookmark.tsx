@@ -202,7 +202,7 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }) => {
                     <LocalServiceStatus url={url} className="bookmark-favicon inline-block shrink-0 rounded-full" />
                   ) : faviconUrl(url) ? (
                     <img
-                      src={faviconUrl(url)}
+                      src={faviconUrl(url) ?? undefined}
                       srcSet={faviconSrcSet(url)}
                       alt=""
                       className="bookmark-favicon shrink-0 rounded-sm object-contain opacity-90"

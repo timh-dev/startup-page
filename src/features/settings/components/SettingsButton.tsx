@@ -95,7 +95,7 @@ function SettingsButton() {
   const { theme, themeMode, setThemeMode, themePalette, setThemePalette, setCustomThemeVars } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const [settingsState, setSettingsState] = useState(savedSettings);
-  const [storageState, setStorageState] = useState(null);
+  const [storageState, setStorageState] = useState<Awaited<ReturnType<typeof getStorageDiagnostics>> | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
   const [customThemeName, setCustomThemeName] = useState("");
   const [customThemeCSS, setCustomThemeCSS] = useState("");

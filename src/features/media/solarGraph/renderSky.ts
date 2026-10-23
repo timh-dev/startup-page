@@ -1,4 +1,4 @@
-export function renderSky(ctx, width, height) {
+export function renderSky(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const sky = ctx.createLinearGradient(0, 0, 0, height);
   sky.addColorStop(0, '#02030b');
   sky.addColorStop(0.45, '#070713');

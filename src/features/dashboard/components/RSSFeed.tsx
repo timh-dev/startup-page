@@ -1,5 +1,5 @@
 import React from "react";
-import { fetchRssFeed } from "@/lib/rss";
+import { fetchRssFeed, type RssFeed, type RssItem } from "@/lib/rss";
 
 function timeAgo(dateStr: string) {
   const s = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -10,17 +10,18 @@ function timeAgo(dateStr: string) {
 }
 
 export default function RSSFeed({ feedUrl }: { feedUrl?: string | null }) {
-  const [feed, setFeed] = React.useState(null);
-  const [items, setItems] = React.useState([]);
+  const [feed, setFeed] = React.useState<RssFeed["feed"] | null>(null);
+  const [items, setItems] = React.useState<RssItem[]>([]);
   const [status, setStatus] = React.useState("loading");
 
   React.useEffect(() => {
     if (!feedUrl) { setStatus("no-feed"); return; }
+    const url = feedUrl;
     let cancelled = false;
 
     async function load() {
       try {
-        const { feed: parsedFeed, items: parsedItems } = await fetchRssFeed(feedUrl, { limit: 12 });
+        const { feed: parsedFeed, items: parsedItems } = await fetchRssFeed(url, { limit: 12 });
         if (cancelled) return;
         setFeed(parsedFeed);
         setItems(parsedItems);

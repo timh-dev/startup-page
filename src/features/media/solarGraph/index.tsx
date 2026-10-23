@@ -2,9 +2,9 @@ import { useRef, useEffect } from 'react';
 import { readSettings } from '@/lib/settings';
 import { getOrRequestLocation } from '@/lib/geolocation';
 import { useSettingsStore } from '@/features/settings/stores';
-import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour } from './solarMath';
+import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour, type SolarContext } from './solarMath';
 import { renderSky } from './renderSky';
-import { createStarField, renderStars } from './renderStars';
+import { createStarField, renderStars, type Star } from './renderStars';
 import { renderCurve } from './renderCurve';
 import { renderSun } from './renderSun';
 import { renderHorizonGlow } from './renderHorizonGlow';
@@ -14,9 +14,26 @@ const SWEEP_SPEED = 0.075;
 const SWEEP_INTERVAL = 22; // ms per sweep step
 const TARGET_FRAME_MS = 1000 / 30; // idle at 30 fps; hover upgrades to 60
 
+interface SolarGraphState {
+  lst: number;
+  sweeping: boolean;
+  stars: Star[] | null;
+  solar: SolarContext | null;
+  animationTime: number;
+  animFrameId: number | null;
+  lastTimestamp: number;
+  hovering: boolean;
+  hoverHour: number | null;
+  pixelRatio: number;
+  renderWidth: number;
+  renderHeight: number;
+  _realTimeTimer: ReturnType<typeof setInterval> | null;
+  _frameFunc: FrameRequestCallback | null;
+}
+
 export default function SolarGraph() {
-  const canvasRef = useRef(null);
-  const stateRef = useRef({
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef<SolarGraphState>({
     lst: 0,
     sweeping: true,
     stars: null,
@@ -29,21 +46,23 @@ export default function SolarGraph() {
     pixelRatio: 1,
     renderWidth: 0,
     renderHeight: 0,
-    _realTimeTimer: null as ReturnType<typeof setInterval> | null,
-    _frameFunc: null as FrameRequestCallback | null,
+    _realTimeTimer: null,
+    _frameFunc: null,
   });
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const canvasEl = canvasRef.current;
+    const context = canvasEl?.getContext('2d');
+    if (!canvasEl || !context) return;
+    // Re-bound as non-null consts so the nested functions keep the narrowing.
+    const canvas: HTMLCanvasElement = canvasEl;
+    const ctx: CanvasRenderingContext2D = context;
     const state = stateRef.current;
 
     // Resolve location
     const settings = readSettings();
 
-    function initSolar(lat, lng) {
+    function initSolar(lat: number, lng: number) {
       // Cancel any in-flight animation from a previous initSolar call
       if (state.animFrameId) { cancelAnimationFrame(state.animFrameId); state.animFrameId = null; }
       if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
@@ -59,6 +78,7 @@ export default function SolarGraph() {
     // Resize handler
     function resize() {
       const container = canvas.parentElement;
+      if (!container) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = container.clientWidth;
       const h = container.clientHeight;
@@ -79,14 +99,14 @@ export default function SolarGraph() {
     }
 
     const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(canvas.parentElement);
+    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
     resize();
 
     // Sweep timer for startup animation
-    let sweepTimer = null;
+    let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
     function startAnimation() {
-      const targetLst = state.solar.currentTime;
+      const targetLst = state.solar?.currentTime ?? getCurrentLst();
 
       // Startup sweep: animate from 0 to current time
       sweepTimer = setInterval(() => {
@@ -95,7 +115,7 @@ export default function SolarGraph() {
           if (state.lst >= targetLst) {
             state.lst = targetLst;
             state.sweeping = false;
-            clearInterval(sweepTimer);
+            if (sweepTimer) clearInterval(sweepTimer);
           }
         }
       }, SWEEP_INTERVAL);
@@ -108,7 +128,7 @@ export default function SolarGraph() {
       }, 60000);
 
       // Main render loop — 30 fps idle, 60 fps while hovering
-      function frame(timestamp) {
+      function frame(timestamp: number) {
         state.animFrameId = requestAnimationFrame(frame);
         const elapsed = timestamp - state.lastTimestamp;
         const targetMs = state.hovering ? 1000 / 60 : TARGET_FRAME_MS;
@@ -146,7 +166,7 @@ export default function SolarGraph() {
       }
     }
 
-    function draw(ctx, canvas, state) {
+    function draw(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, state: SolarGraphState) {
       if (!state.solar || !state.stars) return;
 
       const w = state.renderWidth || canvas.clientWidth;
@@ -154,7 +174,7 @@ export default function SolarGraph() {
       const solar = state.solar;
 
       // Use hovered time when hovering, otherwise real time
-      const effectiveLst = state.hovering ? state.hoverHour : state.lst;
+      const effectiveLst = state.hovering && state.hoverHour !== null ? state.hoverHour : state.lst;
 
       // Compute once — shared by stars, horizon glow, and sun renderers
       const cachedElev = sunElevation(solar.lat, solar.lng, effectiveLst, solar.doy);
@@ -178,12 +198,12 @@ export default function SolarGraph() {
 
       // 6. Markers (only when hovering)
       if (state.hovering) {
-        renderMarkers(ctx, w, h, state.hoverHour, solar, horizonY, state.lst);
+        renderMarkers(ctx, w, h, effectiveLst, solar, horizonY, state.lst);
       }
     }
 
     // Mouse event handlers for hover interaction
-    function onMouseMove(e) {
+    function onMouseMove(e: MouseEvent) {
       if (!state.solar) return;
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
