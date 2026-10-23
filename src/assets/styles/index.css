@@ -1125,46 +1125,61 @@
   padding-inline: clamp(0.75rem, 7cqw, 1.25rem);
 }
 
-/* .weather-location/-temp/-desc are invisible in the DOM — kept for
-   layout/accessibility/text-selection only. The visible glyphs are drawn by
-   VolumetricCloudscape's shader, which knocks out (inverts) its own pixels
-   at each text's position so it reacts live to the clouds/sun/moon actually
-   behind it. Font metrics here must stay in sync with the clamp()/weight/
-   letter-spacing math mirrored in VolumetricCloudscape.tsx's syncTextTexture(). */
+/* Current conditions: crisp white type over the sky with a soft shadow
+   for legibility on bright clouds. */
 .weather-location {
-  color: transparent;
-  font-size: clamp(1.1rem, 9.8cqh, 1.5rem);
-  line-height: 1.1;
-  letter-spacing: 0.12em;
+  color: white;
+  font-size: clamp(0.62rem, 5.6cqh, 0.75rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  opacity: 0.88;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
 }
 
 .weather-temp {
-  color: transparent;
-  margin-top: clamp(0.0625rem, 1cqh, 0.25rem);
-  font-size: clamp(1.45rem, 18cqh, 2.25rem);
+  color: white;
+  margin-top: clamp(0.05rem, 1cqh, 0.2rem);
+  font-size: clamp(1.9rem, 24cqh, 3.25rem);
+  font-weight: 300;
   line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.18);
 }
 
 .weather-desc {
-  color: transparent;
-  max-width: min(46cqw, 9.5rem);
-  font-size: clamp(1.1rem, 9.8cqh, 1.5rem);
-  line-height: 1.15;
+  color: white;
+  max-width: min(48cqw, 11rem);
+  font-size: clamp(0.72rem, 6.4cqh, 0.875rem);
+  font-weight: 500;
+  line-height: 1.25;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
 }
 
+/* Unit and data source: only on hover, so the tile stays clean. */
 .weather-meta {
-  color: white;
-  mix-blend-mode: difference;
-  font-size: clamp(0.45rem, 3.6cqh, 0.625rem);
+  margin-top: 0.15rem;
+  color: rgb(255 255 255 / 0.75);
+  font-size: clamp(0.55rem, 4.2cqh, 0.6875rem);
   line-height: 1.1;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.weather-widget:hover .weather-meta {
+  opacity: 1;
 }
 
 .weather-forecast {
   position: relative;
   align-items: stretch;
   min-height: clamp(3rem, 36cqh, 4.55rem);
-  padding: clamp(0.35rem, 3.2cqh, 0.7rem) clamp(0.45rem, 3.4cqw, 0.8rem);
+  padding: clamp(0.5rem, 4.5cqh, 0.9rem) clamp(0.45rem, 3.4cqw, 0.8rem) clamp(0.35rem, 3.2cqh, 0.6rem);
   color: white;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  /* A soft shade behind the forecast so it reads on any sky. */
+  background: linear-gradient(to top, rgb(0 0 0 / 0.22), rgb(0 0 0 / 0.08) 65%, transparent);
 }
 
 .weather-forecast-day {
@@ -1194,8 +1209,8 @@
 
 .weather-forecast-name {
   color: white;
-  mix-blend-mode: difference;
-  font-size: clamp(0.55rem, 4.2cqh, 0.75rem);
+  opacity: 0.9;
+  font-size: clamp(0.6rem, 4.4cqh, 0.75rem);
   line-height: 1.1;
 }
 
@@ -1209,11 +1224,9 @@
   line-height: 1.1;
 }
 
-/* Both the low and high temp are plain text nodes in child spans — blend
-   each span individually since mix-blend-mode isn't inherited. */
 .weather-forecast-temp > span {
   color: white;
-  mix-blend-mode: difference;
+  font-variant-numeric: tabular-nums;
 }
 
 .weather-forecast-low {
@@ -1224,8 +1237,7 @@
 
 .weather-forecast-precip {
   min-height: 1.05em;
-  color: white;
-  mix-blend-mode: difference;
+  color: rgb(186 230 253);
   font-size: clamp(0.52rem, 3.8cqh, 0.66rem);
   line-height: 1.05;
 }
@@ -1261,7 +1273,6 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: inherit;
   background: rgb(15 23 42);
   color: white;
@@ -1273,32 +1284,93 @@
   z-index: 0;
 }
 
+/* A soft shade over the sky so the numbers read on bright or busy clouds. */
+.weather-detail-shader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.28), rgb(0 0 0 / 0.08) 40%, rgb(0 0 0 / 0.22));
+}
+
 .weather-detail-content {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: clamp(0.6rem, 4cqh, 1.1rem);
-  gap: clamp(0.5rem, 3.5cqh, 0.9rem);
-  text-align: center;
+  /* Bottom padding clears a stack's switcher. */
+  padding: clamp(0.8rem, 5cqh, 1.25rem) clamp(0.9rem, 4cqw, 1.4rem) clamp(2.2rem, 12cqh, 2.8rem);
+  gap: clamp(0.6rem, 4cqh, 1rem);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
 }
 
-/* Hourly columns: icon/temp/bar/value all stacked and centered per hour,
-   so each hour's chart bar sits directly under that hour's condition —
-   one aligned grid instead of separate hour-label and chart sections. */
-/* 24 hourly cells, 12 per row (2 rows) — real data comes in 3h steps, the
-   rest are interpolated (see buildHourlySeries + [data-interpolated]). */
+.weather-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.weather-detail-day {
+  font-size: clamp(0.62rem, 4cqh, 0.72rem);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.weather-detail-summary {
+  margin-top: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(0.8rem, 5cqh, 0.95rem);
+  font-weight: 500;
+}
+
+/* Metric switcher: a compact segmented control in the header. */
+.weather-detail-metric-tabs {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.125rem;
+  padding: 0.15rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.12);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.2);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.weather-detail-metric-tab {
+  border-radius: 9999px;
+  padding: clamp(0.18rem, 1.3cqh, 0.28rem) clamp(0.5rem, 2.4cqw, 0.7rem);
+  color: rgb(255 255 255 / 0.72);
+  font-size: clamp(0.58rem, 3.6cqh, 0.6875rem);
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: none;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.weather-detail-metric-tab:hover {
+  color: white;
+}
+
+.weather-detail-metric-tab[data-active="true"] {
+  background: rgb(255 255 255 / 0.9);
+  color: rgb(15 23 42);
+}
+
+/* One row of twelve two-hourly columns: time, condition, temperature, the
+   selected metric's bar and value, aligned per hour. */
 .weather-detail-hours {
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: end;
-  align-content: center;
-  gap: clamp(0.15rem, 1cqw, 0.35rem) clamp(0.1rem, 0.8cqw, 0.3rem);
+  align-items: stretch;
+  gap: clamp(0.1rem, 0.8cqw, 0.3rem);
   width: 100%;
   min-height: 0;
 }
@@ -1307,66 +1379,70 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(0.15rem, 1.1cqh, 0.3rem);
+  justify-content: space-between;
+  gap: clamp(0.2rem, 1.6cqh, 0.4rem);
   min-width: 0;
-  border: 1px solid transparent;
-  border-radius: 0.5rem;
-  padding: clamp(0.15rem, 1.1cqh, 0.3rem) clamp(0.05rem, 0.5cqw, 0.15rem);
-  background: transparent;
+  min-height: 0;
+  border-radius: 0.6rem;
+  padding: clamp(0.25rem, 1.6cqh, 0.4rem) 0;
   color: white;
-  font: inherit;
   cursor: pointer;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 0, 0, 0.3);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.weather-detail-hour-col:hover {
+  background: rgb(255 255 255 / 0.08);
 }
 
 .weather-detail-hour-col[data-active="true"] {
-  border-color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.14);
+  background: rgb(255 255 255 / 0.16);
 }
 
-
 .weather-detail-hour-label {
-  font-size: clamp(0.42rem, 2.7cqh, 0.54rem);
+  font-size: clamp(0.5rem, 3cqh, 0.625rem);
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgb(255 255 255 / 0.75);
+  white-space: nowrap;
 }
 
 .weather-detail-hour-icon {
-  width: clamp(0.85rem, 6cqh, 1.25rem);
-  height: clamp(0.85rem, 6cqh, 1.25rem);
+  width: clamp(0.9rem, 6cqh, 1.2rem);
+  height: clamp(0.9rem, 6cqh, 1.2rem);
+  opacity: 0.92;
 }
 
 .weather-detail-hour-temp {
-  font-size: clamp(0.56rem, 3.6cqh, 0.7rem);
-  font-weight: 700;
+  font-size: clamp(0.66rem, 4.4cqh, 0.85rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .weather-detail-hour-bar {
+  flex: 1 1 auto;
   display: flex;
   align-items: end;
   justify-content: center;
-  width: clamp(0.4rem, 1.8cqw, 0.6rem);
-  height: clamp(2rem, 14cqh, 3.4rem);
+  width: clamp(0.35rem, 1.5cqw, 0.5rem);
+  min-height: 1.5rem;
+  max-height: 5rem;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgb(255 255 255 / 0.16);
   overflow: hidden;
 }
 
-/* Wind: an arrow pointing where the wind is headed, instead of a bar. Sized
-   to its own content rather than matching .weather-detail-hour-bar's tall
-   box — that left a lot of empty space above/below the small glyph. */
+/* Wind: an arrow pointing where the wind is headed, instead of a bar. */
 .weather-detail-hour-wind {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .weather-detail-hour-wind-arrow {
-  width: clamp(1.3rem, 8cqh, 2rem);
-  height: clamp(1.3rem, 8cqh, 2rem);
-  color: rgba(255, 255, 255, 0.88);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  width: clamp(1.1rem, 7cqh, 1.6rem);
+  height: clamp(1.1rem, 7cqh, 1.6rem);
+  color: rgb(255 255 255 / 0.9);
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
 }
 
 .weather-detail-hour-bar-fill {
@@ -1376,36 +1452,11 @@
 }
 
 .weather-detail-hour-value {
-  font-size: clamp(0.44rem, 2.9cqh, 0.56rem);
+  font-size: clamp(0.5rem, 3cqh, 0.625rem);
   font-weight: 600;
-}
-
-/* Metric switcher — the very bottom of the panel. */
-.weather-detail-metric-tabs {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: clamp(0.25rem, 1.6cqw, 0.45rem);
-}
-
-.weather-detail-metric-tab {
-  flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 9999px;
-  padding: clamp(0.2rem, 1.4cqh, 0.32rem) clamp(0.5rem, 2.6cqw, 0.75rem);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: clamp(0.52rem, 3.6cqh, 0.64rem);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  color: rgb(255 255 255 / 0.85);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-.weather-detail-metric-tab[data-active="true"] {
-  border-color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.22);
-  color: white;
 }
 
 .weather-detail-empty {
@@ -1434,13 +1485,10 @@
   }
 }
 
-@container (max-height: 24rem) {
-  .weather-detail-content {
-    gap: 0.35rem;
-  }
-
-  .weather-detail-hour-bar {
-    height: clamp(1.8rem, 14cqh, 3rem);
+@container (max-height: 15rem) {
+  .weather-detail-hour-icon,
+  .weather-detail-hour-value {
+    display: none;
   }
 }
 

@@ -220,7 +220,7 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
     },
     {
       key: "uv",
-      label: "UV Index (est.)",
+      label: "UV",
       max: 11,
       getValue: (hour) => estimateUVIndex(uvLat, uvLon, hour),
       format: (hour) => `${Math.round(estimateUVIndex(uvLat, uvLon, hour))}`,
@@ -234,7 +234,7 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
     },
     {
       key: "precipitation",
-      label: "Precipitation",
+      label: "Rain",
       max: 100,
       getValue: (hour) => hour.precipitationProbability,
       format: (hour) => formatNumber(hour.precipitationProbability, "%"),
@@ -259,10 +259,36 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
         />
       </div>
       <div className="weather-detail-content">
+        <div className="weather-detail-header">
+          <div className="min-w-0">
+            <p className="weather-detail-day">{day.dayName}</p>
+            <p className="weather-detail-summary">
+              {day.description} · <span className="numeric">{day.high}° / {day.low}°</span>
+            </p>
+          </div>
+          {samples.length > 0 && (
+            <div className="weather-detail-metric-tabs" role="tablist" aria-label="Hourly detail">
+              {metrics.map((metric) => (
+                <button
+                  key={metric.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={metric.key === activeMetricKey}
+                  className="weather-detail-metric-tab"
+                  data-active={metric.key === activeMetricKey}
+                  onClick={() => setActiveMetricKey(metric.key)}
+                >
+                  {metric.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {samples.length > 0 ? (
           <>
             <div className="weather-detail-hours">
-              {samples.map((hour) => {
+              {/* Every other hour: twelve readable columns rather than 24. */}
+              {samples.filter((_hour, index) => index % 2 === 0).map((hour) => {
                 const value = activeMetric.getValue(hour);
                 const height = `${Math.max(6, Math.min(((value ?? 0) / activeMetric.max) * 100, 100))}%`;
                 const color = getScaleColor(activeMetric.key, value, activeMetric.max);
@@ -298,21 +324,6 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
                   </button>
                 );
               })}
-            </div>
-            <div className="weather-detail-metric-tabs" role="tablist">
-              {metrics.map((metric) => (
-                <button
-                  key={metric.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={metric.key === activeMetricKey}
-                  className="weather-detail-metric-tab"
-                  data-active={metric.key === activeMetricKey}
-                  onClick={() => setActiveMetricKey(metric.key)}
-                >
-                  {metric.label}
-                </button>
-              ))}
             </div>
           </>
         ) : (
