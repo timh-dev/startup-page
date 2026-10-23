@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .bow { fill: #1d1c1a; }
+    .knot { fill: #000; }
+    @media (prefers-color-scheme: dark) {
+      .bow { fill: #efeae0; }
+      .knot { fill: #fff; }
+    }
+  </style>
+  <path class="bow" d="M5 20.4c0-2.7 2.8-4.5 5.3-3.3L28 25.2v13.6l-17.7 8.1C7.8 48.1 5 46.3 5 43.6z"/>
+  <path class="bow" d="M59 20.4c0-2.7-2.8-4.5-5.3-3.3L36 25.2v13.6l17.7 8.1c2.5 1.2 5.3-.6 5.3-3.3z"/>
+  <rect class="knot" x="26" y="23.5" width="12" height="17" rx="4.5"/>
+</svg>

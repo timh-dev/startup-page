@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -196,8 +197,10 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
     let time: WebGLUniformLocation | null = null;
     let intensityUniform: WebGLUniformLocation | null = null;
 
+    const canvasResolution = createAdaptiveResolution();
+
     function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 1);
+      const dpr = canvasResolution.scale;
       const width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
       const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
 
@@ -218,6 +221,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
 
     function render(now: number) {
       animationFrame = requestAnimationFrame(render);
+      if (canvasResolution.sample(now)) resize();
       if (!canvas.clientWidth) return; // hidden (ancestor display:none) — skip GPU work
 
       if (!glReady) {

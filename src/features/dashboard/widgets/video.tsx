@@ -33,6 +33,10 @@ function VideoRender({ instance, cardClass }: WidgetRenderProps) {
           height: `${100 * zoom}%`,
           left: `${offsetX}px`,
           top: `${offsetY}px`,
+          // The built-in clip is pixel art: scale it with hard pixel edges
+          // instead of the default smoothing, which blurs it on large or
+          // high-density tiles. Custom URLs are usually footage, so smooth.
+          imageRendering: src === desert ? "pixelated" : undefined,
         }}
         src={src}
         autoPlay

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { getFlashEnvelope } from "@/features/weather/lightning";
 
 const VERTEX_SHADER = `
@@ -669,9 +670,9 @@ export default function VolumetricCloudscape({
       return text.slice(0, lo) + "…";
     }
 
-    // The main framebuffer is deliberately capped at 1x device-pixel-ratio
-    // (see resize()) to keep the cloud shader cheap — but that leaves text
-    // soft on Retina screens. Rasterize the text mask at real device
+    // The main framebuffer renders at an adaptive resolution (see resize())
+    // that drops toward 1x when the cloud shader can't keep up — which would
+    // leave text soft on Retina screens. Rasterize the text mask at real device
     // resolution regardless, independent of the main canvas's backing-store
     // size: it's just a texture sample in the shader, so oversampling it
     // costs nothing per-frame, only a slightly bigger one-off upload whenever
@@ -759,8 +760,10 @@ export default function VolumetricCloudscape({
     let uFlash: WebGLUniformLocation | null = null;
     let uTextTex: WebGLUniformLocation | null = null;
 
+    const resolution = createAdaptiveResolution();
+
     function resize() {
-      const dpr   = Math.min(window.devicePixelRatio || 1, 1.0);
+      const dpr   = resolution.scale;
       const width  = Math.max(1, Math.floor(canvas.clientWidth  * dpr));
       const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
       if (canvas.width !== width || canvas.height !== height) {
@@ -779,6 +782,7 @@ export default function VolumetricCloudscape({
 
     function render(now: number) {
       animationFrame = requestAnimationFrame(render);
+      if (resolution.sample(now)) resize();
       if (!canvas.clientWidth) return; // hidden (ancestor display:none) — skip GPU work
 
       if (!glReady) {

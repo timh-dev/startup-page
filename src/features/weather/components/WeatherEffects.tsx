@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { getFlashEvent, getFlashEnvelope, makeRng } from "@/features/weather/lightning";
 import type { PrecipitationStyle, WeatherVisualProfile } from "@/features/weather/types/weather";
 
-const MAX_DPR = 1.5;
+const MAX_DPR = 2;
 
 function useAnimatedCanvas(
   draw: (ctx: CanvasRenderingContext2D, w: number, h: number, dt: number, t: number) => void,

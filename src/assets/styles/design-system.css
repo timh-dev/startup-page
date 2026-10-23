@@ -524,3 +524,33 @@
   mask-image: linear-gradient(to bottom, black calc(100% - 1.1rem), transparent);
   padding-bottom: 0.6rem;
 }
+
+/* --- Photo credit ----------------------------------------------------------- */
+
+.photo-credit {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 25;
+  max-width: calc(100% - 1rem);
+  overflow: hidden;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgb(255 255 255 / 0.92);
+  background: rgb(0 0 0 / 0.35);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
+}
+
+.group\/photo:hover .photo-credit,
+.photo-credit:focus-visible {
+  opacity: 1;
+  transform: none;
+}
