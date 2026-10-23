@@ -52,6 +52,51 @@ function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
   return ts ? new Date(ts * 1000) : null;
 }
 
+// Lower is better: the subscription that decides a customer's access.
+const STATUS_RANK: Record<string, number> = {
+  active: 0,
+  trialing: 1,
+  past_due: 2,
+  unpaid: 3,
+  incomplete: 4,
+  paused: 5,
+  incomplete_expired: 6,
+  canceled: 7,
+};
+
+/** The subscription that should drive access: best status first, then the newest. */
+export function pickSubscription(subs: Stripe.Subscription[]): Stripe.Subscription | null {
+  const rank = (sub: Stripe.Subscription) => STATUS_RANK[sub.status] ?? 99;
+  return [...subs].sort((a, b) => rank(a) - rank(b) || b.created - a.created)[0] ?? null;
+}
+
+/**
+ * Write the customer's current subscription state, fetched fresh from Stripe.
+ * Stripe can deliver events late, twice, or out of order, so an event is only
+ * a signal that something changed; the event's own copy of the object may be
+ * stale (a late subscription.updated arriving after subscription.deleted
+ * would otherwise reactivate a canceled user). Re-reading the source of truth
+ * makes every event idempotent and order-independent.
+ */
+async function syncCustomerSubscription(customerId: string): Promise<void> {
+  const user = await findUserByCustomer(customerId);
+  if (!user) return;
+
+  const { data } = await getStripe().subscriptions.list({ customer: customerId, status: "all", limit: 20 });
+  const sub = pickSubscription(data);
+  const live = sub && sub.status !== "canceled" && sub.status !== "incomplete_expired";
+
+  await getDb()
+    .update(users)
+    .set({
+      stripeSubscriptionId: live ? sub.id : null,
+      subscriptionStatus: sub ? sub.status : "none",
+      subscriptionPeriodEnd: live ? subscriptionPeriodEnd(sub) : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, user.id));
+}
+
 export async function POST(request: Request): Promise<Response> {
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature") ?? "";
@@ -67,74 +112,46 @@ export async function POST(request: Request): Promise<Response> {
     return json({ detail: "Invalid signature" }, 400);
   }
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object;
-      const clerkUserId = session.client_reference_id;
-      const customerId = customerIdOf(session.customer);
-      if (clerkUserId && customerId) {
-        const user = await getDb().query.users.findFirst({
-          where: eq(users.clerkUserId, clerkUserId),
-        });
-        if (user && !user.stripeCustomerId) {
-          await getDb()
-            .update(users)
-            .set({ stripeCustomerId: customerId, updatedAt: new Date() })
-            .where(eq(users.id, user.id));
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        const clerkUserId = session.client_reference_id;
+        const customerId = customerIdOf(session.customer);
+        if (clerkUserId && customerId) {
+          const user = await getDb().query.users.findFirst({
+            where: eq(users.clerkUserId, clerkUserId),
+          });
+          if (user && !user.stripeCustomerId) {
+            await getDb()
+              .update(users)
+              .set({ stripeCustomerId: customerId, updatedAt: new Date() })
+              .where(eq(users.id, user.id));
+          }
+          await syncCustomerSubscription(customerId);
         }
+        break;
       }
-      break;
-    }
 
-    case "customer.subscription.created":
-    case "customer.subscription.updated": {
-      const sub = event.data.object;
-      const customerId = customerIdOf(sub.customer);
-      const user = customerId ? await findUserByCustomer(customerId) : null;
-      if (user) {
-        await getDb()
-          .update(users)
-          .set({
-            stripeSubscriptionId: sub.id,
-            subscriptionStatus: sub.status,
-            subscriptionPeriodEnd: subscriptionPeriodEnd(sub),
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, user.id));
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const customerId = customerIdOf(event.data.object.customer);
+        if (customerId) await syncCustomerSubscription(customerId);
+        break;
       }
-      break;
-    }
 
-    case "customer.subscription.deleted": {
-      const sub = event.data.object;
-      const customerId = customerIdOf(sub.customer);
-      const user = customerId ? await findUserByCustomer(customerId) : null;
-      if (user) {
-        await getDb()
-          .update(users)
-          .set({
-            subscriptionStatus: "canceled",
-            stripeSubscriptionId: null,
-            subscriptionPeriodEnd: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, user.id));
+      case "invoice.payment_failed": {
+        const customerId = customerIdOf(event.data.object.customer);
+        if (customerId) await syncCustomerSubscription(customerId);
+        break;
       }
-      break;
     }
-
-    case "invoice.payment_failed": {
-      const invoice = event.data.object;
-      const customerId = customerIdOf(invoice.customer);
-      const user = customerId ? await findUserByCustomer(customerId) : null;
-      if (user) {
-        await getDb()
-          .update(users)
-          .set({ subscriptionStatus: "past_due", updatedAt: new Date() })
-          .where(eq(users.id, user.id));
-      }
-      break;
-    }
+  } catch (err) {
+    // A 5xx makes Stripe retry the event later, which is safe because
+    // handling is idempotent.
+    console.error(`[stripe webhook] ${event.type} ${event.id} failed:`, err);
+    return json({ detail: "Webhook handling failed" }, 500);
   }
 
   return json({ received: true });
