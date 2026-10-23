@@ -17,8 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/features/auth/stores";
-import { useSettingsStore } from "@/features/settings/stores";
-import { syncSettingsFromCloud } from "@/lib/settings";
+import { forceSyncNow } from "@/lib/cloudSync";
 import UpgradeModal from "@/features/auth/UpgradeModal";
 
 const PLAN_LABEL: Record<string, string> = {
@@ -61,6 +60,13 @@ const MERGE_KEY_LABELS: Record<string, string> = {
   ui: "your appearance settings",
   decorativeVideo: "your background video",
   layout: "your dashboard layout",
+  customThemes: "your custom themes",
+  units: "your units",
+  search: "your search engines",
+  news: "your headlines",
+  timer: "your timer",
+  unsplash: "your photo topics",
+  featurePanel: "your feature panel",
 };
 
 function formatMergeKeys(keys: string[]): string {
@@ -239,8 +245,8 @@ export default function AccountButton() {
     if (!canSyncNow) return;
     setManualSyncing(true);
     try {
-      const applied = await syncSettingsFromCloud();
-      if (applied) useSettingsStore.getState().reloadSettings();
+      // Changes it brings in reach the store through AuthBridge's subscription.
+      await forceSyncNow();
     } finally {
       setManualSyncing(false);
     }
@@ -306,7 +312,7 @@ export default function AccountButton() {
               )}
               {hasAccess && syncStatus === "synced" && lastMergeKeys && lastMergeKeys.length > 0 && (
                 <p className="mt-2 text-xs text-amber-600">
-                  Another device changed {formatMergeKeys(lastMergeKeys)} at the same time — kept the most recent edit for {lastMergeKeys.length === 1 ? "it" : "each"}.
+                  Another device edited the same part of {formatMergeKeys(lastMergeKeys)} — everything else was merged, and where both changed the same thing the latest edit was kept.
                 </p>
               )}
             </div>

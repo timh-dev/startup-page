@@ -1,58 +1,50 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "./_lib/db.js";
-import {
-  userBookmarks,
-  userWidgets,
-  userVaultItems,
-  userReadItems,
-  userThemes,
-  userPreferences,
-} from "./_lib/schema.js";
 import { getCurrentUser, requireSyncAccess } from "./_lib/auth.js";
 import { json, errorResponse } from "./_lib/http.js";
+import { DOMAIN_TABLE_ENTRIES, type DomainKey } from "./_lib/settingsDomains.js";
 import { MAX_SETTINGS_BYTES, settingsPutSchema } from "./_lib/settingsSchema.js";
-import {
-  DOMAIN_TABLE_ENTRIES,
-  assembleSettings,
-  maxTimestamp,
-  sliceSettingsIntoDomains,
-  type DomainKey,
-  type DomainRows,
-} from "./_lib/settingsDomains.js";
+import { stripWidgetCredentials } from "../shared/credentials.js";
 
-async function fetchDomainRows(userId: string): Promise<DomainRows> {
-  const results = await Promise.all(
-    DOMAIN_TABLE_ENTRIES.map(({ table }) =>
-      getDb().select().from(table).where(eq(table.userId, userId)).limit(1).then((rows) => rows[0])
-    )
-  );
+// Cloud sync, one record per settings domain. Each record has a version the
+// server bumps on every write. GET returns every domain's data and version.
+// PUT sends only changed domains, each with the version it was based on; a
+// domain is written only if that is still the stored version, otherwise its
+// current data and version come back as a conflict for the client to merge
+// and resend. Ordering never depends on a device's clock.
 
-  const rows: DomainRows = {};
-  DOMAIN_TABLE_ENTRIES.forEach(({ key }, i) => {
-    if (results[i]) rows[key] = results[i];
-  });
-  return rows;
+interface StoredDomain {
+  data: unknown;
+  version: number;
 }
 
-function toResponse(rows: DomainRows) {
-  const rowList = DOMAIN_TABLE_ENTRIES.map(({ key }) => rows[key]);
-  return {
-    settings: assembleSettings(rows),
-    schema_version: 2,
-    server_updated_at: (maxTimestamp(rowList, "serverUpdatedAt") ?? new Date()).toISOString(),
-    client_updated_at: maxTimestamp(rowList, "clientUpdatedAt")?.toISOString() ?? null,
-  };
+type DomainResult = { status: "ok"; version: number } | ({ status: "conflict" } & StoredDomain);
+
+async function readDomains(userId: string, keys?: DomainKey[]): Promise<Partial<Record<DomainKey, StoredDomain>>> {
+  const entries = DOMAIN_TABLE_ENTRIES.filter(({ key }) => !keys || keys.includes(key));
+  const rows = await Promise.all(
+    entries.map(({ table }) =>
+      getDb()
+        .select({ data: table.data, version: table.version })
+        .from(table)
+        .where(eq(table.userId, userId))
+        .limit(1)
+        .then((result) => result[0]),
+    ),
+  );
+
+  const domains: Partial<Record<DomainKey, StoredDomain>> = {};
+  entries.forEach(({ key }, i) => {
+    if (rows[i]) domains[key] = rows[i];
+  });
+  return domains;
 }
 
 export async function GET(request: Request): Promise<Response> {
   try {
     // Reads only require sign-in: a lapsed subscriber can always retrieve their data.
     const user = await getCurrentUser(request);
-    const rows = await fetchDomainRows(user.id);
-    if (DOMAIN_TABLE_ENTRIES.every(({ key }) => !rows[key])) {
-      return json({ detail: "No settings saved yet" }, 404);
-    }
-    return json(toResponse(rows));
+    return json({ domains: await readDomains(user.id) });
   } catch (err) {
     return errorResponse(err);
   }
@@ -73,78 +65,65 @@ export async function PUT(request: Request): Promise<Response> {
     } catch {
       // Falls through to the schema error below.
     }
+    // Clients from before versioned sync push the whole settings object with
+    // a timestamp. Accepting that would let a stale copy overwrite newer
+    // data, so refuse it; a reload picks up the current client.
+    if (raw && typeof raw === "object" && "settings" in raw && !("domains" in raw)) {
+      return json({ detail: "This copy of the app is out of date. Reload the page to update it." }, 426);
+    }
     const parsed = settingsPutSchema.safeParse(raw);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const where = issue?.path.length ? ` at ${issue.path.join(".")}` : "";
       return json({ detail: `Invalid settings${where}: ${issue?.message ?? "malformed body"}` }, 422);
     }
-    const payload = parsed.data;
 
-    const incomingClientUpdatedAt = payload.client_updated_at ? new Date(payload.client_updated_at) : null;
-
-    const existingRows = await fetchDomainRows(user.id);
-
-    // Last line of defense: never let a push silently replace existing data
-    // with something older (or something carrying no timestamp at all, e.g.
-    // a client bug pushing freshly-seeded default state). Reject instead of
-    // overwriting so the caller can reconcile.
-    const existingTime = maxTimestamp(
-      DOMAIN_TABLE_ENTRIES.map(({ key }) => existingRows[key]),
-      "clientUpdatedAt"
-    )?.getTime() ?? 0;
-    const incomingTime = incomingClientUpdatedAt?.getTime() ?? 0;
-    if (existingTime > 0 && incomingTime < existingTime) {
-      return json({ detail: "Conflict: server has newer data", ...toResponse(existingRows) }, 409);
+    const changes = DOMAIN_TABLE_ENTRIES.flatMap(({ key, table }) => {
+      const change = parsed.data.domains[key];
+      if (!change) return [];
+      // API keys stay on the device; drop any an out-of-date client still sends.
+      const data =
+        key === "widgets" ? { ...change.data, widgets: stripWidgetCredentials((change.data as { widgets?: unknown[] }).widgets) } : change.data;
+      return [{ key, table, data, baseVersion: change.base_version }];
+    });
+    if (!changes.length) {
+      return json({ domains: {} });
     }
 
-    const sliced = sliceSettingsIntoDomains(payload.settings);
+    // One round trip, all-or-nothing. Each statement inserts the domain's
+    // first record (version 1) or, if one exists, updates it only when its
+    // version still matches; otherwise it changes nothing and returns no row.
     const serverUpdatedAt = new Date();
-
-    function upsertDomain(table: (typeof DOMAIN_TABLE_ENTRIES)[number]["table"], key: DomainKey) {
-      const values = {
-        userId: user.id,
-        data: sliced[key],
-        clientUpdatedAt: incomingClientUpdatedAt,
-        serverUpdatedAt,
-      };
-      return getDb()
+    const queries = changes.map(({ table, data, baseVersion }) =>
+      getDb()
         .insert(table)
-        .values(values)
+        .values({ userId: user.id, data, version: 1, serverUpdatedAt })
         .onConflictDoUpdate({
           target: table.userId,
-          set: {
-            data: values.data,
-            clientUpdatedAt: values.clientUpdatedAt,
-            serverUpdatedAt: values.serverUpdatedAt,
-          },
+          set: { data, version: sql`${table.version} + 1`, serverUpdatedAt },
+          setWhere: eq(table.version, baseVersion),
         })
-        .returning();
+        .returning({ version: table.version }),
+    );
+    const written = await getDb().batch(queries as unknown as [(typeof queries)[number], ...(typeof queries)[number][]]);
+
+    const results: Partial<Record<DomainKey, DomainResult>> = {};
+    const conflicted: DomainKey[] = [];
+    changes.forEach(({ key }, i) => {
+      const row = (written[i] as Array<{ version: number }>)[0];
+      if (row) results[key] = { status: "ok", version: row.version };
+      else conflicted.push(key);
+    });
+
+    if (conflicted.length) {
+      const current = await readDomains(user.id, conflicted);
+      for (const key of conflicted) {
+        const stored = current[key] ?? { data: null, version: 0 };
+        results[key] = { status: "conflict", data: stored.data, version: stored.version };
+      }
     }
 
-    // A batch, not a loop of independent requests: neon-http doesn't support
-    // interactive transactions, but .batch() sends all six upserts as one
-    // all-or-nothing round trip, so this stays as atomic as the old single-row
-    // upsert was.
-    const [bookmarksRows, widgetsRows, vaultItemsRows, readItemsRows, themesRows, preferencesRows] = await getDb().batch([
-      upsertDomain(userBookmarks, "bookmarks"),
-      upsertDomain(userWidgets, "widgets"),
-      upsertDomain(userVaultItems, "vaultItems"),
-      upsertDomain(userReadItems, "readItems"),
-      upsertDomain(userThemes, "themes"),
-      upsertDomain(userPreferences, "preferences"),
-    ]);
-
-    const rows: DomainRows = {
-      bookmarks: bookmarksRows[0],
-      widgets: widgetsRows[0],
-      vaultItems: vaultItemsRows[0],
-      readItems: readItemsRows[0],
-      themes: themesRows[0],
-      preferences: preferencesRows[0],
-    };
-
-    return json(toResponse(rows));
+    return json({ domains: results });
   } catch (err) {
     return errorResponse(err);
   }

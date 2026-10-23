@@ -36,7 +36,7 @@ npx vercel integration add neon
 
 Manual path:
 
-1. Create a project at [neon.tech](https://neon.tech) (free tier is plenty — the app stores one settings blob per user).
+1. Create a project at [neon.tech](https://neon.tech) (free tier is plenty — the app stores a few small JSON records per user; see [sync.md](./sync.md)).
 2. It comes with a `main` branch — that's Production. Create a second branch called `dev` for Development/Preview.
 3. Copy each branch's connection string (pooled, `sslmode=require`) — these become `DATABASE_URL`.
    - Optional: install the [Neon Vercel integration](https://vercel.com/integrations/neon) to auto-inject `DATABASE_URL` and create an isolated DB branch per preview deployment.

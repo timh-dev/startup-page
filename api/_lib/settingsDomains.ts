@@ -6,16 +6,10 @@ import {
   userThemes,
   userPreferences,
 } from "./schema.js";
-import { SETTINGS_DOMAINS, type SettingsDomainId } from "../../shared/settingsDomains.js";
-import { stripWidgetCredentials } from "../../shared/credentials.js";
+import type { SettingsDomainId } from "../../shared/settingsDomains.js";
 
-// The settings object's top-level keys that live in the "preferences" domain
-// — everything that isn't its own dedicated table.
-const PREFERENCE_KEYS = SETTINGS_DOMAINS.preferences.keys;
-
-// One entry per domain table, used to drive both the parallel GET fetch and
-// the PUT transaction's upserts generically instead of repeating six
-// near-identical blocks.
+// One table per settings domain (shared/settingsDomains.ts), each holding
+// that domain's data for a user plus a server-assigned version.
 export const DOMAIN_TABLE_ENTRIES = [
   { key: "bookmarks", table: userBookmarks } as const,
   { key: "widgets", table: userWidgets } as const,
@@ -26,56 +20,4 @@ export const DOMAIN_TABLE_ENTRIES = [
 ] satisfies Array<{ key: SettingsDomainId; table: unknown }>;
 
 export type DomainKey = (typeof DOMAIN_TABLE_ENTRIES)[number]["key"];
-
-interface DomainRow {
-  data: unknown;
-  clientUpdatedAt: Date | null;
-  serverUpdatedAt: Date;
-}
-
-export type DomainRows = Partial<Record<DomainKey, DomainRow>>;
-
-/** Reconstruct the combined settings object exactly as the old single-blob shape. */
-export function assembleSettings(rows: DomainRows): Record<string, unknown> {
-  const widgetsData = (rows.widgets?.data as { widgets?: unknown; layout?: unknown } | undefined) ?? {};
-
-  return {
-    bookmark: rows.bookmarks?.data ?? [],
-    widgets: widgetsData.widgets ?? [],
-    layout: widgetsData.layout ?? {},
-    vaultItems: rows.vaultItems?.data ?? [],
-    readItems: rows.readItems?.data ?? [],
-    customThemes: rows.themes?.data ?? [],
-    ...((rows.preferences?.data as Record<string, unknown> | undefined) ?? {}),
-  };
-}
-
-/** Split an incoming full settings object into the six per-table payloads to upsert. */
-export function sliceSettingsIntoDomains(settings: Record<string, unknown>): Record<DomainKey, unknown> {
-  const preferences: Record<string, unknown> = {};
-  for (const key of PREFERENCE_KEYS) {
-    if (key in settings) preferences[key] = settings[key];
-  }
-
-  return {
-    bookmarks: settings.bookmark ?? [],
-    // API keys stay on the device; drop any an out-of-date client still sends.
-    widgets: { widgets: stripWidgetCredentials(settings.widgets ?? []), layout: settings.layout ?? {} },
-    vaultItems: settings.vaultItems ?? [],
-    readItems: settings.readItems ?? [],
-    themes: settings.customThemes ?? [],
-    preferences,
-  };
-}
-
-/** Latest of a set of (possibly absent) row timestamps, or null if none exist. */
-export function maxTimestamp(rows: Array<DomainRow | undefined>, field: "clientUpdatedAt" | "serverUpdatedAt"): Date | null {
-  let max: Date | null = null;
-  for (const row of rows) {
-    const value = row?.[field];
-    if (value && (!max || value.getTime() > max.getTime())) {
-      max = value;
-    }
-  }
-  return max;
-}
+export type DomainTable = (typeof DOMAIN_TABLE_ENTRIES)[number]["table"];

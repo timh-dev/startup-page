@@ -1,62 +1,59 @@
-// End-to-end tests for cloud sync across devices: real settings + cloudSync
-// modules, an in-memory IndexedDB per device (fake-indexeddb), and a fake
-// /api/settings that applies the same accept/reject rule as api/settings.ts.
-//
-// Tests marked `it.fails` describe how sync should behave but currently
-// doesn't (the whole-object, client-clock conflict model). They pass while
-// the bug exists and will start failing once it's fixed, at which point the
-// marker should be removed.
+// End-to-end tests for cloud sync across devices: the real settings and
+// cloudSync modules, an in-memory IndexedDB per device (fake-indexeddb), and
+// a fake /api/settings that applies the same per-domain version rule as
+// api/settings.ts (a write applies only if its base version is current).
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SETTINGS_DOMAIN_IDS, sliceSettings, type SettingsDomainId } from "../../../shared/settingsDomains";
 
 type SettingsModule = typeof import("@/lib/settings");
 type CloudSyncModule = typeof import("@/lib/cloudSync");
 type AuthStoresModule = typeof import("@/features/auth/stores");
 
-// Mirrors api/settings.ts: GET 404s until something is stored; PUT is
-// rejected with 409 when it carries an older client timestamp than what's
-// stored, otherwise it replaces the stored settings wholesale.
+interface Stored {
+  data: unknown;
+  version: number;
+}
+
 class FakeCloud {
-  settings: Record<string, any> | null = null;
-  clientUpdatedAt = 0;
-  serverUpdatedAt = 0;
+  domains: Partial<Record<SettingsDomainId, Stored>> = {};
   puts = 0;
-  rejected = 0;
+  conflicts = 0;
+  /** Runs while a PUT is being handled, to simulate something happening mid-sync. */
+  duringPut: (() => Promise<void>) | null = null;
 
   async handle(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-    const method = (init.method ?? "GET").toUpperCase();
     if (!String(input).endsWith("/api/settings")) return new Response(null, { status: 404 });
+    const method = (init.method ?? "GET").toUpperCase();
+    if (method === "GET") return Response.json({ domains: structuredClone(this.domains) });
 
-    if (method === "GET") {
-      if (!this.settings) return Response.json({ detail: "No settings saved yet" }, { status: 404 });
-      return Response.json(this.body());
-    }
-
-    const payload = JSON.parse(String(init.body));
-    const incoming = payload.client_updated_at ? Date.parse(payload.client_updated_at) : 0;
-    if (this.clientUpdatedAt > 0 && incoming < this.clientUpdatedAt) {
-      this.rejected += 1;
-      return Response.json({ detail: "Conflict: server has newer data", ...this.body() }, { status: 409 });
-    }
     this.puts += 1;
-    this.settings = structuredClone(payload.settings);
-    this.clientUpdatedAt = incoming;
-    this.serverUpdatedAt = Date.now();
-    return Response.json(this.body());
+    const hook = this.duringPut;
+    this.duringPut = null;
+    if (hook) await hook();
+
+    const { domains } = JSON.parse(String(init.body));
+    const results: Record<string, unknown> = {};
+    for (const [id, change] of Object.entries(domains as Record<SettingsDomainId, { data: unknown; base_version: number }>)) {
+      const stored = this.domains[id as SettingsDomainId];
+      if ((stored?.version ?? 0) === change.base_version) {
+        const version = (stored?.version ?? 0) + 1;
+        this.domains[id as SettingsDomainId] = { data: structuredClone(change.data), version };
+        results[id] = { status: "ok", version };
+      } else {
+        this.conflicts += 1;
+        results[id] = { status: "conflict", ...structuredClone(stored!) };
+      }
+    }
+    return Response.json({ domains: results });
   }
 
-  private body() {
-    return {
-      settings: this.settings,
-      schema_version: 2,
-      server_updated_at: new Date(this.serverUpdatedAt).toISOString(),
-      client_updated_at: this.clientUpdatedAt ? new Date(this.clientUpdatedAt).toISOString() : null,
-    };
+  data(id: SettingsDomainId): any {
+    return this.domains[id]?.data;
   }
 }
 
 interface Device {
-  name: string;
   idb: IDBFactory;
   storage: Record<string, string>;
   clockOffsetMs: number;
@@ -65,12 +62,13 @@ interface Device {
 let cloud: FakeCloud;
 let realNow: number;
 let current: Device | null = null;
+let stopBackgroundSync: (() => void) | null = null;
 let settings: SettingsModule;
 let cloudSync: CloudSyncModule;
 let auth: AuthStoresModule;
 
-function device(name: string, clockOffsetMs = 0): Device {
-  return { name, idb: new IDBFactory(), storage: {}, clockOffsetMs };
+function device(clockOffsetMs = 0): Device {
+  return { idb: new IDBFactory(), storage: {}, clockOffsetMs };
 }
 
 function setOnline(online: boolean) {
@@ -82,8 +80,13 @@ async function settle() {
   for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 5));
 }
 
-/** Switch the test to `next`'s storage, clock and a fresh copy of the app modules (a page load). */
+/**
+ * Switches to `next`'s storage and clock with a fresh copy of the app
+ * modules: a page load, or returning to a tab that was already open (its
+ * state is just what it saved, since nothing else touched it).
+ */
 async function open(next: Device) {
+  stopBackgroundSync?.();
   if (current) {
     const storage = window.localStorage;
     current.storage = {};
@@ -104,23 +107,19 @@ async function open(next: Device) {
   auth = await import("@/features/auth/stores");
   auth.useAuthStore.setState({ isSignedIn: true, isLoaded: true, subscriptionStatus: "active" });
   await settings.hydrateSettingsFromIndexedDb();
+  stopBackgroundSync = cloudSync.startBackgroundSync();
 }
 
-/** What AuthBridge does once per page load after sign-in. */
-async function signIn() {
-  await settings.syncSettingsFromCloud();
-  await flushPush();
-}
-
-async function flushPush() {
-  await settle();
-  cloudSync.forcePushNow();
-  await settle();
+/** A page load with sync: what AuthBridge does after sign-in. */
+async function load(next: Device) {
+  await open(next);
+  await cloudSync.syncNow();
 }
 
 async function edit(change: (current: Record<string, any>) => Record<string, any>) {
   await settings.writeSettings(change(settings.readSettings()));
-  await flushPush();
+  await settle();
+  await cloudSync.forceSyncNow();
 }
 
 /** Move real time forward; each device's clock keeps its own offset. */
@@ -140,107 +139,93 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopBackgroundSync?.();
+  stopBackgroundSync = null;
   vi.useRealTimers();
   vi.unstubAllGlobals();
   window.localStorage.clear();
 });
 
 describe("cloud sync across devices", () => {
-  it("pushes the first device's settings when the cloud is empty", async () => {
-    const laptop = device("laptop");
-    await open(laptop);
+  it("pushes the first device's changes when the cloud is empty", async () => {
+    await load(device());
     await edit((s) => ({ ...s, units: "metric" }));
-    await signIn();
 
-    expect(cloud.settings?.units).toBe("metric");
+    expect(cloud.data("preferences").units).toBe("metric");
+    expect(auth.useAuthStore.getState().syncStatus).toBe("synced");
   });
 
-  it("a fresh device signing in adopts the cloud copy instead of overwriting it", async () => {
-    const laptop = device("laptop");
-    await open(laptop);
-    await signIn();
-    wait(1000);
+  it("doesn't push an untouched device's defaults", async () => {
+    await load(device());
+    expect(cloud.puts).toBe(0);
+  });
+
+  it("a fresh device adopts the cloud copy instead of overwriting it", async () => {
+    await load(device());
     await edit((s) => ({ ...s, units: "metric" }));
-    expect(cloud.settings?.units).toBe("metric");
 
     wait(60_000);
-    await open(device("phone"));
-    await signIn();
+    await load(device());
 
     expect(settings.readSettings().units).toBe("metric");
-    expect(cloud.settings?.units).toBe("metric");
+    expect(cloud.data("preferences").units).toBe("metric");
   });
 
-  it("merges edits to different settings made on two devices between page loads", async () => {
-    const laptop = device("laptop");
-    const phone = device("phone");
-    await open(laptop);
-    await signIn();
-    await open(phone);
-    await signIn();
+  it("merges edits to different settings made on two devices", async () => {
+    const laptop = device();
+    const phone = device();
+    await load(laptop);
+    await load(phone);
 
-    wait(1000);
-    await open(laptop);
-    await signIn();
+    await load(laptop);
     await edit((s) => ({ ...s, units: "metric" }));
-
-    wait(1000);
-    await open(phone);
-    await signIn(); // a page load pulls and three-way merges before editing
+    await load(phone);
     await edit((s) => ({ ...s, ui: { ...s.ui, themeMode: "dark" } }));
 
-    expect(cloud.settings?.units).toBe("metric");
-    expect(cloud.settings?.ui?.themeMode).toBe("dark");
+    expect(cloud.data("preferences")).toMatchObject({ units: "metric", ui: { themeMode: "dark" } });
+    await load(laptop);
+    expect(settings.readSettings()).toMatchObject({ units: "metric", ui: { themeMode: "dark" } });
   });
 
-  it("queues an offline edit and pushes it when the connection returns", async () => {
-    await open(device("laptop"));
-    await signIn();
+  it("keeps an edit made on another device since a tab was opened", async () => {
+    const laptop = device();
+    const phone = device();
+    await load(laptop);
+    await load(phone);
 
-    setOnline(false);
-    wait(1000);
-    await edit((s) => ({ ...s, units: "metric" }));
-    expect(cloud.settings?.units).not.toBe("metric");
-    expect(auth.useAuthStore.getState().syncStatus).toBe("offline");
-
-    setOnline(true);
-    window.dispatchEvent(new Event("online"));
-    await settle();
-
-    expect(cloud.settings?.units).toBe("metric");
-  });
-
-  it.fails("keeps an edit made on another device since this page loaded", async () => {
-    // Pushes replace the whole settings object, and a device only pulls once
-    // per page load, so a long-open tab overwrites newer edits from elsewhere.
-    const laptop = device("laptop");
-    const phone = device("phone");
-    await open(laptop);
-    await signIn();
-    await open(phone);
-    await signIn();
-
-    wait(1000);
-    await open(laptop);
-    await signIn();
+    await load(laptop);
     await edit((s) => ({ ...s, units: "metric" }));
 
-    wait(1000);
-    // Back to the phone tab that was already open: its state from before the
-    // laptop's edit, and no pull (that only happens on page load).
+    // Back to the phone tab that was already open: it hasn't seen the edit.
     await open(phone);
     await edit((s) => ({ ...s, ui: { ...s.ui, themeMode: "dark" } }));
 
-    expect(cloud.settings?.ui?.themeMode).toBe("dark");
-    expect(cloud.settings?.units).toBe("metric");
+    expect(cloud.data("preferences")).toMatchObject({ units: "metric", ui: { themeMode: "dark" } });
+    expect(settings.readSettings()).toMatchObject({ units: "metric", ui: { themeMode: "dark" } });
+    expect(auth.useAuthStore.getState().syncStatus).toBe("synced");
   });
 
-  it.fails("keeps edits to different items in the same list", async () => {
-    // The merge is per top-level key, so two devices editing different vault
-    // items is a conflict on `vaultItems` and the older side's edit is lost.
-    const laptop = device("laptop");
-    const phone = device("phone");
-    await open(laptop);
+  it("recovers from a push rejected because another device wrote first", async () => {
+    await load(device());
+    await edit((s) => ({ ...s, news: { ...s.news, rotationSeconds: 9 } }));
+
+    // The phone pushes while the laptop's sync is between its pull and push.
+    cloud.duringPut = async () => {
+      const preferences = cloud.domains.preferences!;
+      cloud.domains.preferences = { data: { ...(preferences.data as object), units: "metric" }, version: preferences.version + 1 };
+    };
+    await edit((s) => ({ ...s, ui: { ...s.ui, themeMode: "dark" } }));
+
+    expect(cloud.conflicts).toBe(1);
+    expect(cloud.data("preferences")).toMatchObject({ units: "metric", ui: { themeMode: "dark" } });
+    expect(settings.readSettings().units).toBe("metric");
+    expect(auth.useAuthStore.getState().syncStatus).toBe("synced");
+  });
+
+  it("keeps edits to different items in the same list", async () => {
+    const laptop = device();
+    const phone = device();
+    await load(laptop);
     await edit((s) => ({
       ...s,
       vaultItems: [
@@ -248,71 +233,108 @@ describe("cloud sync across devices", () => {
         { id: "b", kind: "code", title: "B" },
       ],
     }));
-    await signIn();
-    await open(phone);
-    await signIn();
+    await load(phone);
 
-    wait(1000);
-    await open(laptop);
-    await signIn();
+    await load(laptop);
     await edit((s) => ({ ...s, vaultItems: s.vaultItems.map((i: any) => (i.id === "a" ? { ...i, title: "A2" } : i)) }));
-
-    wait(1000);
-    await open(phone); // still-open tab, no pull
+    await open(phone);
     await edit((s) => ({ ...s, vaultItems: s.vaultItems.map((i: any) => (i.id === "b" ? { ...i, title: "B2" } : i)) }));
 
-    const titles = (cloud.settings?.vaultItems ?? []).map((i: any) => i.title).sort();
-    expect(titles).toEqual(["A2", "B2"]);
+    expect(cloud.data("vaultItems").map((i: any) => i.title)).toEqual(["A2", "B2"]);
   });
 
-  it.fails("accepts edits from a device whose clock is behind", async () => {
-    // The server orders pushes by the client's own clock, so a device running
-    // an hour slow has every push rejected (409) after a correct-clock device
-    // has pushed, and nothing retries.
-    const laptop = device("laptop");
-    const slowPhone = device("phone", -60 * 60 * 1000);
-    await open(laptop);
-    await signIn();
-    await open(slowPhone);
-    await signIn();
+  it("keeps items added on two devices at once", async () => {
+    const laptop = device();
+    const phone = device();
+    await load(laptop);
+    await load(phone);
 
-    wait(1000);
-    await open(laptop);
-    await signIn();
+    await load(laptop);
+    await edit((s) => ({ ...s, readItems: [{ id: "from-laptop", title: "Laptop link", url: "https://a" }, ...s.readItems] }));
+    await open(phone);
+    await edit((s) => ({ ...s, readItems: [{ id: "from-phone", title: "Phone link", url: "https://b" }, ...s.readItems] }));
+
+    expect(cloud.data("readItems").map((i: any) => i.id).sort()).toEqual(["from-laptop", "from-phone"]);
+  });
+
+  it("accepts edits from a device whose clock is behind", async () => {
+    const laptop = device();
+    const slowPhone = device(-60 * 60 * 1000);
+    await load(laptop);
+    await load(slowPhone);
+
+    await load(laptop);
     await edit((s) => ({ ...s, units: "metric" }));
-
     wait(5 * 60 * 1000);
-    await open(slowPhone);
-    await signIn();
+    await load(slowPhone);
     await edit((s) => ({ ...s, ui: { ...s.ui, themeMode: "dark" } }));
 
-    expect(cloud.rejected).toBe(0);
-    expect(cloud.settings?.ui?.themeMode).toBe("dark");
+    expect(cloud.data("preferences")).toMatchObject({ units: "metric", ui: { themeMode: "dark" } });
   });
 
-  it.fails("recovers from a rejected push instead of stopping at an error", async () => {
-    // A 409 sets the status to "error" and drops the push; the edit only
-    // reaches the cloud if the user reloads.
-    const laptop = device("laptop");
-    const phone = device("phone");
-    await open(laptop);
-    await signIn();
-    await open(phone);
-    await signIn();
+  it("queues an offline edit and pushes it when the connection returns", async () => {
+    await load(device());
 
-    // The phone's clock runs ahead, so its push carries a "newer" timestamp…
-    wait(1000);
-    phone.clockOffsetMs = 10 * 60 * 1000;
-    await open(phone);
+    setOnline(false);
+    await edit((s) => ({ ...s, units: "metric" }));
+    expect(cloud.data("preferences")?.units).not.toBe("metric");
+    expect(auth.useAuthStore.getState().syncStatus).toBe("offline");
+
+    setOnline(true);
+    window.dispatchEvent(new Event("online"));
+    await settle();
+
+    expect(cloud.data("preferences").units).toBe("metric");
+  });
+
+  it("keeps an edit made while a sync is in flight, and pushes it next", async () => {
+    const laptop = device();
+    const phone = device();
+    await load(laptop);
+    await load(phone);
+    await load(laptop);
     await edit((s) => ({ ...s, units: "metric" }));
 
-    // …then the laptop tab (still open, no pull) edits and gets a 409.
-    wait(1000);
-    await open(laptop);
+    await open(phone);
+    cloud.duringPut = async () => {
+      await settings.saveSettingsLocally({ ...settings.readSettings(), news: { subreddit: "space" } });
+    };
     await edit((s) => ({ ...s, ui: { ...s.ui, themeMode: "dark" } }));
-    expect(cloud.rejected).toBe(1);
+    await cloudSync.syncNow();
 
-    expect(auth.useAuthStore.getState().syncStatus).not.toBe("error");
-    expect(cloud.settings?.ui?.themeMode).toBe("dark");
+    const expected = { units: "metric", ui: { themeMode: "dark" }, news: { subreddit: "space" } };
+    expect(settings.readSettings()).toMatchObject(expected);
+    expect(cloud.data("preferences")).toMatchObject(expected);
+  });
+
+  it("merges against a snapshot saved before versioned sync instead of overwriting", async () => {
+    await open(device());
+    // State left by the previous sync design: a whole-settings snapshot, and
+    // cloud rows at version 1 (what the migration gives existing rows).
+    const base = settings.readSettings();
+    await settings.writeSyncSnapshot({ schemaVersion: 2, updatedAt: "2026-10-01T00:00:00.000Z", settings: base });
+    for (const [id, data] of Object.entries(sliceSettings(base))) {
+      cloud.domains[id as SettingsDomainId] = { data: structuredClone(data), version: 1 };
+    }
+    // Another device changed units after this one last synced.
+    cloud.domains.preferences = { data: { ...(cloud.data("preferences") as object), units: "metric" }, version: 2 };
+
+    await settings.saveSettingsLocally({ ...base, ui: { ...base.ui, themeMode: "dark" } });
+    await cloudSync.syncNow();
+
+    expect(cloud.data("preferences")).toMatchObject({ units: "metric", ui: { themeMode: "dark" } });
+    expect(SETTINGS_DOMAIN_IDS.filter((id) => (cloud.domains[id]?.version ?? 0) > 1)).toEqual(["preferences"]);
+  });
+
+  it("tells subscribers when a sync changes local settings", async () => {
+    await load(device());
+    await edit((s) => ({ ...s, units: "metric" }));
+
+    await open(device());
+    const seen: unknown[] = [];
+    cloudSync.subscribeToRemoteChanges((next) => seen.push(next.units));
+    await cloudSync.syncNow();
+
+    expect(seen).toEqual(["metric"]);
   });
 });

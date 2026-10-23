@@ -167,42 +167,40 @@ export async function readBackupSettings(id: string) {
   });
 }
 
-export async function readSyncedSnapshotFromIndexedDb(): Promise<StoredSettingsRecord | null> {
+/**
+ * The sync engine's record of what this device last agreed with the server
+ * (see src/lib/cloudSync.ts). Stored as-is; the engine owns its shape and
+ * migrates older formats.
+ */
+export async function readSyncSnapshot(): Promise<unknown> {
   const db = await getIndexedDb();
   if (!db) {
     return null;
   }
 
-  return new Promise<StoredSettingsRecord | null>((resolve, reject) => {
+  return new Promise<unknown>((resolve, reject) => {
     const transaction = db.transaction(SETTINGS_STORE_NAME, "readonly");
     const request = transaction.objectStore(SETTINGS_STORE_NAME).get(SYNCED_SNAPSHOT_RECORD_KEY);
 
-    request.onsuccess = () => resolve(normalizeStoredRecord(request.result));
+    request.onsuccess = () => resolve(request.result ?? null);
     request.onerror = () => reject(request.error);
   });
 }
 
-export async function writeSyncedSnapshotToIndexedDb(settings: Settings, updatedAt: string) {
+export async function writeSyncSnapshot(snapshot: unknown) {
   const db = await getIndexedDb();
   if (!db) {
     return;
   }
 
-  const record = { schemaVersion: SETTINGS_SCHEMA_VERSION, updatedAt, settings };
-
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(SETTINGS_STORE_NAME, "readwrite");
-    transaction.objectStore(SETTINGS_STORE_NAME).put(record, SYNCED_SNAPSHOT_RECORD_KEY);
+    transaction.objectStore(SETTINGS_STORE_NAME).put(snapshot, SYNCED_SNAPSHOT_RECORD_KEY);
 
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
-}
-
-/** Called after a push the server actually accepted, so the next sync's merge diffs against what's really up there. */
-export async function markSyncedSnapshot(settings: Settings, updatedAt: string) {
-  await writeSyncedSnapshotToIndexedDb(normalizeSettingsShape(settings), updatedAt);
 }
 
 export async function clearSettingsFromIndexedDb() {

@@ -13,9 +13,8 @@ export const SETTINGS_SCHEMA_VERSION = 2;
 export const SETTINGS_STORE_NAME = "settings";
 export const BACKUPS_STORE_NAME = "settings-backups";
 export const SETTINGS_RECORD_KEY = "workspace-settings";
-// The last settings snapshot both this device and the cloud agreed on — the
-// three-way-merge base in syncSettingsFromCloud. Lives in the same store as
-// SETTINGS_RECORD_KEY (just a different key), so it needs no schema bump.
+// The sync engine's base record (src/lib/cloudSync.ts). Lives in the same
+// store as SETTINGS_RECORD_KEY under a different key, so it needs no schema bump.
 export const SYNCED_SNAPSHOT_RECORD_KEY = "workspace-settings-last-synced";
 export const BACKUP_LIMIT = 10;
 export const SETTINGS_EXPORT_FORMAT = "startup-page-settings";

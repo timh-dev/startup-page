@@ -9,6 +9,7 @@ import { settingsNavItems } from "@/features/settings/constants";
 import { getStorageDiagnostics } from "@/lib/settings";
 import { useSettingsStore, type StartupSettings } from "@/features/settings/stores";
 import AppearanceTab from "@/features/settings/components/appearance/AppearanceTab";
+import { merge3 } from "@/lib/sync/merge";
 import DataTab from "@/features/settings/components/DataTab";
 
 function SettingsButton() {
@@ -18,6 +19,9 @@ function SettingsButton() {
   const { themeMode, setThemeMode, themePalette, setThemePalette, setCustomThemeVars } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const [settingsState, setSettingsState] = useState(savedSettings);
+  // The settings the dialog started from. Saving applies only what was
+  // changed in the dialog, so anything synced in meanwhile isn't reverted.
+  const dialogBaseRef = React.useRef<StartupSettings>(savedSettings);
   const [storageState, setStorageState] = useState<Awaited<ReturnType<typeof getStorageDiagnostics>> | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -32,6 +36,7 @@ function SettingsButton() {
 
   const openModal = () => {
     const freshSettings = reloadSettings();
+    dialogBaseRef.current = freshSettings;
     setSettingsState(freshSettings);
     setThemeMode(freshSettings.ui.themeMode);
     setThemePalette(freshSettings.ui.themePalette || "zen");
@@ -60,7 +65,10 @@ function SettingsButton() {
   // need to replace settingsState wholesale and keep the live theme preview,
   // the settings store, and the storage diagnostics footer in sync.
   const applySettings = React.useCallback(
-    async (nextSettings: StartupSettings, message: string, options: { clearCustomThemeVars?: boolean } = {}) => {
+    async (nextSettings: StartupSettings, message: string, options: { clearCustomThemeVars?: boolean; persisted?: boolean } = {}) => {
+      // An import is only applied on Save, so it stays a change against the
+      // saved settings; a reset or restore has already been saved.
+      if (options.persisted) dialogBaseRef.current = nextSettings;
       useSettingsStore.setState({ settings: nextSettings });
       setSettingsState(nextSettings);
       setThemeMode(nextSettings.ui.themeMode);
@@ -75,7 +83,9 @@ function SettingsButton() {
   );
 
   const handleSave = async () => {
-    await persistSettingsToStore(settingsState);
+    // Apply the dialog's changes on top of the current settings, which may
+    // have picked up synced edits while the dialog was open.
+    await persistSettingsToStore((current) => merge3(dialogBaseRef.current, settingsState, current).value);
     setThemeMode(settingsState.ui.themeMode);
     setThemePalette(settingsState.ui.themePalette || "zen");
     setStatusMessage(`Saved settings at ${new Date().toLocaleString()}.`);
