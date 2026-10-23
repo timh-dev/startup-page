@@ -3,131 +3,23 @@ import {
   HiArrowDownTray,
   HiArrowUpTray,
   HiArrowsUpDown,
-  HiCheck,
   HiChevronDown,
-  HiChevronLeft,
   HiChevronRight,
-  HiChevronUpDown,
   HiMagnifyingGlass,
   HiOutlineInboxStack,
   HiOutlineMagnifyingGlassCircle,
   HiOutlineSparkles,
-  HiPencil,
-  HiTrash,
   HiPlus,
   HiXMark,
 } from "react-icons/hi2";
 import { DEFAULT_READ_TAGS, READ_TAG_COLORS } from "@/features/resourceVault/constants";
-import { formatItemDate, groupItemsByDate, normalizeResourceVaultItems } from "@/features/resourceVault/utils";
+import { usePopoverDismiss } from "@/features/resourceVault/hooks/usePopoverDismiss";
+import { useUndoableDelete } from "@/features/resourceVault/hooks/useUndoableDelete";
 import { useQuickAddStore } from "@/features/resourceVault/stores/quickAddStore";
-import { getAuthToken } from "@/lib/authToken";
-
-const UNDO_DELETE_DELAY_MS = 5000;
-
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
-
-interface VaultItemRowProps {
-  item: any;
-  onToggle: (id: string) => void;
-  onEdit: (item: any) => void;
-  onDelete: (item: any) => void;
-}
-
-// Its own component (not an inline render function) so the description's
-// expanded/collapsed state is scoped per-row — toggling one item's
-// description doesn't re-render the rest of the list.
-function VaultItemRow({ item, onToggle, onEdit, onDelete }: VaultItemRowProps) {
-  const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
-  const manuallySetRef = React.useRef(false);
-  const titleRef = React.useRef<HTMLSpanElement>(null);
-  const descriptionRef = React.useRef<HTMLButtonElement>(null);
-
-  // Auto-expand the description onto its own line when the collapsed single
-  // line would truncate either the title or the description — but never
-  // auto-collapse it back (that would fight a user's manual toggle and can
-  // oscillate, since measuring while already expanded reads as "fits").
-  React.useLayoutEffect(() => {
-    if (descriptionExpanded || manuallySetRef.current || !item.description) {
-      return undefined;
-    }
-
-    const checkOverflow = () => {
-      const titleOverflows = titleRef.current ? titleRef.current.scrollWidth > titleRef.current.clientWidth + 1 : false;
-      const descriptionOverflows = descriptionRef.current
-        ? descriptionRef.current.scrollWidth > descriptionRef.current.clientWidth + 1
-        : false;
-      if (titleOverflows || descriptionOverflows) {
-        setDescriptionExpanded(true);
-      }
-    };
-
-    checkOverflow();
-    window.addEventListener("resize", checkOverflow);
-    return () => window.removeEventListener("resize", checkOverflow);
-  }, [descriptionExpanded, item.title, item.description]);
-
-  const toggleDescription = () => {
-    manuallySetRef.current = true;
-    setDescriptionExpanded((current) => !current);
-  };
-
-  return (
-    <li
-      className={`vg-item ${READ_TAG_COLORS[item.tag] || ""} group/vg-item ${descriptionExpanded ? "vg-item-expanded" : ""}`}
-    >
-      <button
-        type="button"
-        className={`vg-item-check ${item.status === "done" ? "vg-item-check-done" : ""}`}
-        onClick={() => onToggle(item.id)}
-        title={item.status === "done" ? "Move to todo" : "Mark done"}
-      >
-        {item.status === "done" && <HiCheck className="size-2.5" />}
-      </button>
-      <a
-        href={item.url || undefined}
-        target={item.url ? "_blank" : undefined}
-        rel={item.url ? "noreferrer" : undefined}
-        className={`vg-item-main ${!item.url ? "pointer-events-none" : ""}`}
-      >
-        <span ref={titleRef} className={`vg-item-title ${item.status === "done" ? "line-through opacity-55" : ""}`}>
-          {item.title}
-        </span>
-      </a>
-      {item.description && (
-        <button
-          ref={descriptionRef}
-          type="button"
-          className={`vg-item-description ${descriptionExpanded ? "vg-item-description-expanded" : ""}`}
-          onClick={toggleDescription}
-          title={descriptionExpanded ? "Click to collapse" : "Click to show the full description"}
-        >
-          {item.description}
-        </button>
-      )}
-      <span className="vg-item-rule" aria-hidden="true" />
-      <span className="vg-item-tag">{item.tag}</span>
-      <span className="vg-item-date">
-        {formatItemDate(item.status === "done" ? (item.completedAt || item.createdAt) : item.createdAt)}
-      </span>
-      <span className="vg-item-actions">
-        <button type="button" className="vg-item-action" onClick={() => onEdit(item)} title="Edit item">
-          <HiPencil className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          className="vg-item-action"
-          onClick={() => onToggle(item.id)}
-          title={item.status === "done" ? "Move back to todo" : "Archive to done"}
-        >
-          {item.status === "done" ? <HiChevronLeft className="size-3.5" /> : <HiCheck className="size-3.5" />}
-        </button>
-        <button type="button" className="vg-item-action" onClick={() => onDelete(item)} title="Delete item">
-          <HiTrash className="size-3.5" />
-        </button>
-      </span>
-    </li>
-  );
-}
+import { groupItemsByDate, normalizeResourceVaultItems } from "@/features/resourceVault/utils";
+import UndoToastStack from "./UndoToastStack";
+import LinkComposer, { type LinkDraft } from "./links/LinkComposer";
+import LinkItemRow from "./links/LinkItemRow";
 
 interface VaultGlassViewProps {
   items: unknown;
@@ -161,25 +53,10 @@ export default function VaultGlassView({
   const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
   const filterMenuRef = React.useRef<HTMLDivElement>(null);
   const [composerOpen, setComposerOpen] = React.useState(false);
-  const [composerTagMenuOpen, setComposerTagMenuOpen] = React.useState(false);
-  const composerTagMenuRef = React.useRef<HTMLDivElement>(null);
-  const [editingItemId, setEditingItemId] = React.useState<string | null>(null);
-  const [pendingDeleteIds, setPendingDeleteIds] = React.useState<Set<string>>(new Set());
-  const [deleteToasts, setDeleteToasts] = React.useState<Array<{ id: string; title: string }>>([]);
-  const deleteTimersRef = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [editingItem, setEditingItem] = React.useState<any | null>(null);
+  const [lastTag, setLastTag] = React.useState("Read");
   const [importMessage, setImportMessage] = React.useState("");
-  const [fetchingPreview, setFetchingPreview] = React.useState(false);
-  const [draft, setDraft] = React.useState({
-    title: "",
-    description: "",
-    url: "",
-    tag: "Read",
-  });
-  // Tracks whether the current composer session's tag was chosen by the
-  // user (explicit pick, or loaded from an existing item being edited) so
-  // the link-preview auto-suggestion never clobbers a deliberate choice —
-  // same "don't overwrite what the user already set" rule as title/description.
-  const tagManuallySetRef = React.useRef(false);
+  const { pendingIds, toasts, deleteWithUndo, undo } = useUndoableDelete(onDeleteItem);
 
   const quickAddPending = useQuickAddStore((state) => state.pending && state.section === "links");
   const consumeQuickAdd = useQuickAddStore((state) => state.consumeQuickAdd);
@@ -193,14 +70,6 @@ export default function VaultGlassView({
     consumeQuickAdd();
   }, [quickAddPending, consumeQuickAdd]);
 
-  // Timers for pending (undoable) deletes must be cleared on unmount so a
-  // stale setTimeout doesn't fire onDeleteItem after the view is gone.
-  React.useEffect(() => {
-    return () => {
-      Object.values(deleteTimersRef.current).forEach(clearTimeout);
-    };
-  }, []);
-
   React.useEffect(() => {
     if (autoFocusSearch) {
       searchInputRef.current?.focus();
@@ -208,8 +77,8 @@ export default function VaultGlassView({
   }, [autoFocusSearch]);
 
   const normalizedItems = React.useMemo(() => (
-    (Array.isArray(items) ? items : []).filter((item: any) => !pendingDeleteIds.has(item.id))
-  ), [items, pendingDeleteIds]);
+    (Array.isArray(items) ? items : []).filter((item: any) => !pendingIds.has(item.id))
+  ), [items, pendingIds]);
 
   const tagCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
@@ -252,190 +121,37 @@ export default function VaultGlassView({
     [activeItems, activeStatus],
   );
 
-  const pickDraftTag = React.useCallback((tag: string) => {
-    tagManuallySetRef.current = true;
-    setDraft((current) => ({ ...current, tag }));
-    setComposerTagMenuOpen(false);
-  }, []);
-
   const pickFilterTag = React.useCallback((tag: string) => {
     setActiveTag(tag);
     setFilterMenuOpen(false);
   }, []);
 
-  React.useEffect(() => {
-    if (!filterMenuOpen && !composerTagMenuOpen) {
-      return undefined;
-    }
+  const closeFilterMenu = React.useCallback(() => setFilterMenuOpen(false), []);
+  usePopoverDismiss(filterMenuOpen, filterMenuRef, closeFilterMenu);
 
-    const handlePointerDown = (event: PointerEvent) => {
-      if (filterMenuOpen && filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
-        setFilterMenuOpen(false);
-      }
-      if (composerTagMenuOpen && composerTagMenuRef.current && !composerTagMenuRef.current.contains(event.target as Node)) {
-        setComposerTagMenuOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setFilterMenuOpen(false);
-        setComposerTagMenuOpen(false);
-        return;
-      }
-
-      if (composerTagMenuOpen) {
-        const tagIndex = Number(event.key) - 1;
-        if (tagIndex >= 0 && tagIndex < DEFAULT_READ_TAGS.length) {
-          event.preventDefault();
-          pickDraftTag(DEFAULT_READ_TAGS[tagIndex]);
-        }
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [composerTagMenuOpen, filterMenuOpen, pickDraftTag]);
-
-  const openComposer = () => {
-    tagManuallySetRef.current = false;
-    setComposerOpen(true);
-  };
+  const openComposer = () => setComposerOpen(true);
 
   const closeComposer = () => {
-    tagManuallySetRef.current = false;
     setComposerOpen(false);
-    setComposerTagMenuOpen(false);
-    setEditingItemId(null);
-    setDraft({ title: "", description: "", url: "", tag: draft.tag });
+    setEditingItem(null);
   };
 
-  const submitDraft = (event: React.FormEvent) => {
-    event.preventDefault();
-    const title = draft.title.trim();
-
-    if (!title) {
-      return;
-    }
-
-    const nextItem = {
-      title,
-      description: draft.description.trim(),
-      url: draft.url.trim(),
-      tag: draft.tag,
-    };
-
-    if (editingItemId) {
-      onUpdateItem(editingItemId, nextItem);
+  const submitDraft = (nextItem: LinkDraft) => {
+    if (editingItem) {
+      onUpdateItem(editingItem.id, nextItem);
     } else {
       onAddItem(nextItem);
     }
-
+    setLastTag(nextItem.tag);
     closeComposer();
   };
 
   const editItem = (item: any) => {
-    // Editing an existing item means its tag was already chosen (by the
-    // user or a prior suggestion) — treat it as manually set so re-pasting
-    // the URL to refresh title/description can't silently re-tag it.
-    tagManuallySetRef.current = true;
-    setEditingItemId(item.id);
-    setDraft({
-      title: item.title || "",
-      description: item.description || "",
-      url: item.url || "",
-      tag: item.tag || "Read",
-    });
+    setEditingItem(item);
     setComposerOpen(true);
   };
 
-  // Fetches the target page's <title>/description through the
-  // /api/link-preview endpoint. Silently no-ops on any failure (network
-  // error, 404 because this deployment has no /api at all, timeout, etc.) —
-  // auto-fill is a convenience, never a requirement, so the user can always
-  // just type the title themselves.
-  const maybeFetchLinkPreview = React.useCallback(async (rawUrl: string) => {
-    const trimmed = rawUrl.trim();
-    if (!/^https?:\/\//i.test(trimmed)) {
-      return;
-    }
-
-    // Previews need a signed-in user (the endpoint isn't an open proxy);
-    // signed out, the user just types the title themselves.
-    const token = await getAuthToken();
-    if (!token) {
-      return;
-    }
-
-    setFetchingPreview(true);
-    try {
-      const response = await fetch(`${API_URL}/api/link-preview?url=${encodeURIComponent(trimmed)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        return;
-      }
-      const data = await response.json();
-      const suggestedTag = DEFAULT_READ_TAGS.includes(data.tag) ? data.tag : null;
-      setDraft((current) => (
-        current.url.trim() === trimmed
-          ? {
-              ...current,
-              title: current.title.trim() ? current.title : (data.title || current.title),
-              description: current.description.trim() ? current.description : (data.description || current.description),
-              tag: !tagManuallySetRef.current && suggestedTag ? suggestedTag : current.tag,
-            }
-          : current
-      ));
-    } catch (_error) {
-      // No /api available (static/self-hosted deployment) or the fetch
-      // failed — leave the composer exactly as the user left it.
-    } finally {
-      setFetchingPreview(false);
-    }
-  }, []);
-
-  const handleUrlPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
-    const pasted = event.clipboardData.getData("text");
-    if (pasted) {
-      void maybeFetchLinkPreview(pasted);
-    }
-  };
-
-  const deleteItemWithUndo = (item: any) => {
-    setPendingDeleteIds((current) => new Set(current).add(item.id));
-    setDeleteToasts((current) => [...current, { id: item.id, title: item.title }]);
-
-    deleteTimersRef.current[item.id] = setTimeout(() => {
-      delete deleteTimersRef.current[item.id];
-      setDeleteToasts((current) => current.filter((toast) => toast.id !== item.id));
-      setPendingDeleteIds((current) => {
-        const next = new Set(current);
-        next.delete(item.id);
-        return next;
-      });
-      onDeleteItem(item.id);
-    }, UNDO_DELETE_DELAY_MS);
-  };
-
-  const undoDelete = (itemId: string) => {
-    const timer = deleteTimersRef.current[itemId];
-    if (timer) {
-      clearTimeout(timer);
-      delete deleteTimersRef.current[itemId];
-    }
-    setDeleteToasts((current) => current.filter((toast) => toast.id !== itemId));
-    setPendingDeleteIds((current) => {
-      const next = new Set(current);
-      next.delete(itemId);
-      return next;
-    });
-  };
+  const deleteItemWithUndo = (item: any) => deleteWithUndo(item.id, item.title);
 
   const importResourceVault = async (file: File) => {
     if (!file) {
@@ -570,73 +286,16 @@ export default function VaultGlassView({
       )}
 
       {composerOpen && (
-        <form className="vg-composer" onSubmit={submitDraft}>
-          <div className="vg-composer-row">
-            <input
-              autoFocus
-              value={draft.title}
-              onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Title"
-              className="vg-composer-title"
-            />
-            <div className="vg-tag-menu" ref={composerTagMenuRef}>
-              <button
-                type="button"
-                className="vg-tag-trigger"
-                aria-expanded={composerTagMenuOpen}
-                aria-haspopup="listbox"
-                onClick={() => setComposerTagMenuOpen((current) => !current)}
-              >
-                <span className={`read-tag-dot read-tag-dot-lg ${READ_TAG_COLORS[draft.tag] || "bg-primary"}`} />
-                <HiChevronUpDown className="size-4" />
-              </button>
-              {composerTagMenuOpen && (
-                <div className="vg-popover vg-tag-popover" role="listbox" aria-label="Choose tag">
-                  {DEFAULT_READ_TAGS.map((tag, index) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      role="option"
-                      aria-selected={draft.tag === tag}
-                      className={`vg-popover-option ${draft.tag === tag ? "vg-popover-option-active" : ""}`}
-                      onClick={() => pickDraftTag(tag)}
-                    >
-                      <span className={`read-tag-dot read-tag-dot-lg ${READ_TAG_COLORS[tag] || "bg-primary"}`} />
-                      <span>{tag}</span>
-                      {draft.tag === tag && <HiCheck className="size-4" />}
-                      <span className="vg-tag-shortcut">{index + 1}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="vg-composer-url-row">
-            <input
-              value={draft.url}
-              onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))}
-              onPaste={handleUrlPaste}
-              placeholder="https://... (paste a link to auto-fill the title)"
-              className="vg-composer-url"
-            />
-            {fetchingPreview && <span className="vg-composer-url-spinner" aria-hidden="true" />}
-          </div>
-          <input
-            value={draft.description}
-            onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-            placeholder="Add a short note (optional)"
-            className="vg-composer-desc"
-          />
-          <div className="vg-composer-actions">
-            <button type="submit" className="vg-primary-btn">
-              <HiPlus className="size-4" />
-              {editingItemId ? "Save changes" : "Add resource"}
-            </button>
-            <button type="button" className="vg-ghost-btn" onClick={closeComposer}>
-              Cancel
-            </button>
-          </div>
-        </form>
+        <LinkComposer
+          key={editingItem?.id ?? "new"}
+          editingItem={editingItem}
+          defaultTag={lastTag}
+          onSubmit={submitDraft}
+          onCancel={(tag) => {
+            setLastTag(tag);
+            closeComposer();
+          }}
+        />
       )}
 
       <div className="vg-tabs" role="tablist" aria-label="Read item status">
@@ -669,7 +328,7 @@ export default function VaultGlassView({
             </h2>
             <ul className="vg-list">
               {group.items.map((item: any) => (
-                <VaultItemRow
+                <LinkItemRow
                   key={item.id}
                   item={item}
                   onToggle={onToggleItem}
@@ -704,18 +363,7 @@ export default function VaultGlassView({
         )}
       </div>
 
-      {deleteToasts.length > 0 && (
-        <div className="vg-toast-stack">
-          {deleteToasts.map((toast) => (
-            <div key={toast.id} className="vg-toast">
-              <span className="vg-toast-text">Deleted "{toast.title}"</span>
-              <button type="button" className="vg-toast-undo" onClick={() => undoDelete(toast.id)}>
-                Undo
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <UndoToastStack toasts={toasts} onUndo={undo} />
     </div>
   );
 }
