@@ -24,12 +24,8 @@ jobs:
       - name: Run tests
         run: pnpm test
 
-      # Not a blocking gate yet: the codebase currently has pre-existing type
-      # errors unrelated to any given change. Surfaced here so regressions are
-      # visible without turning every PR red until those are cleaned up.
-      - name: Typecheck (non-blocking)
+      - name: Typecheck
         run: pnpm run typecheck
-        continue-on-error: true
 
       - name: Build
         run: pnpm run build:local

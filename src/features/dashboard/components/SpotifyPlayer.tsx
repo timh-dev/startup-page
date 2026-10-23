@@ -87,7 +87,7 @@ async function getToken(clientId) {
   return data.access_token;
 }
 
-async function spotifyApi(clientId, path, options = {}) {
+async function spotifyApi(clientId, path, options: RequestInit = {}) {
   const token = await getToken(clientId);
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
     ...options,

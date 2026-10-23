@@ -3,7 +3,7 @@ import React from "react";
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
-type ThemeVarsByMode = {
+export type ThemeVarsByMode = {
   light?: Record<string, string>;
   dark?: Record<string, string>;
 };

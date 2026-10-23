@@ -13,7 +13,7 @@ import type {
   ResolvedWeather,
   TimeKey,
   WeatherVisualProfile,
-} from "./types";
+} from "./types/weather";
 
 export function getConditionCategory(weather: string): WeatherCondition {
   if (weather in CONDITION_GRADIENTS) return weather as WeatherCondition;

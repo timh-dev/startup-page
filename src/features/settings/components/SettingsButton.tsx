@@ -1,7 +1,7 @@
 import React, { useContext, useState } from "react";
 import { HiOutlineCog } from "react-icons/hi2";
 
-import { ThemeContext } from "@/components/layout/ThemeContext";
+import { ThemeContext, type ThemeVarsByMode } from "@/components/layout/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -42,7 +42,7 @@ function PaletteSwatchPreview({ swatches, mode }) {
   );
 }
 
-function SettingField({ label, description, children }) {
+function SettingField({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-foreground">{label}</Label>
@@ -151,7 +151,7 @@ function SettingsButton() {
     setThemeMode(value);
   };
 
-  const handleThemePaletteChange = (value, customVars) => {
+  const handleThemePaletteChange = (value: string, customVars: ThemeVarsByMode | null = null) => {
     handleUiChange("themePalette", value);
     setThemePalette(value);
     setCustomThemeVars(customVars || null);

@@ -18,30 +18,46 @@
 // CORS-forwarding proxies, tried in order until one returns a parseable feed.
 // Public proxies come and go and occasionally rate-limit, so we keep a few.
 const PROXY_BUILDERS = [
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
 ];
+
+export interface RssItem {
+  title: string;
+  link: string;
+  guid: string;
+  author: string;
+  pubDate: string;
+  content: string;
+  thumbnail: string;
+  enclosure: { thumbnail: string };
+}
+
+export interface RssFeed {
+  feed: { title: string; link: string; description: string; image: string };
+  items: RssItem[];
+}
 
 const FEED_ROOTS = new Set(["rss", "feed", "rdf"]);
 const IMAGE_URL_PATTERN = /\.(jpe?g|png|gif|webp|avif)(\?|#|$)/i;
 const CONTENT_IMG_PATTERN = /<img[^>]+src="([^"]+)"/i;
 
-function directChildren(parent, localName) {
+function directChildren(parent: Element | null, localName: string): Element[] {
   if (!parent) return [];
   return Array.from(parent.children).filter((child) => child.localName === localName);
 }
 
-function firstChild(parent, localName) {
+function firstChild(parent: Element | null, localName: string): Element | null {
   return directChildren(parent, localName)[0] || null;
 }
 
-function childText(parent, localName) {
+function childText(parent: Element | null, localName: string): string {
   const element = firstChild(parent, localName);
   return element ? element.textContent.trim() : "";
 }
 
-function decodeEntities(value) {
+function decodeEntities(value: string): string {
   if (typeof value !== "string") return value;
   return value
     .replaceAll("&amp;", "&")
@@ -52,14 +68,14 @@ function decodeEntities(value) {
     .replaceAll("&apos;", "'");
 }
 
-function toIsoDate(value) {
+function toIsoDate(value: string): string {
   if (!value) return "";
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
 }
 
 // Atom links live in the `href` attribute; prefer the human-facing alternate.
-function atomLink(parent) {
+function atomLink(parent: Element): string {
   const links = directChildren(parent, "link");
   const chosen =
     links.find((link) => link.getAttribute("rel") === "alternate") ||
@@ -68,7 +84,7 @@ function atomLink(parent) {
   return chosen ? chosen.getAttribute("href") || "" : "";
 }
 
-function getAuthor(entry, isAtom) {
+function getAuthor(entry: Element, isAtom: boolean): string {
   if (isAtom) {
     const author = firstChild(entry, "author");
     return author ? childText(author, "name") : "";
@@ -76,7 +92,7 @@ function getAuthor(entry, isAtom) {
   return childText(entry, "creator") || childText(entry, "author");
 }
 
-function getFeedImage(channel, isAtom) {
+function getFeedImage(channel: Element, isAtom: boolean): string {
   if (isAtom) {
     return childText(channel, "icon") || childText(channel, "logo");
   }
@@ -91,7 +107,7 @@ function getFeedImage(channel, isAtom) {
 
 // Pull an image URL from the common feed conventions, falling back to the first
 // <img> embedded in the item's HTML content (how Reddit surfaces thumbnails).
-function getItemImage(entry, contentHtml) {
+function getItemImage(entry: Element, contentHtml: string): string {
   const mediaThumb = firstChild(entry, "thumbnail");
   if (mediaThumb && mediaThumb.getAttribute("url")) {
     return decodeEntities(mediaThumb.getAttribute("url"));
@@ -128,7 +144,7 @@ function getItemImage(entry, contentHtml) {
   return "";
 }
 
-function parseItem(entry, isAtom) {
+function parseItem(entry: Element, isAtom: boolean): RssItem {
   const content =
     childText(entry, "encoded") || // content:encoded
     (isAtom ? childText(entry, "content") : "") ||
@@ -157,13 +173,13 @@ function parseItem(entry, isAtom) {
   };
 }
 
-function parseFeedDocument(doc, limit) {
+function parseFeedDocument(doc: Document, limit?: number): RssFeed {
   const root = doc.documentElement;
   const rootName = (root.localName || root.nodeName || "").toLowerCase();
   const isAtom = rootName === "feed";
 
-  let channel;
-  let entryElements;
+  let channel: Element;
+  let entryElements: Element[];
   if (isAtom) {
     channel = root;
     entryElements = directChildren(root, "entry");
@@ -189,8 +205,8 @@ function parseFeedDocument(doc, limit) {
   return { feed, items: limited };
 }
 
-async function fetchFeedDocument(url) {
-  let lastError = null;
+async function fetchFeedDocument(url: string): Promise<Document> {
+  let lastError: unknown = null;
 
   for (const buildProxyUrl of PROXY_BUILDERS) {
     try {
@@ -220,7 +236,7 @@ async function fetchFeedDocument(url) {
 }
 
 // Fetch and parse a feed. `limit` optionally caps the number of items returned.
-export async function fetchRssFeed(url, { limit } = {}) {
+export async function fetchRssFeed(url: string, { limit }: { limit?: number } = {}): Promise<RssFeed> {
   if (!url) throw new Error("No feed URL provided");
   const doc = await fetchFeedDocument(url);
   return parseFeedDocument(doc, limit);

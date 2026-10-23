@@ -53,7 +53,7 @@ import { Button } from "@/components/ui/button";
 import desert from "@/assets/media/desert.mp4";
 
 // Split out of the eagerly-loaded dashboard bundle: each pulls in a
-// dependency (canvas/SVG scenes, a shader library, axios, a stack of other
+// dependency (canvas/SVG scenes, a shader library, a stack of other
 // widgets) that most dashboards don't need on first paint just because one
 // tile of this type exists somewhere in the layout.
 const SolarGraph = React.lazy(() => import("@/features/media/solarGraph"));
@@ -427,7 +427,7 @@ function PhotoConfigFields({ config, onChange }: { config: PhotoConfig; onChange
   const value = Array.isArray(config.searchTerms) ? config.searchTerms.join(", ") : "";
 
   const clearCache = () => {
-    // Dynamic import so clearing a cache doesn't drag Unsplash's axios/shader
+    // Dynamic import so clearing a cache doesn't drag Unsplash's shader
     // dependencies into this config panel's chunk.
     void import("@/features/media/components/Unsplash").then(({ clearPhotoCache }) =>
       clearPhotoCache(config.searchTerms || []),
@@ -507,7 +507,6 @@ function VideoRender({ instance, cardClass }: { instance: WidgetInstance; cardCl
         loop
         playsInline
         preload="auto"
-        referrerPolicy="no-referrer"
       />
     </div>
   );

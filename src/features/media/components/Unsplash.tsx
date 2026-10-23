@@ -1,10 +1,7 @@
 import React, { Component } from "react";
-import axios from "axios";
 import FilteredImageShader from "./FilteredImageShader";
 import { getEnabledImageFilterKeys } from "@/lib/image-filters";
-import { readSettings } from '@/lib/settings';
-
-const settings = readSettings();
+import { useSettingsStore } from "@/features/settings/stores";
 
 // ---------------------------------------------------------------------------
 // Two-level photo cache
@@ -24,11 +21,11 @@ const settings = readSettings();
 const PHOTO_CACHE_NAME = "startup-page-photos-v1";
 const URL_STORE_KEY = "startup-page.photo-urls";
 
-function buildCacheKey(searchTerms) {
+function buildCacheKey(searchTerms: string[]) {
   return [...searchTerms].sort().join(",");
 }
 
-function getUrlFromStore(searchTerms) {
+function getUrlFromStore(searchTerms: string[]) {
   if (!searchTerms?.length) return null;
   try {
     const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
@@ -40,7 +37,7 @@ function getUrlFromStore(searchTerms) {
 
 const PHOTO_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-function isCacheStale(searchTerms) {
+function isCacheStale(searchTerms: string[]) {
   if (!searchTerms?.length) return true;
   try {
     const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
@@ -51,7 +48,7 @@ function isCacheStale(searchTerms) {
   }
 }
 
-function saveUrlToStore(searchTerms, url) {
+function saveUrlToStore(searchTerms: string[], url: string) {
   try {
     const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
     store[buildCacheKey(searchTerms)] = { url, cachedAt: Date.now() };
@@ -59,7 +56,7 @@ function saveUrlToStore(searchTerms, url) {
   } catch {}
 }
 
-async function getCachedBlobUrl(imageUrl) {
+async function getCachedBlobUrl(imageUrl: string): Promise<string | null> {
   if (!("caches" in window)) return null;
   try {
     const cache = await caches.open(PHOTO_CACHE_NAME);
@@ -71,7 +68,7 @@ async function getCachedBlobUrl(imageUrl) {
   }
 }
 
-async function fetchAndCacheImage(imageUrl) {
+async function fetchAndCacheImage(imageUrl: string): Promise<string | null> {
   if (!("caches" in window)) return null;
   try {
     const response = await fetch(imageUrl, { mode: "cors" });
@@ -88,10 +85,10 @@ async function fetchAndCacheImage(imageUrl) {
 // API) so its next mount fetches a fresh photo instead of reusing the old
 // one. Scoped to these exact search terms — clearing one photo tile's cache
 // doesn't touch any other tile's.
-export async function clearPhotoCache(searchTerms) {
+export async function clearPhotoCache(searchTerms: string[]) {
   if (!searchTerms?.length) return;
   const key = buildCacheKey(searchTerms);
-  let cachedUrl = null;
+  let cachedUrl: string | null = null;
 
   try {
     const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
@@ -110,11 +107,29 @@ export async function clearPhotoCache(searchTerms) {
 
 // ---------------------------------------------------------------------------
 
-class Unsplash extends Component {
-  constructor(props) {
+interface UnsplashProps {
+  search?: string[];
+  cardClass?: string;
+}
+
+interface UnsplashState {
+  photos: string | null;
+  category: string;
+  loaded: boolean;
+  filterKey: string | null;
+  imageReady: boolean;
+}
+
+interface WikimediaPage {
+  imageinfo?: Array<{ thumburl?: string; url?: string }>;
+}
+
+class Unsplash extends Component<UnsplashProps, UnsplashState> {
+  _mounted = false;
+  _blobUrl: string | null = null;
+
+  constructor(props: UnsplashProps) {
     super(props);
-    this._mounted = false;
-    this._blobUrl = null;
     this.state = {
       photos: null,
       category: "",
@@ -143,7 +158,7 @@ class Unsplash extends Component {
 
   // Show a photo URL (may be a blob: URL or a plain https: URL as fallback).
   // Tracks and revokes any previous blob URL to avoid memory leaks.
-  _show(url, category) {
+  _show(url: string, category: string) {
     if (!this._mounted) return;
     this._revokeBlobUrl();
     if (url?.startsWith("blob:")) this._blobUrl = url;
@@ -183,12 +198,13 @@ class Unsplash extends Component {
     await this._fetchDisplayAndCache(category, searchTerms, true);
   }
 
-  async _refreshInBackground(category, searchTerms) {
+  async _refreshInBackground(category: string, searchTerms: string[]) {
     await this._fetchDisplayAndCache(category, searchTerms, false);
   }
 
-  async _fetchDisplayAndCache(category, searchTerms, updateDisplay) {
-    const accessKey = (settings.unsplashCredential || "").trim();
+  async _fetchDisplayAndCache(category: string, searchTerms: string[], updateDisplay: boolean) {
+    // Read at call time so a key entered in Settings applies without a reload.
+    const accessKey = (useSettingsStore.getState().settings.unsplashCredential || "").trim();
 
     if (!accessKey) {
       await this._fetchFallback(category, searchTerms, updateDisplay);
@@ -196,12 +212,13 @@ class Unsplash extends Component {
     }
 
     try {
-      const res = await axios.get("https://api.unsplash.com/search/photos", {
-        params: { query: category, per_page: 100 },
+      const params = new URLSearchParams({ query: category, per_page: "100" });
+      const res = await fetch(`https://api.unsplash.com/search/photos?${params}`, {
         headers: { Authorization: "Client-ID " + accessKey },
       });
+      if (!res.ok) throw new Error(`Unsplash responded with ${res.status}`);
 
-      const results = res.data.results;
+      const results: Array<{ urls: { regular: string } }> = (await res.json()).results;
       if (!results?.length) {
         await this._fetchFallback(category, searchTerms, updateDisplay);
         return;
@@ -219,7 +236,7 @@ class Unsplash extends Component {
     }
   }
 
-  async _fetchFallback(category, searchTerms, updateDisplay) {
+  async _fetchFallback(category: string, searchTerms: string[], updateDisplay: boolean) {
     const searchTerm = `${category} filetype:bitmap`;
     const fallbackImage = this.buildFallbackImageUrl(category);
 
@@ -230,7 +247,7 @@ class Unsplash extends Component {
         )}&gsrnamespace=6&gsrlimit=20&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`
       );
       const data = await response.json();
-      const pages = Object.values(data.query?.pages || {});
+      const pages = Object.values(data.query?.pages || {}) as WikimediaPage[];
       const imageUrls = pages
         .map((page) => page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url)
         .filter(Boolean);
@@ -253,13 +270,13 @@ class Unsplash extends Component {
     }
   }
 
-  getRandomCategory() {
+  getRandomCategory(): string {
     const categoryArray = this.props.search || [];
     if (categoryArray.length === 0) return "landscape";
     return categoryArray[Math.floor(Math.random() * categoryArray.length)];
   }
 
-  buildFallbackImageUrl(category) {
+  buildFallbackImageUrl(category: string): string {
     const curatedFallbacks = {
       mountains: "https://upload.wikimedia.org/wikipedia/commons/4/4f/Matterhorn_from_Domhütte_-_2.jpg",
       city: "https://upload.wikimedia.org/wikipedia/commons/0/06/Lower_Manhattan_skyline_-_June_2017.jpg",
@@ -276,13 +293,14 @@ class Unsplash extends Component {
     return curatedFallbacks[match || "default"];
   }
 
-  pickFilterKey() {
-    const enabledFilterKeys = getEnabledImageFilterKeys(settings.ui?.imageEffects);
+  pickFilterKey(): string | null {
+    const enabledFilterKeys = getEnabledImageFilterKeys(useSettingsStore.getState().settings.ui?.imageEffects);
     if (enabledFilterKeys.length === 0) return null;
     return enabledFilterKeys[Math.floor(Math.random() * enabledFilterKeys.length)];
   }
 
   render() {
+    const settings = useSettingsStore.getState().settings;
     const filterSettings =
       settings.ui?.imageEffects?.filterSettings?.[this.state.filterKey] || null;
     const shouldUseShader = Boolean(this.state.filterKey && filterSettings && this.state.photos);

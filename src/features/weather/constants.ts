@@ -1,4 +1,4 @@
-import type { WeatherCondition } from "./types";
+import type { WeatherCondition } from "./types/weather";
 
 export const CONDITION_GRADIENTS: Record<WeatherCondition, { day: string; night: string }> = {
   Clear:        { day: "from-sky-400 via-blue-500 to-blue-400",        night: "from-slate-950 via-indigo-950 to-slate-900" },
