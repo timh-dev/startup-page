@@ -3,6 +3,8 @@
 import defaultSettings from "../../config/settings.json";
 import { ensureBookmarkIds, flattenGroups } from "@/features/bookmarks/lib/tree";
 import type { WidgetInstance } from "@/lib/dashboard-dimensions";
+import { adoptLegacyCredentials } from "@/lib/credentials";
+import { LEGACY_CREDENTIAL_KEYS, stripWidgetCredentials } from "../../../shared/credentials";
 import { SETTINGS_EXPORT_FORMAT, SETTINGS_SCHEMA_VERSION, type Settings } from "./constants";
 
 export function isPlainObject(value: unknown): value is Record<string, any> {
@@ -219,7 +221,12 @@ export function normalizeSettingsShape(settings: Settings): Settings {
   // while never re-synthesizing over a record that already has `widgets`
   // (even a legitimately emptied one).
   const isBootstrapSeed = settings === defaultSettings;
+  // API keys live in the device-local credential store, never in settings.
+  // Every load, import, restore and pull passes through here, so this is
+  // where keys saved by older versions are picked up before being dropped.
+  adoptLegacyCredentials(settings);
   const mergedSettings = mergeSettings(defaultSettings, settings);
+  for (const key of LEGACY_CREDENTIAL_KEYS) delete mergedSettings[key];
   const decorativeVideo = mergedSettings.decorativeVideo || {};
   const bookmark = ensureBookmarkIds(mergedSettings.bookmark);
   const layout = {
@@ -244,6 +251,7 @@ export function normalizeSettingsShape(settings: Settings): Settings {
 
   return {
     ...mergedSettings,
+    widgets: stripWidgetCredentials(mergedSettings.widgets),
     bookmark,
     layout,
     decorativeVideo: {

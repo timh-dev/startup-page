@@ -22,8 +22,6 @@ export const settingsSchema = z.object({
   latitude: z.union([z.number(), z.string()]).nullable().optional(),
   longitude: z.union([z.number(), z.string()]).nullable().optional(),
   units: nullableText.optional(),
-  unsplashCredential: nullableText.optional(),
-  openWeatherCredential: nullableText.optional(),
   ui: record.optional(),
   featurePanel: record.optional(),
   search: record.optional(),

@@ -3,7 +3,7 @@ import { HiOutlinePhoto } from "react-icons/hi2";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useSettingsStore } from "@/features/settings/stores";
+import { useCredentialsStore } from "@/lib/credentials";
 import { TextField } from "./TextField";
 import { defineWidget, type WidgetRenderProps } from "./types";
 
@@ -27,14 +27,12 @@ function PhotoRender({ instance, cardClass }: WidgetRenderProps) {
   );
 }
 
-// The Unsplash access key is one shared credential, not something that makes
-// sense to vary per tile — editing it here writes straight to the app-wide
-// setting (same field every photo widget already falls back to), so setting
-// it from any one photo widget applies to all of them. Takes a reload to
-// show up on already-mounted widgets, same as it did from Settings before.
+// The Unsplash access key is one device-wide credential (see
+// src/lib/credentials.ts): setting it from any photo widget applies to all of
+// them, and it stays on this device — it isn't synced or exported.
 function PhotoConfigFields({ config, onChange }: { config: PhotoConfig; onChange: (next: PhotoConfig) => void }) {
-  const unsplashCredential = useSettingsStore((state) => state.settings.unsplashCredential) as string | null | undefined;
-  const persistSettings = useSettingsStore((state) => state.persistSettings);
+  const unsplashCredential = useCredentialsStore((state) => state.unsplash);
+  const setCredential = useCredentialsStore((state) => state.setCredential);
   const value = Array.isArray(config.searchTerms) ? config.searchTerms.join(", ") : "";
 
   const clearCache = () => {
@@ -64,10 +62,10 @@ function PhotoConfigFields({ config, onChange }: { config: PhotoConfig; onChange
       </div>
       <TextField
         id="photo-access-key"
-        label="Unsplash access key (applies to all photo widgets)"
+        label="Unsplash access key (all photo widgets, this device only)"
         value={unsplashCredential || ""}
         placeholder="Use the Access Key, not the Secret Key"
-        onChange={(value) => void persistSettings((prev) => ({ ...prev, unsplashCredential: value.trim() || null }))}
+        onChange={(value) => setCredential("unsplash", value)}
       />
       <div>
         <Button type="button" variant="outline" onClick={clearCache}>

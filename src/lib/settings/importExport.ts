@@ -1,6 +1,5 @@
 // Settings backup files: export (whole or one domain), and parsing/previewing
 // an import before it's applied.
-import defaultSettings from "../../config/settings.json";
 import {
   DOMAIN_KEY_GROUPS,
   SETTINGS_EXPORT_FORMAT,
@@ -8,14 +7,14 @@ import {
   SETTINGS_SCHEMA_VERSION,
   type Settings,
 } from "./constants";
-import { isPlainObject, mergeSettings, normalizeSettingsShape } from "./normalize";
+import { isPlainObject, normalizeSettingsShape } from "./normalize";
 
 function createSettingsEnvelope(settings: Settings, overrides: Record<string, unknown> = {}) {
   return {
     format: SETTINGS_EXPORT_FORMAT,
     schemaVersion: SETTINGS_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
-    settings: mergeSettings(defaultSettings, settings),
+    settings: normalizeSettingsShape(settings),
     ...overrides,
   };
 }
@@ -142,7 +141,7 @@ export function exportDomainBlob(settings: Record<string, unknown>, domainId: st
     schemaVersion: SETTINGS_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     domain: domainId,
-    settings: pickSettingsDomain(settings, group.keys),
+    settings: pickSettingsDomain(normalizeSettingsShape(settings), group.keys),
     app: { name: "startup-page" },
   };
 

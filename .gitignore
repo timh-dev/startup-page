@@ -4,7 +4,7 @@ node_modules
 # vscode
 .vscode
 
-# settings exports contain personal API credentials — never commit
+# personal settings exports — never commit
 startup-page-settings-*.json
 
 # config files (secrets — never commit; .env.example is the tracked template)

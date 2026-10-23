@@ -7,6 +7,7 @@ import {
   userPreferences,
 } from "./schema.js";
 import { SETTINGS_DOMAINS, type SettingsDomainId } from "../../shared/settingsDomains.js";
+import { stripWidgetCredentials } from "../../shared/credentials.js";
 
 // The settings object's top-level keys that live in the "preferences" domain
 // — everything that isn't its own dedicated table.
@@ -58,7 +59,8 @@ export function sliceSettingsIntoDomains(settings: Record<string, unknown>): Rec
 
   return {
     bookmarks: settings.bookmark ?? [],
-    widgets: { widgets: settings.widgets ?? [], layout: settings.layout ?? {} },
+    // API keys stay on the device; drop any an out-of-date client still sends.
+    widgets: { widgets: stripWidgetCredentials(settings.widgets ?? []), layout: settings.layout ?? {} },
     vaultItems: settings.vaultItems ?? [],
     readItems: settings.readItems ?? [],
     themes: settings.customThemes ?? [],

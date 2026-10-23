@@ -14,8 +14,6 @@ describe("sliceSettingsIntoDomains / assembleSettings", () => {
     latitude: 40.7,
     longitude: -74,
     units: "imperial",
-    unsplashCredential: "unsplash-key",
-    openWeatherCredential: "weather-key",
     featurePanel: { mode: "windy" },
     search: { engines: [] },
     decorativeVideo: { urls: [] },
@@ -48,7 +46,6 @@ describe("sliceSettingsIntoDomains / assembleSettings", () => {
     expect(sliced.preferences).toMatchObject({
       latitude: 40.7,
       units: "imperial",
-      openWeatherCredential: "weather-key",
     });
     expect(sliced.preferences).not.toHaveProperty("bookmark");
     expect(sliced.preferences).not.toHaveProperty("vaultItems");

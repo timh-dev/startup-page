@@ -11,7 +11,7 @@ export const SETTINGS_DOMAINS = {
   preferences: {
     label: "Preferences",
     keys: [
-      "latitude", "longitude", "units", "unsplashCredential", "openWeatherCredential",
+      "latitude", "longitude", "units",
       "ui", "featurePanel", "search", "decorativeVideo", "news", "timer", "unsplash",
     ],
   },

@@ -2,8 +2,6 @@
   "latitude": null,
   "longitude": null,
   "units": "imperial",
-  "unsplashCredential": null,
-  "openWeatherCredential": null,
   "widgets": [],
   "ui": {
     "themeMode": "system",

@@ -2,6 +2,7 @@ import React, { Component } from "react";
 import FilteredImageShader from "./FilteredImageShader";
 import { getEnabledImageFilterKeys } from "@/lib/image-filters";
 import { useSettingsStore } from "@/features/settings/stores";
+import { useCredentialsStore } from "@/lib/credentials";
 
 // ---------------------------------------------------------------------------
 // Two-level photo cache
@@ -204,7 +205,7 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
 
   async _fetchDisplayAndCache(category: string, searchTerms: string[], updateDisplay: boolean) {
     // Read at call time so a key entered in Settings applies without a reload.
-    const accessKey = (useSettingsStore.getState().settings.unsplashCredential || "").trim();
+    const accessKey = (useCredentialsStore.getState().unsplash || "").trim();
 
     if (!accessKey) {
       await this._fetchFallback(category, searchTerms, updateDisplay);

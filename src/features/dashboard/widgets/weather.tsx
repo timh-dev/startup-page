@@ -2,6 +2,7 @@ import React from "react";
 import { HiOutlineCloud, HiOutlineSparkles } from "react-icons/hi2";
 import { Label } from "@/components/ui/label";
 import type { WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
+import { useCredentialsStore } from "@/lib/credentials";
 import { TextField } from "./TextField";
 import { defineWidget, type WidgetRenderProps } from "./types";
 
@@ -11,12 +12,11 @@ const WeatherBox = React.lazy(() =>
 const WeatherDayDetail = React.lazy(() => import("@/features/weather/components/WeatherDayDetail"));
 const WeatherFrostedCard = React.lazy(() => import("@/features/weather/components/WeatherFrostedCard"));
 
-// Per-widget overrides of the app-wide location, units and API key.
+// Per-widget overrides of the app-wide location and units.
 interface WeatherSourceConfig {
   lat?: number | null;
   lon?: number | null;
   units?: "imperial" | "metric" | null;
-  openWeatherKey?: string | null;
 }
 
 interface WeatherConfig extends WeatherSourceConfig {
@@ -28,7 +28,6 @@ function weatherOverridesFrom(config: WeatherSourceConfig): WeatherOverrides {
     lat: config.lat ?? undefined,
     lon: config.lon ?? undefined,
     units: config.units ?? undefined,
-    apiKey: config.openWeatherKey ?? undefined,
   };
 }
 
@@ -41,10 +40,13 @@ function WeatherSourceFields<C extends WeatherSourceConfig>({
   config: C;
   onChange: (next: C) => void;
 }) {
+  const openWeatherKey = useCredentialsStore((state) => state.openWeather);
+  const setCredential = useCredentialsStore((state) => state.setCredential);
+
   return (
     <>
       <p className="text-xs text-muted-foreground">
-        Leave location/key blank to use the app-wide values from Settings → Content.
+        Leave the location blank to use your current location.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <TextField
@@ -75,9 +77,9 @@ function WeatherSourceFields<C extends WeatherSourceConfig>({
       </div>
       <TextField
         id={`${idPrefix}-key`}
-        label="OpenWeather API key (optional override)"
-        value={config.openWeatherKey || ""}
-        onChange={(value) => onChange({ ...config, openWeatherKey: value || null })}
+        label="OpenWeather API key (all weather widgets, this device only)"
+        value={openWeatherKey || ""}
+        onChange={(value) => setCredential("openWeather", value)}
       />
     </>
   );

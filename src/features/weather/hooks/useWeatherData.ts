@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useCredentialsStore } from "@/lib/credentials";
 import { readSettings } from "@/lib/settings";
 import { getOrRequestLocation } from "@/lib/geolocation";
 import { useWeatherStore } from "@/features/weather/stores/weatherStore";
@@ -173,7 +174,6 @@ export interface WeatherOverrides {
   lat?: number | null;
   lon?: number | null;
   units?: "imperial" | "metric";
-  apiKey?: string | null;
 }
 
 export function useWeatherData(instanceId: string, overrides: WeatherOverrides = {}): void {
@@ -188,7 +188,8 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
   const overrideLat = overrides.lat;
   const overrideLon = overrides.lon;
   const overrideUnits = overrides.units;
-  const overrideApiKey = overrides.apiKey;
+  // Re-runs when the key is entered, so the widget loads without a reload.
+  const apiKey = useCredentialsStore((state) => state.openWeather);
 
   useEffect(() => {
     const instance = useWeatherStore.getState().instances[instanceId];
@@ -196,7 +197,7 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
 
     const settings = readSettings() as Record<string, unknown>;
     const unit = overrideUnits || (settings.unit as string) || (settings.units as string) || "imperial";
-    const key = (overrideApiKey || (settings.openWeatherCredential as string) || "").trim();
+    const key = (apiKey || "").trim();
 
     if (!key) {
       setError(instanceId, "Add your OpenWeather API key in this widget's settings");
@@ -230,5 +231,5 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
         setError(instanceId, "Location unavailable — set coordinates in this widget's settings");
       }
     });
-  }, [instanceId, overrideLat, overrideLon, overrideUnits, overrideApiKey, setData, setError, setLocation, setCoords, setLastFetchedAt]);
+  }, [instanceId, overrideLat, overrideLon, overrideUnits, apiKey, setData, setError, setLocation, setCoords, setLastFetchedAt]);
 }
