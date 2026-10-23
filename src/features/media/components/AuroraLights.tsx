@@ -133,14 +133,16 @@ void main() {
 `;
 
 // Compile and link without blocking status checks — status verified lazily in rAF.
-function createProgram(gl) {
+function createProgram(gl: WebGLRenderingContext) {
   const vs = gl.createShader(gl.VERTEX_SHADER);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  const program = gl.createProgram();
+  // All three are null only when the WebGL context has been lost.
+  if (!vs || !fs || !program) return null;
   gl.shaderSource(vs, VERTEX_SHADER);
   gl.compileShader(vs);
-  const fs = gl.createShader(gl.FRAGMENT_SHADER);
   gl.shaderSource(fs, FRAGMENT_SHADER);
   gl.compileShader(fs);
-  const program = gl.createProgram();
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
   gl.linkProgram(program);
@@ -177,7 +179,9 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
     const gl: WebGLRenderingContext = glContext;
 
     let animationFrame = 0;
-    const program = createProgram(gl);
+    const linkedProgram = createProgram(gl);
+    if (!linkedProgram) { setSupported(false); return undefined; }
+    const program: WebGLProgram = linkedProgram;
     const khrParallel = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
 
     const buffer = gl.createBuffer();

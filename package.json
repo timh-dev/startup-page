@@ -25,7 +25,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
-    "js-cookie": "^3.0.8",
     "kbar": "0.1.0-beta.48",
     "prismjs": "^1.30.0",
     "react": "^19.2.8",

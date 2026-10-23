@@ -152,7 +152,7 @@ export const BUILT_IN_PALETTES = [
   },
 ];
 
-export function isBuiltInPalette(value) {
+export function isBuiltInPalette(value: string) {
   return BUILT_IN_PALETTES.some((p) => p.value === value);
 }
 
@@ -162,9 +162,9 @@ const CSS_VAR_RE = /--([\w-]+)\s*:\s*([^;]+)/g;
  * Parse CSS text containing `:root { --var: val; }` and `.dark { --var: val; }` blocks.
  * Returns { light: { '--var': 'val', ... }, dark: { '--var': 'val', ... } }
  */
-export function parseCustomThemeCSS(cssText) {
-  const light = {};
-  const dark = {};
+export function parseCustomThemeCSS(cssText: string) {
+  const light: Record<string, string> = {};
+  const dark: Record<string, string> = {};
 
   const blockRe = /([^{]*)\{([^}]*)\}/g;
   let match;
@@ -207,9 +207,12 @@ const SWATCH_KEYS = ["--background", "--card", "--primary", "--accent", "--muted
 /**
  * Extract the 5 swatch colors from a stored custom theme for a given mode.
  */
-export function getSwatchesFromCustomTheme(customTheme, mode) {
+export function getSwatchesFromCustomTheme(
+  customTheme: { light: Record<string, string>; dark: Record<string, string> },
+  mode: "light" | "dark",
+) {
   const vars = mode === "dark" ? customTheme.dark : customTheme.light;
-  const result = {};
+  const result: Record<string, string> = {};
   for (const key of SWATCH_KEYS) {
     const shortKey = key.replace("--", "");
     result[shortKey] = vars[key] || "oklch(0.5 0 0)";

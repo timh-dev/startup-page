@@ -10,7 +10,7 @@ const AQI_LEVELS = [
   { max: Infinity, label: "Hazardous",                         color: "#7f1d1d", textClass: "text-red-300",    bgClass: "bg-red-900/30"    },
 ];
 
-function getLevel(aqi) {
+function getLevel(aqi: number) {
   return AQI_LEVELS.find((l) => aqi <= l.max) ?? AQI_LEVELS[AQI_LEVELS.length - 1];
 }
 
@@ -21,7 +21,7 @@ export default function AirQuality() {
   React.useEffect(() => {
     let cancelled = false;
 
-    async function load(lat, lon) {
+    async function load(lat: number, lon: number) {
       try {
         const res = await fetch(
           `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +

@@ -277,7 +277,7 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
   }
 
   buildFallbackImageUrl(category: string): string {
-    const curatedFallbacks = {
+    const curatedFallbacks: Record<string, string> = {
       mountains: "https://upload.wikimedia.org/wikipedia/commons/4/4f/Matterhorn_from_Domhütte_-_2.jpg",
       city: "https://upload.wikimedia.org/wikipedia/commons/0/06/Lower_Manhattan_skyline_-_June_2017.jpg",
       bridge: "https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg",

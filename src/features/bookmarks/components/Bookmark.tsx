@@ -1,7 +1,7 @@
 import React from "react";
 import { HiPlus } from "react-icons/hi2";
 
-function getParsableUrl(url) {
+function getParsableUrl(url: string | null | undefined) {
   if (typeof url !== "string") {
     return "";
   }
@@ -14,7 +14,7 @@ function getParsableUrl(url) {
   return /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
 }
 
-export function getHostname(url) {
+export function getHostname(url: string | null | undefined) {
   try {
     return new URL(getParsableUrl(url)).hostname.replace(/^www\./, "");
   } catch (_error) {
@@ -22,12 +22,12 @@ export function getHostname(url) {
   }
 }
 
-export function faviconUrl(url, size = 64) {
+export function faviconUrl(url: string, size = 64) {
   const host = getHostname(url);
   return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${size}` : null;
 }
 
-export function faviconSrcSet(url) {
+export function faviconSrcSet(url: string) {
   const host = getHostname(url);
 
   if (!host) {
@@ -41,12 +41,12 @@ export function faviconSrcSet(url) {
   ].join(", ");
 }
 
-export function faviconFallbackLabel(name, url) {
+export function faviconFallbackLabel(name: string, url: string) {
   const source = String(name || getHostname(url) || "?").trim();
   return (source.match(/[a-z0-9]/i)?.[0] || "?").toUpperCase();
 }
 
-function isIPv4(host) {
+function isIPv4(host: string) {
 
   return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(
 
@@ -56,7 +56,7 @@ function isIPv4(host) {
 
 }
 
-function isIPv6(host) {
+function isIPv6(host: string) {
 
   // URL.hostname keeps the brackets around an IPv6 literal (e.g. "[::1]"),
   // which the bare address regex below doesn't account for.
@@ -66,7 +66,7 @@ function isIPv6(host) {
 
 }
 
-export function isSelfHostedUrl(url) {
+export function isSelfHostedUrl(url: string) {
 
   try {
 
@@ -94,7 +94,7 @@ export function isSelfHostedUrl(url) {
 
 }
 
-export function LocalServiceStatus({ url, className = "size-3.5" }) {
+export function LocalServiceStatus({ url, className = "size-3.5" }: { url: string; className?: string }) {
   const [online, setOnline] = React.useState(false);
 
   React.useEffect(() => {
@@ -146,7 +146,15 @@ export function LocalServiceStatus({ url, className = "size-3.5" }) {
   );
 }
 
-const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }) => {
+interface BookmarkProps {
+  title: string;
+  content: Array<{ name: string; url: string }>;
+  cardClass?: string;
+  onTitleClick?: () => void;
+  onQuickAdd?: () => void;
+}
+
+const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: BookmarkProps) => {
   const titleContent = (
     <div className="bookmark-title truncate text-center font-semibold leading-none text-primary-foreground">
       {title}

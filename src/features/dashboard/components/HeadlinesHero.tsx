@@ -2,16 +2,16 @@ import React from "react";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 
 import { readSettings } from "@/lib/settings";
-import { fetchRssFeed } from "@/lib/rss";
+import { fetchRssFeed, type RssItem } from "@/lib/rss";
 
 // Reddit blocks anonymous browser requests to its *.json endpoints (HTTP 403 with
 // no CORS headers), so the headlines are loaded from the subreddit RSS feed, parsed
 // by the same client-side helper the RSS feature panel uses.
-function decodeEntities(value) {
+function decodeEntities(value: string) {
   return typeof value === "string" ? value.replaceAll("&amp;", "&") : value;
 }
 
-function matchFromContent(content, pattern) {
+function matchFromContent(content: unknown, pattern: RegExp) {
   if (typeof content !== "string") {
     return null;
   }
@@ -19,14 +19,14 @@ function matchFromContent(content, pattern) {
   return match ? match[1] : null;
 }
 
-function getArticleUrl(item) {
+function getArticleUrl(item: RssItem) {
   // Reddit's RSS embeds the destination article as the "[link]" anchor; fall back
   // to the discussion permalink when a post links to Reddit itself.
   const external = matchFromContent(item.content, /<a[^>]+href="([^"]+)"[^>]*>\s*\[link\]/i);
   return external || item.link;
 }
 
-function getArticleImage(item) {
+function getArticleImage(item: RssItem) {
   const thumbnail = item.thumbnail || item.enclosure?.thumbnail;
   if (typeof thumbnail === "string" && thumbnail.startsWith("http")) {
     return decodeEntities(thumbnail);
@@ -40,7 +40,7 @@ function getArticleImage(item) {
   return null;
 }
 
-function getSourceLabel(url) {
+function getSourceLabel(url: string) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch (_error) {
@@ -48,7 +48,7 @@ function getSourceLabel(url) {
   }
 }
 
-function formatPublishedLabel(pubDate) {
+function formatPublishedLabel(pubDate: string) {
   if (!pubDate) {
     return "";
   }
@@ -62,7 +62,7 @@ function formatPublishedLabel(pubDate) {
   return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-function normalizeArticle(item) {
+function normalizeArticle(item: RssItem) {
   const url = getArticleUrl(item);
   return {
     id: item.guid || url,
@@ -138,7 +138,7 @@ export default function HeadlinesHero({ subreddit: subredditOverride, rotationSe
   }, [articles, rotationSeconds]);
 
   const changeArticle = React.useCallback(
-    (direction) => {
+    (direction: number) => {
       if (!articles.length) {
         return;
       }
@@ -183,7 +183,7 @@ export default function HeadlinesHero({ subreddit: subredditOverride, rotationSe
       style={{ color: "#ffffff" }}
     >
       <img
-        src={article.image}
+        src={article.image ?? undefined}
         alt={article.title}
         className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
       />

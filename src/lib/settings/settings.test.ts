@@ -7,7 +7,7 @@ import {
   normalizeSettingsShape,
   pickSettingsDomain,
   previewImportPayload,
-} from "./settings";
+} from ".";
 
 describe("deepEqual", () => {
   it("treats identical primitives as equal", () => {

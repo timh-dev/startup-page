@@ -1,7 +1,7 @@
 import React, { useContext, useState } from "react";
 import { HiOutlineCog } from "react-icons/hi2";
 
-import { ThemeContext, type ThemeVarsByMode } from "@/components/layout/ThemeContext";
+import { ThemeContext, type ThemeMode, type ThemeVarsByMode } from "@/components/layout/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   IMAGE_FILTER_DEFAULTS,
   IMAGE_FILTER_DEFINITIONS,
+  type ImageFilterPreset,
 } from "@/lib/image-filters";
 import { settingsNavItems } from "@/features/settings/constants";
 import {
@@ -22,10 +23,19 @@ import {
 } from "@/lib/theme-palettes";
 import { cn } from "@/lib/utils";
 import { getStorageDiagnostics } from "@/lib/settings";
-import { useSettingsStore } from "@/features/settings/stores";
+import { useSettingsStore, type StartupSettings } from "@/features/settings/stores";
 import DataTab from "@/features/settings/components/DataTab";
 
-function PaletteSwatchPreview({ swatches, mode }) {
+type Swatches = Record<string, string>;
+
+interface CustomTheme {
+  id: string;
+  name: string;
+  light: Record<string, string>;
+  dark: Record<string, string>;
+}
+
+function PaletteSwatchPreview({ swatches, mode }: { swatches: { light: Swatches; dark: Swatches }; mode: string }) {
   const modeSwatches = mode === "dark" ? swatches.dark : swatches.light;
   const keys = ["background", "card", "primary", "accent", "muted"];
   return (
@@ -52,7 +62,21 @@ function SettingField({ label, description, children }: { label: string; descrip
   );
 }
 
-function RangeControl({ label, value, min, max, step, onChange }) {
+function RangeControl({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+}) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
@@ -70,7 +94,7 @@ function RangeControl({ label, value, min, max, step, onChange }) {
   );
 }
 
-function ChoiceButton({ selected, title, description, onClick }) {
+function ChoiceButton({ selected, title, description, onClick }: { selected: boolean; title: string; description: string; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -119,7 +143,7 @@ function SettingsButton() {
     setOpen(true);
   };
 
-  const closeModal = (nextOpen) => {
+  const closeModal = (nextOpen: boolean) => {
     if (nextOpen) {
       setOpen(true);
       return;
@@ -132,12 +156,12 @@ function SettingsButton() {
     setOpen(false);
   };
 
-  const updateSettings = (updater) => {
+  const updateSettings = (updater: (settings: StartupSettings) => StartupSettings) => {
     setSettingsState((prevSettings) => updater(prevSettings));
   };
 
-  const handleUiChange = (key, value) => {
-    updateSettings((prevSettings) => ({
+  const handleUiChange = (key: string, value: unknown) => {
+    updateSettings((prevSettings: StartupSettings) => ({
       ...prevSettings,
       ui: {
         ...prevSettings.ui,
@@ -146,7 +170,7 @@ function SettingsButton() {
     }));
   };
 
-  const handleThemeModeChange = (value) => {
+  const handleThemeModeChange = (value: ThemeMode) => {
     handleUiChange("themeMode", value);
     setThemeMode(value);
   };
@@ -170,7 +194,7 @@ function SettingsButton() {
       const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const newTheme = { id, name, light: parsed.light, dark: parsed.dark };
 
-      updateSettings((prev) => ({
+      updateSettings((prev: StartupSettings) => ({
         ...prev,
         customThemes: [...(prev.customThemes || []), newTheme],
       }));
@@ -182,10 +206,10 @@ function SettingsButton() {
     }
   };
 
-  const handleRemoveCustomTheme = (themeId) => {
-    updateSettings((prev) => ({
+  const handleRemoveCustomTheme = (themeId: string) => {
+    updateSettings((prev: StartupSettings) => ({
       ...prev,
-      customThemes: (prev.customThemes || []).filter((ct) => ct.id !== themeId),
+      customThemes: (prev.customThemes || []).filter((ct: CustomTheme) => ct.id !== themeId),
     }));
 
     if (settingsState.ui?.themePalette === themeId) {
@@ -193,8 +217,8 @@ function SettingsButton() {
     }
   };
 
-  const handleImageFilterToggle = (filterKey, checked) => {
-    updateSettings((prevSettings) => ({
+  const handleImageFilterToggle = (filterKey: string, checked: boolean) => {
+    updateSettings((prevSettings: StartupSettings) => ({
       ...prevSettings,
       ui: {
         ...prevSettings.ui,
@@ -213,8 +237,8 @@ function SettingsButton() {
     }));
   };
 
-  const handleImageFilterSettingChange = (filterKey, settingKey, value) => {
-    updateSettings((prevSettings) => ({
+  const handleImageFilterSettingChange = (filterKey: string, settingKey: string, value: number | boolean) => {
+    updateSettings((prevSettings: StartupSettings) => ({
       ...prevSettings,
       ui: {
         ...prevSettings.ui,
@@ -237,8 +261,8 @@ function SettingsButton() {
     }));
   };
 
-  const handleImageFilterPreset = (filterKey, preset) => {
-    updateSettings((prevSettings) => ({
+  const handleImageFilterPreset = (filterKey: string, preset: ImageFilterPreset) => {
+    updateSettings((prevSettings: StartupSettings) => ({
       ...prevSettings,
       ui: {
         ...prevSettings.ui,
@@ -261,7 +285,7 @@ function SettingsButton() {
   // need to replace settingsState wholesale and keep the live theme preview,
   // the settings store, and the storage diagnostics footer in sync.
   const applySettings = React.useCallback(
-    async (nextSettings, message, options: { clearCustomThemeVars?: boolean } = {}) => {
+    async (nextSettings: StartupSettings, message: string, options: { clearCustomThemeVars?: boolean } = {}) => {
       useSettingsStore.setState({ settings: nextSettings });
       setSettingsState(nextSettings);
       setThemeMode(nextSettings.ui.themeMode);
@@ -337,11 +361,11 @@ function SettingsButton() {
                     <CardDescription>Choose how light and dark mode should be resolved.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid gap-2 md:grid-cols-3">
-                    {[
+                    {([
                       { value: "system", title: "System", description: "Follow the OS preference." },
                       { value: "light", title: "Light", description: "Force the brighter variant." },
                       { value: "dark", title: "Dark", description: "Force the darker variant." }
-                    ].map((option) => (
+                    ] satisfies Array<{ value: ThemeMode; title: string; description: string }>).map((option) => (
                       <ChoiceButton
                         key={option.value}
                         selected={selectedThemeMode === option.value}
@@ -376,7 +400,7 @@ function SettingsButton() {
                         <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{option.description}</div>
                       </button>
                     ))}
-                    {(settingsState.customThemes || []).map((ct) => {
+                    {(settingsState.customThemes || []).map((ct: CustomTheme) => {
                       const swatches = {
                         light: getSwatchesFromCustomTheme(ct, "light"),
                         dark: getSwatchesFromCustomTheme(ct, "dark"),
@@ -436,7 +460,7 @@ function SettingsButton() {
                     {(settingsState.customThemes || []).length > 0 ? (
                       <div className="mt-4 space-y-2">
                         <p className="text-xs font-medium text-foreground">Saved Custom Themes</p>
-                        {(settingsState.customThemes || []).map((ct) => (
+                        {(settingsState.customThemes || []).map((ct: CustomTheme) => (
                           <div key={ct.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
                             <span className="text-sm">{ct.name}</span>
                             <Button
@@ -620,7 +644,7 @@ function SettingsButton() {
                                       min={control.min}
                                       max={control.max}
                                       step={control.step}
-                                      onChange={(value) =>
+                                      onChange={(value: number) =>
                                         handleImageFilterSettingChange(filter.key, control.key, value)
                                       }
                                     />
@@ -647,7 +671,7 @@ function SettingsButton() {
                       min={7}
                       max={14}
                       step={1}
-                      onChange={(value) => handleUiChange("tileSize", value)}
+                      onChange={(value: number) => handleUiChange("tileSize", value)}
                     />
                     <RangeControl
                       label="Bookmark pill size (rem)"
@@ -655,7 +679,7 @@ function SettingsButton() {
                       min={2.5}
                       max={5}
                       step={0.25}
-                      onChange={(value) => handleUiChange("bookmarkPillSize", value)}
+                      onChange={(value: number) => handleUiChange("bookmarkPillSize", value)}
                     />
                   </CardContent>
                 </Card>

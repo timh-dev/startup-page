@@ -18,13 +18,13 @@ function makeVerifier() {
   return btoa(String.fromCharCode(...arr)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-async function makeChallenge(verifier) {
+async function makeChallenge(verifier: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-async function startOAuth(clientId) {
+async function startOAuth(clientId: string) {
   const verifier = makeVerifier();
   localStorage.setItem(VERIFIER_KEY, verifier);
   const params = new URLSearchParams({
@@ -38,7 +38,7 @@ async function startOAuth(clientId) {
   window.location.href = `https://accounts.spotify.com/authorize?${params}`;
 }
 
-async function exchangeCode(clientId, code) {
+async function exchangeCode(clientId: string, code: string) {
   const verifier = localStorage.getItem(VERIFIER_KEY);
   if (!verifier) throw new Error("No verifier");
   const res = await fetch("https://accounts.spotify.com/api/token", {
@@ -50,7 +50,7 @@ async function exchangeCode(clientId, code) {
   return res.json();
 }
 
-async function doRefresh(clientId) {
+async function doRefresh(clientId: string) {
   const refresh = localStorage.getItem(REFRESH_KEY);
   if (!refresh) throw new Error("No refresh token");
   const res = await fetch("https://accounts.spotify.com/api/token", {
@@ -62,7 +62,7 @@ async function doRefresh(clientId) {
   return res.json();
 }
 
-function storeTokens(data) {
+function storeTokens(data: { access_token: string; refresh_token?: string; expires_in: number }) {
   localStorage.setItem(TOKEN_KEY, data.access_token);
   if (data.refresh_token) localStorage.setItem(REFRESH_KEY, data.refresh_token);
   localStorage.setItem(EXPIRY_KEY, String(Date.now() + data.expires_in * 1000));
@@ -91,7 +91,7 @@ interface SpotifyPlayback {
   };
 }
 
-async function getToken(clientId) {
+async function getToken(clientId: string) {
   const stored = getStoredToken();
   if (stored) return stored;
   const data = await doRefresh(clientId);
@@ -99,7 +99,7 @@ async function getToken(clientId) {
   return data.access_token;
 }
 
-async function spotifyApi(clientId, path, options: RequestInit = {}) {
+async function spotifyApi(clientId: string, path: string, options: RequestInit = {}) {
   const token = await getToken(clientId);
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
     ...options,
@@ -109,7 +109,7 @@ async function spotifyApi(clientId, path, options: RequestInit = {}) {
   return res;
 }
 
-function fmtMs(ms) {
+function fmtMs(ms: number) {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
@@ -149,11 +149,12 @@ export default function SpotifyPlayer({ clientId }: { clientId?: string | null }
   // Poll now playing every 5 s when connected
   React.useEffect(() => {
     if (!clientId || !["poll", "playing", "paused", "idle"].includes(status)) return;
+    const spotifyClientId = clientId;
     let cancelled = false;
 
     async function poll() {
       try {
-        const res = await spotifyApi(clientId, "/me/player/currently-playing");
+        const res = await spotifyApi(spotifyClientId, "/me/player/currently-playing");
         if (cancelled) return;
         if (res.status === 204) { setTrack(null); setStatus("idle"); return; }
         if (!res.ok) throw new Error("Player error");
@@ -182,7 +183,7 @@ export default function SpotifyPlayer({ clientId }: { clientId?: string | null }
     return () => clearInterval(tickRef.current);
   }, [status, track?.item?.id]);
 
-  const control = React.useCallback(async (action) => {
+  const control = React.useCallback(async (action: "play" | "pause" | "next" | "prev") => {
     if (!clientId) return;
     try {
       if (action === "play") await spotifyApi(clientId, "/me/player/play", { method: "PUT" });
@@ -226,7 +227,7 @@ export default function SpotifyPlayer({ clientId }: { clientId?: string | null }
         </div>
         <button
           type="button"
-          onClick={() => startOAuth(clientId)}
+          onClick={() => clientId && startOAuth(clientId)}
           className="rounded-full bg-[#1DB954] px-6 py-2.5 text-sm font-semibold text-black transition hover:bg-[#1ed760] hover:scale-105"
         >
           Connect Spotify

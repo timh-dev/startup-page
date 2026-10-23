@@ -16,7 +16,7 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-function describeEvent(event) {
+function describeEvent(event: GitHubEvent) {
   const p = event.payload || {};
   switch (event.type) {
     case "PushEvent": {
@@ -59,7 +59,7 @@ export default function GitHubActivity({ username }: { username?: string | null 
         if (cancelled) return;
         // Deduplicate: same repo + type + same hour
         const seen = new Set();
-        const filtered = data.filter((e) => {
+        const filtered = (data as GitHubEvent[]).filter((e) => {
           const key = `${e.repo?.name}:${e.type}:${e.created_at?.slice(0, 13)}`;
           if (seen.has(key)) return false;
           seen.add(key);

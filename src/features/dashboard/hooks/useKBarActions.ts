@@ -12,21 +12,21 @@ import {
 import { useSettingsStore } from "@/features/settings/stores";
 
 // Search-provider bangs: "!yt lofi beats" → YouTube search
-const SEARCH_BANGS = {
-  g: { label: "Google", url: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}` },
-  ddg: { label: "DuckDuckGo", url: (q) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}` },
-  yt: { label: "YouTube", url: (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` },
-  gh: { label: "GitHub", url: (q) => `https://github.com/search?q=${encodeURIComponent(q)}` },
-  w: { label: "Wikipedia", url: (q) => `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(q)}` },
-  r: { label: "Reddit", url: (q) => `https://www.reddit.com/search/?q=${encodeURIComponent(q)}` },
-  maps: { label: "Google Maps", url: (q) => `https://www.google.com/maps/search/${encodeURIComponent(q)}` },
-  npm: { label: "npm", url: (q) => `https://www.npmjs.com/search?q=${encodeURIComponent(q)}` },
+const SEARCH_BANGS: Record<string, { label: string; url: (q: string) => string }> = {
+  g: { label: "Google", url: (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}` },
+  ddg: { label: "DuckDuckGo", url: (q: string) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}` },
+  yt: { label: "YouTube", url: (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` },
+  gh: { label: "GitHub", url: (q: string) => `https://github.com/search?q=${encodeURIComponent(q)}` },
+  w: { label: "Wikipedia", url: (q: string) => `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(q)}` },
+  r: { label: "Reddit", url: (q: string) => `https://www.reddit.com/search/?q=${encodeURIComponent(q)}` },
+  maps: { label: "Google Maps", url: (q: string) => `https://www.google.com/maps/search/${encodeURIComponent(q)}` },
+  npm: { label: "npm", url: (q: string) => `https://www.npmjs.com/search?q=${encodeURIComponent(q)}` },
 };
 
 // Inline calculator for "= 340*1.08" queries. The whitelist regex keeps
 // Function() safe: digits, operators, parens, and scientific notation only —
 // no letters (beyond e/E), brackets, or quotes ever reach evaluation.
-function safeCalculate(expression) {
+function safeCalculate(expression: string) {
   const cleaned = expression.replace(/\^/g, "**").replace(/,/g, "");
   if (!/^[\d\s+\-*/().%eE]*$/.test(cleaned) || !/\d/.test(cleaned)) return null;
   try {
@@ -51,15 +51,16 @@ export default function useKBarActions() {
     // --- Bookmarks: fuzzy-search every saved link ---
     const bookmarkGroups = Array.isArray(settings.bookmark) ? settings.bookmark : [];
     bookmarkGroups.forEach((group, groupIndex) => {
-      (group?.content || []).forEach((link, linkIndex) => {
+      (group?.content || []).forEach((link: { name?: string; url?: string }, linkIndex: number) => {
         if (!link?.url) return;
+        const url = link.url;
         list.push({
           id: `bookmark-${groupIndex}-${linkIndex}`,
           name: link.name || link.url,
           subtitle: link.url,
           keywords: `${link.url} ${group?.title || ""}`,
           section: "Bookmarks",
-          perform: () => window.location.assign(link.url),
+          perform: () => window.location.assign(url),
         });
       });
     });
@@ -116,7 +117,7 @@ export default function useKBarActions() {
     });
 
     // --- Theme: Palette (custom) ---
-    customThemes.forEach((ct) => {
+    customThemes.forEach((ct: { id: string; name: string; light: Record<string, string>; dark: Record<string, string> }) => {
       list.push({
         id: `palette-${ct.id}`,
         name: `${ct.name} Palette`,

@@ -2,14 +2,14 @@ import type { SolarContext } from './solarMath';
 import { sunElevation, formatHour } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
-const EVENT_COLORS = {
+const EVENT_COLORS: Record<string, { fill: string; glow: string }> = {
   horizon:       { fill: 'rgba(255, 200, 60, 0.9)',  glow: 'rgba(255, 200, 60, 0.3)' },
   civil:         { fill: 'rgba(230, 140, 50, 0.85)', glow: 'rgba(230, 140, 50, 0.25)' },
   nautical:      { fill: 'rgba(140, 160, 190, 0.8)', glow: 'rgba(140, 160, 190, 0.25)' },
   astronomical:  { fill: 'rgba(70, 90, 160, 0.8)',   glow: 'rgba(70, 90, 160, 0.25)' },
 };
 
-const EVENT_RADIUS = {
+const EVENT_RADIUS: Record<string, number> = {
   horizon: 4.5,
   civil: 3.5,
   nautical: 3.5,

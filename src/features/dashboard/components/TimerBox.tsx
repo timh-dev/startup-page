@@ -4,7 +4,7 @@ import { HiPause, HiPlay, HiStop, HiPencil } from "react-icons/hi2";
 const PRESETS = [5, 15, 25, 50];
 
 // Horizontal scrolling tape — continuously animated with requestAnimationFrame
-function TapeRibbon({ remaining, totalSeconds, running }) {
+function TapeRibbon({ remaining, totalSeconds, running }: { remaining: number; totalSeconds: number; running: boolean }) {
   const [pos, setPos] = React.useState(remaining);
 
   // RAF loop: restarts each time running or remaining changes.
@@ -16,7 +16,7 @@ function TapeRibbon({ remaining, totalSeconds, running }) {
     }
     const startSec  = remaining;
     const startTime = performance.now();
-    let rafId;
+    let rafId = 0;
     const tick = () => {
       const elapsed = (performance.now() - startTime) / 1000;
       setPos(Math.max(0, startSec - elapsed));
@@ -164,7 +164,7 @@ export default function TimerBox({ focusMinutes, onFocusMinutesChange }: TimerBo
     setEditing(false);
   };
 
-  const applyPreset = (m) => { setEditMin(String(m)); setEditSec("00"); };
+  const applyPreset = (m: number) => { setEditMin(String(m)); setEditSec("00"); };
   const reset = () => { setRemaining(totalSeconds); setRunning(false); };
 
   const status = isDone ? "TIME'S UP" : running ? "COUNTING DOWN" : "READY";

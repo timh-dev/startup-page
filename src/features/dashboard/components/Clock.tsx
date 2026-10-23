@@ -4,7 +4,7 @@ import { useSettingsStore } from "@/features/settings/stores";
 
 // e.g. "GMT+5:30" — derived from the browser's own local UTC offset. No
 // timezone picker exists yet, so this always reflects local time.
-function getGmtLabel(date) {
+function getGmtLabel(date: Date) {
   const totalMinutes = -date.getTimezoneOffset();
   const sign = totalMinutes >= 0 ? "+" : "-";
   const absMinutes = Math.abs(totalMinutes);
@@ -13,7 +13,7 @@ function getGmtLabel(date) {
   return `GMT${sign}${hours}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}`;
 }
 
-function getClockParts(date, use24Hour) {
+function getClockParts(date: Date, use24Hour: boolean) {
   const hours24 = date.getHours();
   const hours12 = hours24 % 12 || 12;
   const minutes = date.getMinutes();
@@ -49,7 +49,9 @@ const TICK_LABELS = [12, 6, 12, 6, 12];
 // theme variables so it recolors with whatever palette the user has
 // selected. The dot/line's horizontal position (--clock-now-x) is driven by
 // the actual time of day, not fixed.
-function PlainClock({ parts, showMeridiem }) {
+type ClockParts = ReturnType<typeof getClockParts>;
+
+function PlainClock({ parts, showMeridiem }: { parts: ClockParts; showMeridiem: boolean }) {
   return (
     <div className="clock-plain" aria-hidden="true" style={{ "--clock-now-x": `${parts.nowPercent}%` }}>
       {/* Single shared positioning reference for both the line and the dot —
@@ -83,7 +85,7 @@ function PlainClock({ parts, showMeridiem }) {
   );
 }
 
-function AnalogClock({ parts }) {
+function AnalogClock({ parts }: { parts: ClockParts }) {
   return (
     <div className="clock-underlay clock-analog-underlay" aria-hidden="true">
       <span className="clock-hand clock-hour-hand" style={{ "--clock-hand-angle": `${parts.hourDeg}deg` }} />
@@ -93,15 +95,15 @@ function AnalogClock({ parts }) {
   );
 }
 
-function isLeapYear(year) {
+function isLeapYear(year: number) {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
-function daysInMonth(year, month) {
+function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
-function dayOfYear(date) {
+function dayOfYear(date: Date) {
   const start = new Date(date.getFullYear(), 0, 0);
   return Math.floor((date.getTime() - start.getTime()) / 86400000);
 }
@@ -110,7 +112,7 @@ function dayOfYear(date) {
 // one dot per day. Drawn on canvas so every dot has the exact same radius
 // and spacing: DOM elements snap their boxes to device pixels individually,
 // which makes a ~4px dot grid look ragged; canvas doesn't snap.
-function YearClock({ now }) {
+function YearClock({ now }: { now: Date }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const year = now.getFullYear();
   const month = now.getMonth();

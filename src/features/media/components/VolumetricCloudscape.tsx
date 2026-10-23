@@ -534,14 +534,16 @@ void main() {
 // Compile and link without blocking status checks. getShaderParameter/getProgramParameter
 // force a GPU pipeline stall (1–3 s on complex shaders). Status is checked lazily in the
 // first requestAnimationFrame callback, so React finishes painting before any GPU stall.
-function createProgram(gl) {
+function createProgram(gl: WebGLRenderingContext) {
   const vs = gl.createShader(gl.VERTEX_SHADER);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  const program = gl.createProgram();
+  // All three are null only when the WebGL context has been lost.
+  if (!vs || !fs || !program) return null;
   gl.shaderSource(vs, VERTEX_SHADER);
   gl.compileShader(vs);
-  const fs = gl.createShader(gl.FRAGMENT_SHADER);
   gl.shaderSource(fs, FRAGMENT_SHADER);
   gl.compileShader(fs);
-  const program = gl.createProgram();
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
   gl.linkProgram(program);
@@ -550,7 +552,7 @@ function createProgram(gl) {
   return program;
 }
 
-function getPhaseValue(phase) {
+function getPhaseValue(phase: VolumetricCloudscapeProps["phase"]) {
   if (typeof phase === "number") return Math.min(phase, 2);
   if (phase === "storm") return 0.4; // legacy alias — dark handled via style/density now
   if (phase === "night") return 2;
@@ -558,7 +560,7 @@ function getPhaseValue(phase) {
   return 0;
 }
 
-function getCoverageValue(coverage): number {
+function getCoverageValue(coverage: VolumetricCloudscapeProps["coverage"]): number {
   if (typeof coverage === "number") return Math.max(0, Math.min(coverage, 1));
   if (coverage === "storm") return 0.95;
   if (coverage === "full")  return 0.85;
@@ -566,7 +568,7 @@ function getCoverageValue(coverage): number {
   return 0;
 }
 
-function getStyleValue(cloudStyle) {
+function getStyleValue(cloudStyle: VolumetricCloudscapeProps["cloudStyle"]) {
   if (cloudStyle === "cumulus")       return 2;
   if (cloudStyle === "stratus")       return 3;
   if (cloudStyle === "nimbostratus")  return 4;
@@ -627,7 +629,9 @@ export default function VolumetricCloudscape({
     const gl: WebGLRenderingContext = glContext;
 
     let animationFrame = 0;
-    const program = createProgram(gl);
+    const linkedProgram = createProgram(gl);
+    if (!linkedProgram) { setSupported(false); return undefined; }
+    const program: WebGLProgram = linkedProgram;
     // KHR_parallel_shader_compile lets us poll completion without stalling the GPU pipeline.
     const khrParallel = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
 
