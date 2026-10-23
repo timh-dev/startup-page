@@ -1182,7 +1182,7 @@
   cursor: pointer;
   font: inherit;
   padding: clamp(0.1rem, 1cqh, 0.2rem);
-  transition: background 0.18s ease;
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
 .weather-forecast-day:hover,
@@ -2030,7 +2030,7 @@
   border-radius: 9999px;
   background: transparent;
   color: color-mix(in oklab, var(--foreground) 18%, transparent);
-  transition: color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: color var(--duration-base) var(--ease-out), opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
 }
 
 .vault-nav-button:hover {
@@ -2683,7 +2683,7 @@
   border-radius: 9999px;
   color: color-mix(in oklab, var(--card-foreground) 78%, transparent);
   background: color-mix(in oklab, var(--card) 40%, transparent);
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
 }
 
 .vg-back:hover {
@@ -2741,7 +2741,7 @@
   font-size: 0.8rem;
   font-weight: 500;
   color: color-mix(in oklab, var(--card-foreground) 88%, transparent);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
   white-space: nowrap;
 }
 
@@ -2820,7 +2820,7 @@
   color: color-mix(in oklab, var(--card-foreground) 80%, transparent);
   font-size: 0.82rem;
   font-weight: 500;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
 
 .vg-add-trigger:hover {
@@ -3039,7 +3039,7 @@
   gap: 0.55rem;
   padding: 0.5rem 0.6rem 0.5rem 0.85rem;
   border-radius: 0.6rem;
-  transition: background 0.15s ease;
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
 .vg-item-expanded {
@@ -3074,7 +3074,7 @@
   border-radius: 9999px;
   border: 1.5px solid color-mix(in oklab, var(--muted-foreground) 45%, transparent);
   color: var(--primary-foreground);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
 
 .vg-item-check:hover {
@@ -3226,7 +3226,7 @@
   align-items: center;
   gap: 0.15rem;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
 .vg-item:hover .vg-item-actions,
@@ -3748,7 +3748,7 @@
   font-size: 0.8rem;
   font-weight: 500;
   color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
 
 .vg-section-tab:hover {

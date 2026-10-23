@@ -168,9 +168,10 @@ export default function Index() {
           <div
             className={`dashboard-grid grid w-fit ${gapClass} grid-flow-row-dense content-center justify-center`}
           >
-            {widgets.map((instance) => (
+            {widgets.map((instance, index) => (
               <DashboardTile
                 key={instance.id}
+                index={index}
                 instance={instance}
                 editing={editing}
                 radiusClass={radiusClass}

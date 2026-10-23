@@ -66,10 +66,12 @@ export default function FolderPill({
     opacity: isDragging ? 0.45 : 1,
   };
 
+  // Collapsed folders sit on the page like cards; an open folder takes the
+  // palette's primary colour so it reads as selected; nested ones stay quiet.
   const colorClass = isCollapsed
-    ? "bg-amber-400 font-semibold text-slate-950 ring-2 ring-amber-100/80"
+    ? "surface-tile font-medium"
     : nested
-      ? "bg-cyan-400 font-semibold text-slate-950 ring-2 ring-cyan-100/80"
+      ? "bg-secondary font-medium text-secondary-foreground ring-1 ring-border"
       : "bg-primary font-medium text-primary-foreground";
 
   return (

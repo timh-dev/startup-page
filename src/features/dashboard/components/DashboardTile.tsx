@@ -7,6 +7,8 @@ import { getWidgetType } from "@/features/dashboard/widgetRegistry";
 
 interface DashboardTileProps {
   instance: WidgetInstance;
+  /** Position in the grid, for the load-in stagger. */
+  index: number;
   editing: boolean;
   radiusClass: string;
   cardClass: string;
@@ -14,7 +16,7 @@ interface DashboardTileProps {
   onRemove: () => void;
 }
 
-export default function DashboardTile({ instance, editing, radiusClass, cardClass, onEdit, onRemove }: DashboardTileProps) {
+export default function DashboardTile({ instance, index, editing, radiusClass, cardClass, onEdit, onRemove }: DashboardTileProps) {
   const def = getWidgetType(instance.type);
   const spanClass = TILE_SIZE_SPANS[instance.size] || TILE_SIZE_SPANS.small;
 
@@ -29,6 +31,7 @@ export default function DashboardTile({ instance, editing, radiusClass, cardClas
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+    "--tile-index": index,
   };
 
   return (
@@ -36,7 +39,7 @@ export default function DashboardTile({ instance, editing, radiusClass, cardClas
       ref={setNodeRef}
       style={style}
       data-tile-id={instance.id}
-      className={`${spanClass} min-h-0 min-w-0 relative ${
+      className={`tile-enter ${spanClass} min-h-0 min-w-0 relative ${
         editing ? `${radiusClass} ring-2 ${isDragging ? "ring-primary opacity-60 z-20" : "ring-primary/40"}` : ""
       }`}
     >
