@@ -1,27 +1,26 @@
 import type { SolarContext } from './solarMath';
-import { sunElevation } from './solarMath';
+import { hourToDayFraction, sunElevation } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
-// Time-of-day atmosphere color.
-function getAtmosColor(lst: number, elev: number) {
-  let r, g, b;
+// Colour of the light around the sun. Low suns are golden in the morning
+// and a deeper red-orange in the evening; both cool to blue as it climbs.
+function getAtmosColor(morning: boolean, elev: number) {
+  const low = morning ? [255, 196, 104] : [255, 118, 76];
+  const dusk = morning ? [196, 120, 60] : [170, 60, 70];
+  const lerp = (from: number[], to: number[], t: number) => from.map((value, i) => Math.round(value + (to[i] - value) * t));
 
+  let rgb: number[];
   if (elev < -6) {
-    r = 80; g = 60; b = 50;
+    rgb = morning ? [90, 66, 48] : [80, 44, 60];
   } else if (elev < 2) {
-    const t = (elev + 6) / 8;
-    r = Math.round(180 + 75 * t);
-    g = Math.round(80 + 80 * t);
-    b = Math.round(30 + 10 * t);
+    rgb = lerp(dusk, low, (elev + 6) / 8);
   } else if (elev < 20) {
-    const t = (elev - 2) / 18;
-    r = Math.round(255 - 195 * t);
-    g = Math.round(160 - 10 * t);
-    b = Math.round(40 + 220 * t);
+    rgb = lerp(low, [60, 150, 255], (elev - 2) / 18);
   } else {
-    r = 60; g = 150; b = 255;
+    rgb = [60, 150, 255];
   }
 
+  const [r, g, b] = rgb;
   return { r, g, b };
 }
 
@@ -44,7 +43,7 @@ export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: 
   const { x: sunX, y: sunY } = solarToCanvas(lst, width, height, solar);
 
   const isBelowHorizon = elev < 0;
-  const { r: ar, g: ag, b: ab } = getAtmosColor(lst, elev);
+  const { r: ar, g: ag, b: ab } = getAtmosColor(hourToDayFraction(lst, solar) < 0.5, elev);
 
   if (isBelowHorizon) {
     // Clip below-horizon glow to below the horizon line
@@ -63,19 +62,6 @@ export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: 
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Subtle glow below horizon
-    const nearHorizon = Math.max(0, 1 - Math.abs(elev) / 18);
-    const belowRadius = 34 + nearHorizon * 120;
-    const belowAlpha = 0.08 + nearHorizon * 0.24;
-    ctx.beginPath();
-    const belowGlow = ctx.createRadialGradient(sunX, sunY, 2, sunX, sunY, belowRadius);
-    belowGlow.addColorStop(0, `rgba(${ar},${ag},${ab},${belowAlpha})`);
-    belowGlow.addColorStop(0.5, `rgba(${ar},${ag},${ab},${belowAlpha * 0.3})`);
-    belowGlow.addColorStop(1, `rgba(${ar},${ag},${ab},0)`);
-    ctx.fillStyle = belowGlow;
-    ctx.arc(sunX, sunY, belowRadius, 0, Math.PI * 2);
-    ctx.fill();
-
     ctx.restore();
     return;
   }
@@ -86,7 +72,11 @@ export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: 
   // by renderHorizonGlow, not by stretching the sun.)
   const elFactor = Math.min(1, elev / solar.maxElevation);
 
+  // Glow stays above the horizon; the core below is always drawn.
   ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, width, horizonY);
+  ctx.clip();
   ctx.globalCompositeOperation = 'lighter';
 
   // Layer 0: very broad atmospheric veil.

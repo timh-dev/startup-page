@@ -57,6 +57,12 @@ export function renderMarkers(ctx: CanvasRenderingContext2D, w: number, h: numbe
 
   // --- Event marker dots + labels (label only when cursor is near) ---
   const LABEL_PROXIMITY = 0.5; // hours — how close cursor must be to show label
+  // Twilight events sit minutes apart, so only the one nearest the cursor
+  // gets a label; otherwise their labels pile up on top of each other.
+  const nearest = solar.events.reduce<(typeof solar.events)[number] | null>(
+    (best, evt) => (Math.abs(hoverHour - evt.hour) < (best ? Math.abs(hoverHour - best.hour) : Infinity) ? evt : best),
+    null,
+  );
   for (const evt of solar.events) {
     const { type, hour, label } = evt;
     const colors = EVENT_COLORS[type];
@@ -77,7 +83,7 @@ export function renderMarkers(ctx: CanvasRenderingContext2D, w: number, h: numbe
 
     // Label at bottom of chart when hovering near this event's time
     const dist = Math.abs(hoverHour - hour);
-    if (dist < LABEL_PROXIMITY) {
+    if (evt === nearest && dist < LABEL_PROXIMITY) {
       const labelAlpha = 1 - dist / LABEL_PROXIMITY;
       ctx.globalAlpha = labelAlpha;
       const timeStr = formatHour(hour);

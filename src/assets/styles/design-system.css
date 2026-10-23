@@ -70,10 +70,10 @@
 @layer base {
   html {
     /* Everything sized in rem follows the window: 16px on small screens,
-       about 20px on a 1440×900 window, up to 28px on large displays. Uses
+       about 18px on a 1440×900 window, up to 25px on large displays. Uses
        the smaller of width and height so tall or wide windows don't
        overgrow. */
-    font-size: clamp(16px, min(1.389vw, 2.222vh), 28px);
+    font-size: clamp(15px, min(1.25vw, 2vh), 25px);
     font-optical-sizing: auto;
     /* Inter: single-storey a, open digits; ignored by other faces. */
     font-feature-settings: "cv11", "ss01";

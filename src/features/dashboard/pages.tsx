@@ -48,6 +48,8 @@ export default function Index() {
     gap: decorativeGap,
     padding: { top: 5 * rem, bottom: 1.5 * rem, side: 2 * rem },
     layoutKey: `${widgets.map((widget) => `${widget.id}:${widget.size}`).join(",")}|${editing}`,
+    // Leave some air around the grid rather than filling edge to edge.
+    fill: 0.9,
   });
 
   const radiusClass =

@@ -17,6 +17,8 @@ interface FitGridOptions {
   padding: { top: number; bottom: number; side: number };
   /** Changes whenever the set or shapes of tiles change, to re-measure. */
   layoutKey: string;
+  /** Share of the available space the grid fills (1 = edge to edge). */
+  fill?: number;
 }
 
 /**
@@ -29,7 +31,7 @@ interface FitGridOptions {
  * Applied directly to the element (not through React) because measuring
  * means trying layouts before paint.
  */
-export function useFitGrid(gridRef: React.RefObject<HTMLDivElement | null>, { maxTile, minTile, gap, padding, layoutKey }: FitGridOptions) {
+export function useFitGrid(gridRef: React.RefObject<HTMLDivElement | null>, { maxTile, minTile, gap, padding, layoutKey, fill = 1 }: FitGridOptions) {
   const [viewport, setViewport] = React.useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
 
   React.useEffect(() => {
@@ -63,7 +65,7 @@ export function useFitGrid(gridRef: React.RefObject<HTMLDivElement | null>, { ma
       apply(columns, Math.min(widthFit, maxTile));
       const rows = getComputedStyle(grid).gridTemplateRows.split(" ").filter(Boolean).length || 1;
       const heightFit = (availableHeight - (rows - 1) * gap) / rows;
-      const tile = Math.min(widthFit, heightFit, maxTile);
+      const tile = Math.min(widthFit * fill, heightFit * fill, maxTile);
       if (tile >= minTile * 0.75 && (!best || tile > best.tile * MEANINGFULLY_LARGER)) {
         best = { columns, tile };
       }
@@ -71,5 +73,5 @@ export function useFitGrid(gridRef: React.RefObject<HTMLDivElement | null>, { ma
 
     const choice = best ?? widest ?? { columns: 2, tile: minTile };
     apply(choice.columns, choice.tile);
-  }, [gridRef, viewport, maxTile, minTile, gap, padding.top, padding.bottom, padding.side, layoutKey]);
+  }, [gridRef, viewport, maxTile, minTile, gap, padding.top, padding.bottom, padding.side, layoutKey, fill]);
 }
