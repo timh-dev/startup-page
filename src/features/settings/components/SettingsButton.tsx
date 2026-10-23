@@ -1,5 +1,5 @@
 import React, { useContext, useState } from "react";
-import { HiOutlineCog } from "react-icons/hi2";
+import { HiOutlineCog6Tooth } from "react-icons/hi2";
 
 import { ThemeContext } from "@/components/layout/ThemeContext";
 import { Button } from "@/components/ui/button";
@@ -101,22 +101,23 @@ function SettingsButton() {
     <Dialog open={open} onOpenChange={closeModal}>
       <DialogTrigger asChild>
         <button
-          className="text-current text-4xl cursor-pointer"
+          type="button"
+          className="toolbar-button"
           onClick={openModal}
           aria-label="Open workspace settings"
-          title="Workspace settings"
+          title="Settings"
         >
-          <HiOutlineCog />
+          <HiOutlineCog6Tooth />
         </button>
       </DialogTrigger>
-      <DialogContent className="settings-dialog w-[min(92vw,980px)] border-border/60 bg-background/98 p-0 text-[11px] [&_[data-slot=card]]:rounded-lg [&_[data-slot=card-header]]:gap-0.5 [&_[data-slot=card-header]]:p-2.5 [&_[data-slot=card-content]]:p-2.5 [&_[data-slot=card-content]]:pt-0 [&_[data-slot=card-title]]:text-[13px] [&_[data-slot=card-description]]:text-[11px] [&_[data-slot=tabs-trigger]]:px-2 [&_[data-slot=tabs-trigger]]:py-1.5 [&_[data-slot=tabs-trigger]]:text-[11px] [&_[data-slot=input]]:h-7 [&_[data-slot=input]]:text-[11px] [&_[data-slot=button]]:h-7 [&_[data-slot=button]]:px-2.5 [&_[data-slot=button]]:text-[11px]">
+      <DialogContent className="settings-dialog w-[min(92vw,1040px)] border-border/60 bg-background p-0 text-[13px] [&_[data-slot=card]]:rounded-xl [&_[data-slot=card]]:shadow-none [&_[data-slot=card-header]]:gap-1 [&_[data-slot=card-header]]:p-4 [&_[data-slot=card-content]]:p-4 [&_[data-slot=card-content]]:pt-0 [&_[data-slot=card-title]]:text-[15px] [&_[data-slot=card-title]]:tracking-tight [&_[data-slot=card-description]]:text-[13px] [&_[data-slot=tabs-trigger]]:px-3 [&_[data-slot=tabs-trigger]]:py-2 [&_[data-slot=tabs-trigger]]:text-[13px] [&_[data-slot=input]]:h-9 [&_[data-slot=input]]:text-[13px] [&_[data-slot=button]]:h-8 [&_[data-slot=button]]:px-3 [&_[data-slot=button]]:text-[13px]">
         <Tabs defaultValue="appearance" orientation="vertical" className="grid min-h-[76vh] lg:grid-cols-[160px_1fr] gap-0">
           <div className="border-b border-border bg-sidebar text-sidebar-foreground lg:border-r lg:border-b-0">
             <div className="p-2.5">
               <DialogHeader>
-                <DialogTitle className="font-serif text-base">Workspace Settings</DialogTitle>
+                <DialogTitle className="font-serif text-xl tracking-tight">Settings</DialogTitle>
                 <DialogDescription className="text-xs leading-snug">
-                  Built on the new shadcn-style UI layer with live theme and palette preview.
+                  Changes preview live. Save to keep them.
                 </DialogDescription>
               </DialogHeader>
             </div>

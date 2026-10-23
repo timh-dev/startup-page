@@ -1,4 +1,5 @@
 import React from "react";
+import { ensurePaletteFonts } from "@/lib/palette-fonts";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
@@ -143,6 +144,7 @@ export default function ThemeProvider({
       }
     } else {
       root.dataset.theme = rawThemePalette;
+      ensurePaletteFonts(rawThemePalette);
     }
 
     localStorage.setItem("color-theme", resolvedTheme);

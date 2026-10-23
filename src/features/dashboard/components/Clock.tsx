@@ -2,8 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useSettingsStore } from "@/features/settings/stores";
 
-// e.g. "GMT+5:30" — derived from the browser's own local UTC offset. No
-// timezone picker exists yet, so this always reflects local time.
+// The browser's time zone as a place ("Chicago"), falling back to its UTC
+// offset ("GMT+5:30") when the zone has no city. No timezone picker exists
+// yet, so this always reflects local time.
+function getPlaceLabel(date: Date) {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  const city = zone.includes("/") ? zone.split("/").pop()!.replace(/_/g, " ") : "";
+  return city || getGmtLabel(date);
+}
+
 function getGmtLabel(date: Date) {
   const totalMinutes = -date.getTimezoneOffset();
   const sign = totalMinutes >= 0 ? "+" : "-";
@@ -32,8 +39,9 @@ function getClockParts(date: Date, use24Hour: boolean) {
   return {
     time: `${displayHours}:${String(minutes).padStart(2, "0")}`,
     period: hours24 >= 12 ? "PM" : "AM",
-    dateLabel: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
-    gmtLabel: getGmtLabel(date),
+    weekday: date.toLocaleDateString(undefined, { weekday: "long" }),
+    dateLabel: date.toLocaleDateString(undefined, { month: "long", day: "numeric" }),
+    placeLabel: getPlaceLabel(date),
     hourDeg: ((hours12 % 12) + minutes / 60) * 30,
     minuteDeg: minutes * 6,
     secondDeg: seconds * 6,
@@ -60,8 +68,9 @@ function PlainClock({ parts, showMeridiem }: { parts: ClockParts; showMeridiem: 
           positions for each. */}
       <div className="clock-plain-inner">
         <div className="clock-plain-top">
+          <div className="clock-plain-weekday eyebrow">{parts.weekday}</div>
           <div className="clock-plain-date">{parts.dateLabel}</div>
-          <div className="clock-plain-offset">{parts.gmtLabel}</div>
+          <div className="clock-plain-offset">{parts.placeLabel}</div>
         </div>
 
         <div className="clock-plain-spine">
@@ -70,7 +79,7 @@ function PlainClock({ parts, showMeridiem }: { parts: ClockParts; showMeridiem: 
 
         <div className="clock-plain-bottom">
           <div className="clock-plain-time">
-            <span className="clock-plain-time-value">{parts.time}</span>
+            <span className="clock-plain-time-value numeric">{parts.time}</span>
             {showMeridiem && <span className="clock-plain-time-meridiem">{parts.period}</span>}
           </div>
           <div className="clock-plain-rule" />

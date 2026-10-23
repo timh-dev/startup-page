@@ -1,4 +1,5 @@
 import React from "react";
+import { HiMagnifyingGlass } from "react-icons/hi2";
 
 import { useSettingsStore } from "@/features/settings/stores";
 import {
@@ -55,8 +56,6 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
     event.currentTarget.value = "";
   };
 
-  const searchButtonClass =
-    "search-engine-button flex items-center justify-center rounded-full border border-border/60 bg-card/80 text-foreground shadow-sm outline-none transition hover:bg-accent/70 disabled:border-primary/40 disabled:bg-primary/14 disabled:opacity-100 opacity-75 cursor-pointer";
 
   return (
     <div className="search-widget flex h-full w-full items-center justify-center">
@@ -69,8 +68,8 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
               <button
                 key={engine.id}
                 type="button"
-                className={searchButtonClass}
-                disabled={isActive}
+                className="search-engine-button"
+                aria-pressed={isActive}
                 onClick={() => selectEngine(engine.id)}
                 aria-label={`Search with ${engine.name}`}
                 title={engine.name}
@@ -80,17 +79,18 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
             );
           })}
         </div>
-        <input
-          className="search-input items-center border border-input bg-input/45 text-foreground placeholder:text-muted-foreground rounded-xl shadow-sm transition focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
-          autoFocus
-          id="search-input"
-          type="text"
-          placeholder={
-            engines.find((item) => item.id === activeEngineId)?.name ?? "Search"
-          }
-          ref={inputRef}
-          onKeyDown={handleKeyDown}
-        />
+        <label className="search-field">
+          <HiMagnifyingGlass className="search-field-icon" aria-hidden="true" />
+          <input
+            className="search-input"
+            autoFocus
+            id="search-input"
+            type="text"
+            placeholder={`Search ${engines.find((item) => item.id === activeEngineId)?.name ?? "the web"}`}
+            ref={inputRef}
+            onKeyDown={handleKeyDown}
+          />
+        </label>
       </div>
     </div>
   );

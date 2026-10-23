@@ -1,5 +1,5 @@
 import React from "react";
-import { HiPlus } from "react-icons/hi2";
+import { HiArrowUpRight, HiPlus } from "react-icons/hi2";
 
 function getParsableUrl(url: string | null | undefined) {
   if (typeof url !== "string") {
@@ -154,20 +154,63 @@ interface BookmarkProps {
   onQuickAdd?: () => void;
 }
 
+// Google's favicon service answers unknown or icon-less sites with a generic
+// 16px globe, and many sites only publish 16px icons. Either looks blurry at
+// this size, so those get a lettered tile instead.
+const MIN_SHARP_FAVICON_PX = 32;
+
+function BookmarkFavicon({ name, url }: { name: string; url: string }) {
+  const [state, setState] = React.useState<"loading" | "ok" | "fallback">("loading");
+  const src = faviconUrl(url);
+
+  if (isSelfHostedUrl(url)) {
+    return (
+      <span className="bookmark-favicon-chip">
+        <LocalServiceStatus url={url} className="size-2 rounded-full" />
+      </span>
+    );
+  }
+
+  if (!src || state === "fallback") {
+    return (
+      <span className="bookmark-favicon-chip bookmark-favicon-letter" style={{ "--letter-hue": hueFor(getHostname(url) || name) }}>
+        {faviconFallbackLabel(name, url)}
+      </span>
+    );
+  }
+
+  return (
+    <span className="bookmark-favicon-chip">
+      <img
+        src={src}
+        srcSet={faviconSrcSet(url)}
+        alt=""
+        className="fade-in-image size-full object-contain"
+        data-loaded={state === "ok"}
+        onLoad={(event) => setState(event.currentTarget.naturalWidth < MIN_SHARP_FAVICON_PX ? "fallback" : "ok")}
+        onError={() => setState("fallback")}
+      />
+    </span>
+  );
+}
+
+/** A stable hue per site, so lettered tiles are distinguishable but calm. */
+function hueFor(text: string) {
+  let hash = 0;
+  for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) % 360;
+  return hash;
+}
+
 const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: BookmarkProps) => {
   const titleContent = (
-    <div className="bookmark-title truncate text-center font-semibold leading-none text-primary-foreground">
-      {title}
-    </div>
+    <span className="bookmark-title eyebrow inline-flex max-w-full items-center gap-1">
+      <span className="truncate">{title}</span>
+      {onTitleClick && <HiArrowUpRight className="bookmark-title-arrow size-3 shrink-0" aria-hidden="true" />}
+    </span>
   );
 
   return (
-    <div
-      className={
-        cardClass ||
-        "bg-primary text-primary-foreground rounded-xl col-span-1 h-36 w-36 overflow-hidden border border-border/50 shadow-lg"
-      }
-    >
+    <div className={cardClass || "surface-tile col-span-1 h-36 w-36 overflow-hidden rounded-[1.125rem]"}>
       <div className="bookmark-widget group/tile relative flex h-full flex-col">
         {onQuickAdd ? (
           <button
@@ -176,20 +219,16 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: Bookm
               event.stopPropagation();
               onQuickAdd();
             }}
-            className="absolute -right-1 -top-1 z-10 inline-flex size-6 items-center justify-center rounded-full border border-primary-foreground/30 bg-card text-card-foreground opacity-0 shadow-md transition hover:bg-accent hover:text-accent-foreground focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring group-hover/tile:opacity-100"
-            title="Quick add bookmark"
+            className="bookmark-quick-add"
+            title="Add a bookmark to this folder"
+            aria-label="Add a bookmark to this folder"
           >
             <HiPlus className="size-3.5" />
           </button>
         ) : null}
-        <div className="bookmark-header border-b border-primary-foreground/15">
+        <div className="bookmark-header">
           {onTitleClick ? (
-            <button
-              type="button"
-              onClick={onTitleClick}
-              className="block w-full min-w-0 text-center transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-foreground/45"
-              title="Open bookmark view"
-            >
+            <button type="button" onClick={onTitleClick} className="bookmark-title-button" title="Open in Bookmarks">
               {titleContent}
             </button>
           ) : (
@@ -201,38 +240,12 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: Bookm
           <ul className="bookmark-items">
             {content.map(({ name, url }, key) => (
               <li key={key}>
-                <a
-                  href={url}
-                  className="bookmark-link flex items-center rounded-lg transition hover:bg-primary-foreground/10"
-                  title={url}
-                >
-                  {isSelfHostedUrl(url) ? (
-                    <LocalServiceStatus url={url} className="bookmark-favicon inline-block shrink-0 rounded-full" />
-                  ) : faviconUrl(url) ? (
-                    <img
-                      src={faviconUrl(url) ?? undefined}
-                      srcSet={faviconSrcSet(url)}
-                      alt=""
-                      className="bookmark-favicon shrink-0 rounded-sm object-contain opacity-90"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                        e.currentTarget.nextElementSibling?.removeAttribute("hidden");
-                      }}
-                    />
-                  ) : null}
-                  {!isSelfHostedUrl(url) && (
-                    <span hidden className="bookmark-favicon-fallback bookmark-favicon shrink-0">
-                      {faviconFallbackLabel(name, url)}
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <div className="bookmark-name truncate font-medium leading-tight text-primary-foreground">
-                      {name}
-                    </div>
-                    <div className="bookmark-host truncate leading-none text-primary-foreground/65">
-                      {getHostname(url)}
-                    </div>
-                  </div>
+                <a href={url} className="bookmark-link" title={url}>
+                  <BookmarkFavicon name={name} url={url} />
+                  <span className="min-w-0">
+                    <span className="bookmark-name block truncate">{name}</span>
+                    <span className="bookmark-host block truncate">{getHostname(url)}</span>
+                  </span>
                 </a>
               </li>
             ))}

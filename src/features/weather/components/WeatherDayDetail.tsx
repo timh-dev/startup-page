@@ -3,6 +3,7 @@ import { WiDaySunny, WiCloud, WiRain, WiSprinkle, WiSnow, WiThunderstorm, WiFog 
 import VolumetricCloudscape from "@/features/media/components/VolumetricCloudscape";
 import { useWeatherStore, useWeatherInstance } from "@/features/weather/stores/weatherStore";
 import { useWeatherData, type WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
+import { WeatherStatus } from "./WeatherStatus";
 import { getOpenWeatherCondition, getOpenWeatherCoverage, getOpenWeatherVisualProfile, getCloudFraction, resolveWeather } from "@/features/weather/utils";
 import { sunElevation } from "@/features/media/solarGraph/solarMath";
 import type { HourlyForecastPoint } from "@/features/weather/types/weather";
@@ -172,7 +173,7 @@ interface WeatherDayDetailProps {
 // own or opened from a compact WeatherBox's day-detail dialog.
 export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDetailProps): React.ReactElement {
   useWeatherData(instanceId, overrides);
-  const { data, selectedDay, lat, lon } = useWeatherInstance(instanceId);
+  const { data, error, selectedDay, lat, lon } = useWeatherInstance(instanceId);
   const clockTime = useWeatherStore((state) => state.clockTime);
   const tickClock = useWeatherStore((state) => state.tickClock);
   // Hooks must run unconditionally on every render, so these come before the
@@ -186,11 +187,8 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
   }, [tickClock]);
 
   if (!data) {
-    return (
-      <div className="weather-detail-panel">
-        <p className="weather-detail-empty">Loading weather…</p>
-      </div>
-    );
+    // Showed "Loading weather…" forever when there was an error (e.g. no API key).
+    return <WeatherStatus error={error} instanceId={instanceId} />;
   }
 
   const resolved = resolveWeather(data, clockTime);

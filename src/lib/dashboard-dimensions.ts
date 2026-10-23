@@ -66,8 +66,8 @@ export const DEFAULT_WIDGETS: WidgetInstance[] = [
     size: "feature",
     config: {},
     items: [
-      { id: "default-stack-windy", type: "iframe", size: "small", config: { preset: "windy", url: "" } },
       { id: "default-stack-weather", type: "weather", size: "small", config: { variant: "detail" } },
+      { id: "default-stack-windy", type: "iframe", size: "small", config: { preset: "windy", url: "" } },
       { id: "default-stack-headlines", type: "headlines", size: "small", config: {} },
       { id: "default-stack-airQuality", type: "airQuality", size: "small", config: {} },
       { id: "default-stack-timer", type: "timer", size: "small", config: {} },

@@ -1,11 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { HiMagnifyingGlass, HiOutlineBookOpen, HiPlus } from "react-icons/hi2";
+import { HiChevronRight, HiMagnifyingGlass, HiOutlineBookOpen, HiPlus } from "react-icons/hi2";
 import { VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
 import { useQuickAddStore, type VaultSection } from "@/features/resourceVault/stores/quickAddStore";
 
 const LAUNCHER_TILES: Array<{ section: VaultSection; label: string; icon: typeof HiOutlineBookOpen; colorClass: string }> = [
-  { section: "links", label: "Useful Links", icon: HiOutlineBookOpen, colorClass: "read-tag-reference" },
+  { section: "links", label: "Links", icon: HiOutlineBookOpen, colorClass: "read-tag-reference" },
   ...VAULT_KIND_ORDER.map((kind) => ({
     section: kind as VaultSection,
     label: VAULT_KIND_DEFS[kind].label,
@@ -44,60 +44,63 @@ export default function VaultLauncher() {
 
   return (
     <div className="vault-launcher">
-      <div className="vault-launcher-grid">
-        {LAUNCHER_TILES.map(({ section, label, icon: Icon, colorClass }) => (
+      <div className="vault-launcher-header">
+        <span className="eyebrow">Vault</span>
+        <div className="vault-launcher-actions">
           <button
             type="button"
-            key={section}
-            className="vault-launcher-tile"
-            onClick={() => openSection(section)}
-            title={`Open ${label}`}
+            className="vault-launcher-action"
+            onClick={() => navigate("/resources", { state: { focusSearch: true } })}
+            title="Search the vault"
+            aria-label="Search the vault"
           >
-            <span className={`vault-launcher-tile-icon ${colorClass}`}>
-              <Icon className="size-4" />
-            </span>
-            <span className="vault-launcher-tile-label">{label}</span>
+            <HiMagnifyingGlass className="size-3.5" />
           </button>
-        ))}
-
-        <button
-          type="button"
-          className="vault-launcher-tile vault-launcher-tile-accent"
-          onClick={() => navigate("/resources", { state: { focusSearch: true } })}
-          title="Search the vault"
-        >
-          <HiMagnifyingGlass className="size-4" />
-        </button>
-
-        <div className="vault-launcher-add" ref={addMenuRef}>
-          <button
-            type="button"
-            className="vault-launcher-tile vault-launcher-tile-accent"
-            onClick={() => setAddMenuOpen((current) => !current)}
-            aria-expanded={addMenuOpen}
-            aria-haspopup="listbox"
-            title="Quick add"
-          >
-            <HiPlus className="size-4" />
-          </button>
-          {addMenuOpen && (
-            <div className="vault-launcher-popover" role="listbox" aria-label="Add to vault">
-              {LAUNCHER_TILES.map(({ section, label, icon: Icon }) => (
-                <button
-                  type="button"
-                  key={section}
-                  role="option"
-                  className="vg-popover-option"
-                  onClick={() => quickAdd(section)}
-                >
-                  <Icon className="size-3.5" />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="vault-launcher-add" ref={addMenuRef}>
+            <button
+              type="button"
+              className="vault-launcher-action"
+              onClick={() => setAddMenuOpen((current) => !current)}
+              aria-expanded={addMenuOpen}
+              aria-haspopup="listbox"
+              title="Add to the vault"
+              aria-label="Add to the vault"
+            >
+              <HiPlus className="size-3.5" />
+            </button>
+            {addMenuOpen && (
+              <div className="vault-launcher-popover surface-glass" role="listbox" aria-label="Add to vault">
+                {LAUNCHER_TILES.map(({ section, label, icon: Icon }) => (
+                  <button
+                    type="button"
+                    key={section}
+                    role="option"
+                    className="vg-popover-option"
+                    onClick={() => quickAdd(section)}
+                  >
+                    <Icon className="size-3.5" />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      <ul className="vault-launcher-list">
+        {LAUNCHER_TILES.map(({ section, label, icon: Icon, colorClass }) => (
+          <li key={section}>
+            <button type="button" className="vault-launcher-row" onClick={() => openSection(section)} title={`Open ${label}`}>
+              <span className={`vault-launcher-row-icon ${colorClass}`}>
+                <Icon className="size-3.5" />
+              </span>
+              <span className="vault-launcher-row-label">{label}</span>
+              <HiChevronRight className="vault-launcher-row-chevron size-3.5" aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

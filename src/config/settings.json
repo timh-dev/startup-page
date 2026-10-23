@@ -233,7 +233,7 @@
   },
   "bookmark": [
     {
-      "title": "bookmark box 1",
+      "title": "Reading",
       "content": [
         {
           "name": "hacker news",
@@ -250,7 +250,7 @@
       ]
     },
     {
-      "title": "bookmark box 2",
+      "title": "Development",
       "content": [
         {
           "name": "stackoverflow",
@@ -263,7 +263,7 @@
       ]
     },
     {
-      "title": "bookmark box 3",
+      "title": "Finance",
       "content": [
         {
           "name": "tdameritrade",
@@ -292,7 +292,7 @@
       ]
     },
     {
-      "title": "bookmark box 4",
+      "title": "Social",
       "content": [
         {
           "name": "reddit",
@@ -317,7 +317,7 @@
       ]
     },
     {
-      "title": "bookmark box 5",
+      "title": "Home lab",
       "content": [
         {
           "name": "homebridge",

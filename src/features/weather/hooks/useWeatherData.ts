@@ -170,6 +170,8 @@ async function fetchWeather(
   return { data: weatherData, location: current.name };
 }
 
+export const MISSING_API_KEY_MESSAGE = "Add your OpenWeather API key in this widget's settings";
+
 export interface WeatherOverrides {
   lat?: number | null;
   lon?: number | null;
@@ -200,7 +202,7 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
     const key = (apiKey || "").trim();
 
     if (!key) {
-      setError(instanceId, "Add your OpenWeather API key in this widget's settings");
+      setError(instanceId, MISSING_API_KEY_MESSAGE);
       return;
     }
 

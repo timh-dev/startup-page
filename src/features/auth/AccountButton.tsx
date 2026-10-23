@@ -163,7 +163,7 @@ function StatusDot({ color, pulse, title }: { color: string; pulse: boolean; tit
   return (
     <span
       title={title}
-      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background ${color} ${pulse ? "animate-pulse" : ""}`}
+      className={`absolute bottom-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ring-card ${color} ${pulse ? "animate-pulse" : ""}`}
     />
   );
 }
@@ -204,7 +204,7 @@ export default function AccountButton() {
       <Dialog open={localInfoOpen} onOpenChange={setLocalInfoOpen}>
         <button
           type="button"
-          className="relative cursor-pointer text-2xl"
+          className="toolbar-button"
           onClick={() => setLocalInfoOpen(true)}
           title="Local mode — settings stored in this browser. Click for details."
         >
@@ -257,11 +257,11 @@ export default function AccountButton() {
       <Dialog open={accountOpen} onOpenChange={setAccountOpen}>
         <button
           type="button"
-          className="relative cursor-pointer"
+          className="toolbar-button"
           onClick={() => setAccountOpen(true)}
           title={`Signed in as ${email} — ${presence.label}`}
         >
-          <Avatar imageUrl={user?.imageUrl} initials={initials} size="h-7 w-7" />
+          <Avatar imageUrl={user?.imageUrl} initials={initials} size="h-6 w-6" />
           <StatusDot color={presence.dotColor} pulse={presence.pulse} title={presence.label} />
         </button>
         <DialogContent className="w-[min(92vw,420px)] border-border/60 bg-background/98 p-6">

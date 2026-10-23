@@ -1,26 +1,20 @@
 import React from "react";
-import { HiMoon, HiSun } from "react-icons/hi";
+import { HiOutlineMoon, HiOutlineSun } from "react-icons/hi2";
 import { ThemeContext } from "@/components/layout/ThemeContext";
 
-const Toggle = () => {
+export default function ThemeToggle() {
   const { theme, themeMode, setThemeMode } = React.useContext(ThemeContext);
   const nextTheme = themeMode === "dark" ? "light" : "dark";
 
   return (
-    <div className="transition duration-500 ease-in-out rounded-full p-1">
-      {theme === "dark" ? (
-        <HiMoon
-          onClick={() => setThemeMode(nextTheme)}
-          className="text-current text-4xl cursor-pointer"
-        />
-      ) : (
-        <HiSun
-          onClick={() => setThemeMode(nextTheme)}
-          className="text-current text-4xl cursor-pointer"
-        />
-      )}
-    </div>
+    <button
+      type="button"
+      className="toolbar-button"
+      onClick={() => setThemeMode(nextTheme)}
+      title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {theme === "dark" ? <HiOutlineMoon /> : <HiOutlineSun />}
+    </button>
   );
-};
-
-export default Toggle;
+}

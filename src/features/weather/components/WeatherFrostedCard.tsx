@@ -2,6 +2,7 @@ import React from "react";
 import { WiDaySunny, WiCloudy, WiStrongWind, WiRain, WiSnow } from "react-icons/wi";
 import { useWeatherStore, useWeatherInstance } from "@/features/weather/stores/weatherStore";
 import { useWeatherData, type WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
+import { WeatherStatus } from "./WeatherStatus";
 import { getEffectiveWind, getOpenWeatherCondition, getOpenWeatherVisualProfile } from "@/features/weather/utils";
 import type { WeatherCondition, WeatherData } from "@/features/weather/types/weather";
 
@@ -240,13 +241,8 @@ function FrostedLoading(): React.ReactElement {
   );
 }
 
-function FrostedError({ message }: { message: string }): React.ReactElement {
-  return (
-    <div className="weather-v2-card weather-v2-state relative flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-[inherit] p-4 text-center">
-      <p className="weather-v2-state-title">Weather unavailable</p>
-      <p className="weather-v2-state-hint">{message}</p>
-    </div>
-  );
+function FrostedError({ message, instanceId }: { message: string; instanceId?: string }): React.ReactElement {
+  return <WeatherStatus error={message} instanceId={instanceId} />;
 }
 
 interface FrostedContentProps {
@@ -362,7 +358,7 @@ function LiveFrostedCard({ instanceId, overrides }: { instanceId: string; overri
     return () => window.clearInterval(timer);
   }, [tickClock]);
 
-  if (error) return <FrostedError message={error} />;
+  if (error) return <FrostedError message={error} instanceId={instanceId} />;
   if (!data) return <FrostedLoading />;
 
   // A selected forecast day (from the v1 widget's date pills, sharing this

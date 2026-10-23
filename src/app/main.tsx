@@ -1,6 +1,10 @@
 import { StrictMode, lazy, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter, Route, Routes } from "react-router-dom";
+import "@fontsource-variable/inter/opsz.css";
+import "@fontsource-variable/playfair-display/wght.css";
+import "@fontsource-variable/playfair-display/wght-italic.css";
+import "@fontsource-variable/jetbrains-mono/wght.css";
 import "@/assets/styles/index.css";
 import { hydrateSettingsFromIndexedDb } from "@/lib/settings";
 import { useSettingsStore } from "@/features/settings/stores";

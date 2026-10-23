@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { KBarProvider, useRegisterActions } from "kbar";
-import { HiArchiveBox, HiBookmark, HiHome, HiOutlineSquares2X2 } from "react-icons/hi2";
+import { HiOutlineArchiveBox, HiOutlineBookmark, HiOutlineHome, HiOutlineSquares2X2 } from "react-icons/hi2";
 
 import { isBuiltInPalette } from "@/lib/theme-palettes";
 import { useSettingsStore } from "@/features/settings/stores";
@@ -211,7 +211,7 @@ function AppLayoutInner() {
 
   return (
     <section
-      className="relative min-h-screen overflow-x-hidden bg-background text-foreground transition-colors"
+      className="relative min-h-screen overflow-x-hidden text-foreground"
       onWheel={handleWheel}
     >
       <ThemeSync />
@@ -219,71 +219,72 @@ function AppLayoutInner() {
       <VaultNavigationActions />
       <BookmarkDialogs />
       <WidgetConfigDialog />
-      <nav className="vault-nav-center" aria-label="Page navigation">
-        {vaultEnabled && (
+      <header className="app-header">
+        <nav className="app-nav surface-glass" aria-label="Pages">
+          {vaultEnabled && (
+            <button
+              type="button"
+              className="app-nav-item"
+              onClick={() => navigate("/resources")}
+              title="Resource Vault (1)"
+              aria-current={isResources ? "page" : undefined}
+            >
+              <HiOutlineArchiveBox aria-hidden="true" />
+              <span>Vault</span>
+            </button>
+          )}
           <button
             type="button"
-            className={`vault-nav-button ${isResources ? "vault-nav-button-active" : ""}`}
-            onClick={() => navigate("/resources")}
-            title="Open Resource Vault (1)"
-            aria-label="Resource Vault"
-            aria-current={isResources ? "page" : undefined}
+            className="app-nav-item"
+            onClick={() => navigate("/")}
+            title="Dashboard (2)"
+            aria-current={isDashboard ? "page" : undefined}
           >
-            <HiArchiveBox className="size-4" />
-            <span className="vault-nav-number">1</span>
+            <HiOutlineHome aria-hidden="true" />
+            <span>Home</span>
           </button>
-        )}
-        <button
-          type="button"
-          className={`vault-nav-button ${isDashboard ? "vault-nav-button-active" : ""}`}
-          onClick={() => navigate("/")}
-          title="Dashboard (2)"
-          aria-label="Dashboard"
-          aria-current={isDashboard ? "page" : undefined}
-        >
-          <HiHome className="size-4" />
-          <span className="vault-nav-number">2</span>
-        </button>
-        {bookmarksEnabled && (
-          <button
-            type="button"
-            className={`vault-nav-button ${isBookmarks ? "vault-nav-button-active" : ""}`}
-            onClick={() => navigate("/bookmarks")}
-            title="Open Bookmark Vault (3)"
-            aria-label="Bookmark Vault"
-            aria-current={isBookmarks ? "page" : undefined}
-          >
-            <HiBookmark className="size-4" />
-            <span className="vault-nav-number">3</span>
-          </button>
-        )}
-      </nav>
-      <div className="fixed right-5 top-5 z-40 flex items-center gap-3 text-foreground drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
-        {isDashboard && (
-          <button
-            type="button"
-            onClick={toggleLayoutEditing}
-            className={`cursor-pointer text-4xl transition ${
-              editingLayout ? "text-primary" : "text-current opacity-90 hover:opacity-100"
-            }`}
-            title={editingLayout ? "Finish editing layout" : "Edit layout"}
-            aria-label="Edit dashboard layout"
-            aria-pressed={editingLayout}
-          >
-            <HiOutlineSquares2X2 />
-          </button>
-        )}
-        <Toggle />
-        {isClerkAvailable && <AccountButton />}
-        <SettingsButton />
-      </div>
+          {bookmarksEnabled && (
+            <button
+              type="button"
+              className="app-nav-item"
+              onClick={() => navigate("/bookmarks")}
+              title="Bookmarks (3)"
+              aria-current={isBookmarks ? "page" : undefined}
+            >
+              <HiOutlineBookmark aria-hidden="true" />
+              <span>Bookmarks</span>
+            </button>
+          )}
+        </nav>
+        <div className="app-toolbar surface-glass">
+          {isDashboard && (
+            <button
+              type="button"
+              onClick={toggleLayoutEditing}
+              className="toolbar-button"
+              title={editingLayout ? "Finish editing layout" : "Edit layout"}
+              aria-label="Edit dashboard layout"
+              aria-pressed={editingLayout}
+            >
+              <HiOutlineSquares2X2 />
+            </button>
+          )}
+          <Toggle />
+          {isClerkAvailable && <AccountButton />}
+          <SettingsButton />
+        </div>
+      </header>
       {/* Dashboard stays mounted across navigation so the WebGL context is never destroyed.
           Shader compilation (1–3 s GPU sync) only happens once on first load, not on every
           return visit from /bookmarks or /resources. */}
       <div style={{ display: isDashboard ? "block" : "none" }} aria-hidden={!isDashboard}>
         <DashboardPage />
       </div>
-      {!isDashboard && <Outlet />}
+      {!isDashboard && (
+        <div key={location.pathname} className="page-enter">
+          <Outlet />
+        </div>
+      )}
     </section>
   );
 }

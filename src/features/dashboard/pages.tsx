@@ -73,41 +73,31 @@ export default function Index() {
   `;
   const radiusClass =
     ui.cardStyle === "soft"
-      ? "rounded-[2rem]"
+      ? "rounded-[1.75rem]"
       : ui.cardStyle === "sharp"
-        ? "rounded-md"
-        : "rounded-xl";
+        ? "rounded-[0.625rem]"
+        : "rounded-[1.125rem]";
 
-  const panel = (extra = "") => `${radiusClass} ${extra}`;
-  const surface = "bg-card text-card-foreground border border-border/60 shadow-lg";
-  const mutedSurface = "bg-muted/50 text-foreground border border-border/60 shadow-lg";
-  const strongSurface = "bg-primary text-primary-foreground border border-border/40 shadow-lg";
+  // Two materials (src/assets/styles/design-system.css): an opaque card for
+  // tiles with their own content, and a rimmed edge-to-edge frame for
+  // imagery. Weather paints its own sky, so it only gets the frame.
+  const tile = (extra = "") => `${radiusClass} h-full w-full surface-tile ${extra}`;
+  const media = (extra = "") => `${radiusClass} h-full w-full surface-media ${extra}`;
 
-  // Per-type outer chrome. "weather" stays transparent (it paints its own sky
-  // gradient); bookmark/photo forward the full class straight into the
-  // wrapped component's own `cardClass` prop instead of double-wrapping.
   const cardClassFor = (type: string): string => {
     switch (type) {
-      case "search":
-        return panel(`h-full w-full ${strongSurface}`);
-      case "weather":
-        return panel("h-full w-full overflow-hidden");
       case "bookmark":
-        return panel(`h-full w-full overflow-y-auto ${strongSurface}`);
+        return tile("overflow-y-auto");
       case "photo":
-        return panel(`relative overflow-hidden h-full w-full bg-center bg-no-repeat ${surface}`);
-      case "vault":
-        return panel(`h-full w-full overflow-hidden ${strongSurface}`);
-      case "solarGraph":
-        return panel("h-full w-full bg-black border border-border/60 shadow-lg");
       case "video":
-        return panel(`h-full w-full overflow-hidden ${surface}`);
-      case "stack":
-        return panel(`h-full w-full overflow-visible ${surface}`);
-      case "clock":
-        return panel(`h-full w-full ${mutedSurface}`);
+      case "weather":
+      case "weatherV2":
+      case "iframe":
+        return media();
+      case "solarGraph":
+        return media("bg-black");
       default:
-        return panel(`h-full w-full overflow-hidden ${surface}`);
+        return tile("overflow-hidden");
     }
   };
 
@@ -151,7 +141,7 @@ export default function Index() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 pb-10 pt-28">
+    <div className="flex min-h-screen items-center justify-center px-4 pb-16 pt-24">
       <style>{gridCss}</style>
 
       {editing && (

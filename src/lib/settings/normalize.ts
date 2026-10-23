@@ -79,9 +79,10 @@ const LEGACY_TILE_SIZES: Record<string, string> = {
   clock: "small",
 };
 
-// Mirrors FeaturePanel's old ALL_MODES order/keys.
+// FeaturePanel's old ALL_MODES keys. Weather leads (the old panel opened on
+// the Windy embed) so a new dashboard's stack opens on the native forecast.
 const LEGACY_FEATURE_MODE_ORDER = [
-  "windy", "weather", "headlines", "airQuality", "timer", "wikipedia", "rss", "github", "spotify", "unsplash",
+  "weather", "windy", "headlines", "airQuality", "timer", "wikipedia", "rss", "github", "spotify", "unsplash",
 ];
 
 function buildLegacyFeatureStackItems(featurePanel: Settings["featurePanel"], mergedSettings: Settings) {

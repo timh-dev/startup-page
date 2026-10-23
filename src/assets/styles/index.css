@@ -1,6 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Lora:wght@400;500;600;700&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./design-system.css";
 @config "../../../tailwind.config.cjs";
 
 @custom-variant dark (&:is(.dark *));
@@ -42,9 +42,9 @@
   --sidebar-accent-foreground: oklch(0.3012 0 0);
   --sidebar-border: oklch(0.8434 0.0231 87.1621);
   --sidebar-ring: oklch(0.3012 0 0);
-  --font-sans: "Inter", sans-serif;
-  --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
@@ -90,9 +90,9 @@
   --sidebar-accent-foreground: oklch(0.852 0.0205 100.6306);
   --sidebar-border: oklch(0.2931 0 0);
   --sidebar-ring: oklch(0.852 0.0205 100.6306);
-  --font-sans: "Inter", sans-serif;
-  --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
   --shadow-xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
@@ -1644,19 +1644,26 @@
   gap: clamp(0.3rem, 2cqh, 0.5rem);
 }
 
+.clock-plain-weekday {
+  font-size: clamp(0.6rem, 4.8cqw, 0.6875rem);
+  line-height: 1.2;
+}
+
 .clock-plain-date {
-  font-weight: 700;
-  font-size: clamp(1rem, 11cqw, 1.5rem);
+  margin-top: 0.15em;
+  font-weight: 600;
+  font-size: clamp(0.95rem, 9.5cqw, 1.25rem);
   line-height: 1.15;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  font-variant-numeric: lining-nums;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .clock-plain-offset {
-  margin-top: 0.2em;
-  font-size: clamp(0.68rem, 5.5cqw, 0.85rem);
+  margin-top: 0.1em;
+  font-size: clamp(0.68rem, 5.5cqw, 0.8125rem);
   color: var(--muted-foreground);
 }
 
@@ -1684,16 +1691,16 @@
 }
 
 .clock-plain-time-value {
-  font-weight: 700;
-  font-size: clamp(1.6rem, 17cqw, 2.6rem);
+  font-weight: 600;
+  font-size: clamp(1.75rem, 19cqw, 2.85rem);
   line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
 }
 
 .clock-plain-time-meridiem {
-  font-weight: 600;
-  font-size: clamp(0.9rem, 9cqw, 1.3rem);
+  font-weight: 500;
+  font-size: clamp(0.75rem, 7cqw, 1rem);
+  letter-spacing: 0.02em;
   color: var(--muted-foreground);
 }
 
@@ -1911,31 +1918,82 @@
 }
 
 .search-inner {
-  width: min(82cqw, 15rem);
+  width: min(86cqw, 22rem);
 }
 
 .search-engines {
-  gap: clamp(0.5rem, 6cqw, 2rem);
-  padding-top: clamp(0.25rem, 7cqh, 2rem);
-  padding-bottom: clamp(0.375rem, 4cqh, 1rem);
+  gap: clamp(0.25rem, 3cqw, 0.75rem);
+  padding-bottom: clamp(0.5rem, 6cqh, 0.9rem);
 }
 
 .search-engine-button {
-  width: clamp(1.75rem, 18cqh, 2.5rem);
-  height: clamp(1.75rem, 18cqh, 2.5rem);
-  background-size: clamp(1rem, 10cqh, 1.75rem) clamp(1rem, 10cqh, 1.75rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(1.9rem, 20cqh, 2.4rem);
+  height: clamp(1.9rem, 20cqh, 2.4rem);
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.search-engine-button:hover {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.search-engine-button:active {
+  transform: scale(0.94);
+}
+
+.search-engine-button[aria-pressed="true"] {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 9%, transparent);
 }
 
 .search-engine-icon {
-  width: clamp(1rem, 10cqh, 1.75rem);
-  height: clamp(1rem, 10cqh, 1.75rem);
+  width: clamp(1rem, 10cqh, 1.25rem);
+  height: clamp(1rem, 10cqh, 1.25rem);
+}
+
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-field-icon {
+  position: absolute;
+  left: 0.85rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
 }
 
 .search-input {
   width: 100%;
-  height: clamp(1.8rem, 16cqh, 2.25rem);
-  padding-inline: clamp(0.5rem, 4cqw, 0.75rem);
-  font-size: clamp(0.7rem, 6cqh, 0.875rem);
+  height: clamp(2.1rem, 22cqh, 2.6rem);
+  padding: 0 1rem 0 2.35rem;
+  border-radius: 9999px;
+  border: var(--hairline-width) solid var(--hairline-strong);
+  background: color-mix(in oklab, var(--background) 65%, var(--card));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06);
+  color: var(--foreground);
+  font-size: clamp(0.8rem, 7cqh, 0.9375rem);
+  transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.search-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.search-input:focus {
+  outline: none;
+  background: var(--card);
+  border-color: color-mix(in oklab, var(--ring) 45%, transparent);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.04), 0 0 0 3px color-mix(in oklab, var(--ring) 14%, transparent);
 }
 
 .vault-nav-center {
@@ -2013,49 +2071,124 @@
 
 .bookmark-header {
   min-width: 0;
-  padding: clamp(0.35rem, 4cqh, 0.625rem) clamp(0.85rem, 9cqw, 1.35rem);
+  padding: clamp(0.6rem, 7cqh, 0.9rem) clamp(0.75rem, 8cqw, 1rem) clamp(0.25rem, 3cqh, 0.4rem);
 }
 
-.bookmark-title {
-  margin-top: 0;
+.bookmark-title-button {
+  display: block;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: clamp(0.62rem, 6cqh, 0.875rem);
+  border-radius: 0.375rem;
+  text-align: left;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.bookmark-title-button:hover .bookmark-title {
+  color: var(--foreground);
+}
+
+.bookmark-title-arrow {
+  opacity: 0;
+  transform: translate(-2px, 2px);
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.bookmark-title-button:hover .bookmark-title-arrow {
+  opacity: 1;
+  transform: none;
+}
+
+.bookmark-quick-add {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.bookmark-quick-add:hover {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.group\/tile:hover .bookmark-quick-add,
+.bookmark-quick-add:focus-visible {
+  opacity: 1;
 }
 
 .bookmark-list {
-  padding: clamp(0.25rem, 3cqh, 0.5rem) clamp(0.3rem, 3cqw, 0.5rem);
+  padding: 0 clamp(0.3rem, 3cqw, 0.45rem) clamp(0.3rem, 3cqh, 0.45rem);
 }
 
 .bookmark-items {
   display: grid;
-  gap: clamp(0.0625rem, 1cqh, 0.25rem);
+  gap: 1px;
 }
 
 .bookmark-link {
-  gap: clamp(0.25rem, 3cqw, 0.5rem);
-  padding: clamp(0.2rem, 2.2cqh, 0.375rem) clamp(0.3rem, 3cqw, 0.5rem);
+  display: flex;
+  align-items: center;
+  gap: clamp(0.4rem, 4cqw, 0.6rem);
+  padding: clamp(0.25rem, 2.6cqh, 0.4rem) clamp(0.4rem, 4cqw, 0.55rem);
+  border-radius: 0.6rem;
+  color: var(--card-foreground);
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.bookmark-favicon {
-  width: clamp(0.625rem, 6cqh, 0.875rem);
-  height: clamp(0.625rem, 6cqh, 0.875rem);
+.bookmark-link:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
 }
 
+/* Favicons sit in a small white "app icon" chip, so every site's icon gets
+   the same frame regardless of its own background. */
+.bookmark-favicon-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: clamp(1.25rem, 11cqh, 1.5rem);
+  height: clamp(1.25rem, 11cqh, 1.5rem);
+  padding: 0.2rem;
+  border-radius: 0.45rem;
+  background: color-mix(in oklab, white 92%, var(--card));
+  box-shadow: 0 0 0 var(--hairline-width) var(--hairline), 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.dark .bookmark-favicon-chip {
+  background: color-mix(in oklab, white 88%, var(--card));
+}
+
+.bookmark-favicon-letter {
+  padding: 0;
+  background: linear-gradient(160deg, oklch(0.72 0.09 var(--letter-hue, 220)), oklch(0.58 0.1 var(--letter-hue, 220)));
+  color: white;
+  font-size: clamp(0.6rem, 6cqh, 0.75rem);
+  font-weight: 650;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.dark .bookmark-favicon-letter {
+  background: linear-gradient(160deg, oklch(0.62 0.09 var(--letter-hue, 220)), oklch(0.48 0.1 var(--letter-hue, 220)));
+}
+
+/* Lettered stand-in on the Bookmarks page (pills and folder view). */
 .bookmark-favicon-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in oklab, var(--primary-foreground) 24%, transparent);
-  border-radius: 0.28rem;
-  background:
-    radial-gradient(circle at 30% 24%, color-mix(in oklab, var(--primary-foreground) 34%, transparent), transparent 36%),
-    linear-gradient(135deg, color-mix(in oklab, var(--primary) 88%, white), color-mix(in oklab, var(--accent) 72%, var(--primary)));
+  border-radius: 0.3rem;
+  background: linear-gradient(160deg, color-mix(in oklab, var(--primary) 78%, white), var(--primary));
   color: var(--primary-foreground);
-  font-size: clamp(0.42rem, 3.8cqh, 0.62rem);
-  font-weight: 800;
+  font-size: 0.6rem;
+  font-weight: 650;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -2065,18 +2198,27 @@
 }
 
 .bookmark-name {
-  font-size: clamp(0.55rem, 5cqh, 0.75rem);
+  font-size: clamp(0.72rem, 6.6cqh, 0.8125rem);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
 }
 
 .bookmark-host {
-  margin-top: clamp(0rem, 0.8cqh, 0.125rem);
-  font-size: clamp(0.45rem, 3.6cqh, 0.625rem);
+  margin-top: 1px;
+  font-size: clamp(0.62rem, 5cqh, 0.6875rem);
+  line-height: 1.2;
+  color: var(--muted-foreground);
 }
 
-@container (max-height: 7.75rem) {
+/* Domains are secondary; drop them before rows start scrolling out of view. */
+@container (max-height: 14rem) {
   .bookmark-host {
     display: none;
   }
+}
+
+@container (max-height: 7.75rem) {
 
   .bookmark-link {
     padding-block: clamp(0.15rem, 1.7cqh, 0.25rem);
@@ -3622,74 +3764,99 @@
 
 .vault-launcher {
   display: flex;
+  flex-direction: column;
   height: 100%;
-  padding: 0.6rem;
-  border-radius: 1rem;
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-  background: color-mix(in oklab, var(--card) 92%, black 8%);
+  padding: 0.6rem 0.45rem 0.45rem;
 }
 
-.vault-launcher-grid {
+.vault-launcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.3rem 0.25rem 0.55rem;
+}
+
+.vault-launcher-actions {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.vault-launcher-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.vault-launcher-action:hover,
+.vault-launcher-action[aria-expanded="true"] {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 7%, transparent);
+}
+
+.vault-launcher-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: min-content;
-  gap: 0.4rem;
-  width: 100%;
+  gap: 1px;
   min-height: 0;
   overflow-y: auto;
 }
 
-.vault-launcher-tile {
+.vault-launcher-row {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0.45rem;
-  min-width: 0;
-  min-height: 3.6rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: 0.7rem;
-  background: color-mix(in oklab, var(--foreground) 6%, transparent);
-  color: color-mix(in oklab, var(--card-foreground) 92%, transparent);
-  transition: background 0.15s ease;
-}
-
-.vault-launcher-tile:hover {
-  background: color-mix(in oklab, var(--foreground) 12%, transparent);
-}
-
-.vault-launcher-tile-icon {
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 9999px;
-  color: var(--read-tag-color, currentColor);
-  background: color-mix(in oklab, var(--read-tag-color, var(--muted-foreground)) 18%, transparent);
-}
-
-.vault-launcher-tile-label {
+  gap: 0.6rem;
   width: 100%;
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1.15;
+  padding: 0.22rem 0.45rem;
+  border-radius: 0.6rem;
+  color: var(--card-foreground);
   text-align: left;
-  overflow-wrap: break-word;
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.vault-launcher-tile-accent {
+.vault-launcher-row:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.vault-launcher-row-icon {
+  display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  color: color-mix(in oklab, var(--card-foreground) 75%, transparent);
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.5rem;
+  color: var(--read-tag-color, currentColor);
+  background: color-mix(in oklab, var(--read-tag-color, var(--muted-foreground)) 15%, transparent);
+}
+
+.vault-launcher-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.vault-launcher-row-chevron {
+  color: var(--muted-foreground);
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.vault-launcher-row:hover .vault-launcher-row-chevron {
+  opacity: 1;
+  transform: none;
 }
 
 .vault-launcher-add {
   position: relative;
-}
-
-.vault-launcher-add .vault-launcher-tile {
-  width: 100%;
 }
 
 /* Anchored to the trigger's horizontal center (not left/right:0) since this
@@ -3699,8 +3866,7 @@
 .vault-launcher-popover {
   position: absolute;
   top: calc(100% + 0.4rem);
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
