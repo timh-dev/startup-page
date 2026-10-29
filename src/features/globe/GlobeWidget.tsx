@@ -16,6 +16,22 @@ const FALLBACK = { latitude: 40.7128, longitude: -74.006 };
 const MAX_DPR = 1.5;
 const FRAME_MS = 1000 / 30;
 
+// On load the sun replays the day so far: time runs from local midnight to
+// now, a short sweep just after midnight and up to ~4 s by evening. It eases
+// in and out: a beat on the night side, then through the day, settling into
+// the present.
+function sweepDuration(from: Date, to: Date) {
+  const dayFraction = (to.getTime() - from.getTime()) / 86_400_000;
+  return 1200 + 2800 * Math.min(1, Math.max(0, dayFraction));
+}
+const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+
+function localMidnight(date: Date) {
+  const midnight = new Date(date);
+  midnight.setHours(0, 0, 0, 0);
+  return midnight;
+}
+
 /** The browser's time zone as a place ("Chicago"), as the clock shows it. */
 function placeLabel() {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
@@ -42,6 +58,11 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
   const savedLongitude = useSettingsStore((state) => state.settings.longitude);
   const [located, setLocated] = useState<{ latitude: number; longitude: number } | null>(null);
   const [now, setNow] = useState(() => new Date());
+  // The replayed moment while the day sweeps in; null once it reaches now.
+  const [sweepTime, setSweepTime] = useState<Date | null>(null);
+  const sweepRef = useRef<{ start: number; from: Date; to: Date; duration: number } | null>(null);
+  // Pulse clock, shared by every redraw so the ring never jumps.
+  const pulseStartRef = useRef(performance.now());
 
   const latitude = savedLatitude ?? located?.latitude ?? FALLBACK.latitude;
   const longitude = savedLongitude ?? located?.longitude ?? FALLBACK.longitude;
@@ -90,12 +111,12 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     let alive = true;
     let frame = 0;
     let lastFrame = 0;
-    const started = performance.now();
+    const pulseTime = () => (performance.now() - pulseStartRef.current) / 1000;
 
     const renderScene = () => {
-      if (!canvas.clientWidth) return;
+      if (!canvas.clientWidth || sweepRef.current) return;
       renderer.renderScene({ ...sceneRef.current, now: new Date() });
-      renderer.renderFrame((performance.now() - started) / 1000, !prefersReducedMotion());
+      renderer.renderFrame(pulseTime(), !prefersReducedMotion());
     };
 
     const resize = () => {
@@ -116,18 +137,42 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     image.onload = () => {
       if (!alive) return;
       renderer.setLandMask(image);
-      renderScene();
+      if (prefersReducedMotion()) {
+        renderScene();
+        return;
+      }
+      const to = new Date();
+      const from = localMidnight(to);
+      sweepRef.current = { start: performance.now(), from, to, duration: sweepDuration(from, to) };
     };
     image.src = landMaskUrl;
 
-    // The pulse animates at 30 fps; with reduced motion it stays still and
-    // only redraws when the scene does.
+    // The day sweep renders the planet every frame; after it, the pulse
+    // animates at 30 fps. With reduced motion it stays still and only
+    // redraws when the scene does.
     const loop = (timestamp: number) => {
       frame = requestAnimationFrame(loop);
-      if (prefersReducedMotion() || !canvas.clientWidth || document.hidden) return;
+      if (!canvas.clientWidth || document.hidden) return;
+      const sweep = sweepRef.current;
+      if (sweep) {
+        const progress = Math.min(1, (performance.now() - sweep.start) / sweep.duration);
+        const at = new Date(sweep.from.getTime() + (sweep.to.getTime() - sweep.from.getTime()) * easeInOutCubic(progress));
+        renderer.renderScene({ ...sceneRef.current, now: at });
+        renderer.renderFrame(0, false);
+        setSweepTime(at);
+        if (progress >= 1) {
+          // Landed on now: hand over to the live view, first ripple at once.
+          sweepRef.current = null;
+          setSweepTime(null);
+          pulseStartRef.current = performance.now();
+          renderScene();
+        }
+        return;
+      }
+      if (prefersReducedMotion()) return;
       if (timestamp - lastFrame < ambientFrameMs(FRAME_MS)) return;
       lastFrame = timestamp;
-      renderer.renderFrame((timestamp - started) / 1000, true);
+      renderer.renderFrame(pulseTime(), true);
     };
     frame = requestAnimationFrame(loop);
 
@@ -144,13 +189,15 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
   useEffect(() => {
     const renderer = rendererRef.current;
     const canvas = canvasRef.current;
-    if (!renderer || !canvas?.clientWidth) return;
+    if (!renderer || !canvas?.clientWidth || sweepRef.current) return;
     renderer.renderScene({ view, latitude, longitude, now });
-    renderer.renderFrame(performance.now() / 1000, !prefersReducedMotion());
+    renderer.renderFrame((performance.now() - pulseStartRef.current) / 1000, !prefersReducedMotion());
   }, [view, latitude, longitude, now]);
 
-  const elevation = sunElevation(latitude, longitude, now);
-  const time = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  // The caption follows the sweep, then the clock.
+  const shown = sweepTime ?? now;
+  const elevation = sunElevation(latitude, longitude, shown);
+  const time = shown.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const place = placeLabel();
 
   return (
