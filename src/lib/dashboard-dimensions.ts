@@ -49,6 +49,11 @@ export interface WidgetInstance {
   config: Record<string, unknown>;
   /** Only present when type === "stack" — one level deep, no nested stacks. */
   items?: WidgetInstance[];
+  /**
+   * Top-left cell on the dashboard grid. Missing for cards saved before free
+   * placement (and inside stacks); those fill the first free spots.
+   */
+  pos?: { x: number; y: number };
 }
 
 // The dashboard a brand-new user (or a reset) sees. Ids are stable literals

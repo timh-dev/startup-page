@@ -1,87 +1,110 @@
 import React from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { HiOutlineArrowsPointingOut, HiOutlineCog6Tooth, HiOutlineXMark } from "react-icons/hi2";
-import { TILE_SIZE_SPANS, type WidgetInstance } from "@/lib/dashboard-dimensions";
+import { HiXMark } from "react-icons/hi2";
+
+import type { WidgetInstance } from "@/lib/dashboard-dimensions";
 import { getWidgetType } from "@/features/dashboard/widgetRegistry";
+import type { Placement } from "@/features/dashboard/layout/grid";
 
 interface DashboardTileProps {
   instance: WidgetInstance;
-  /** Position in the grid, for the load-in stagger. */
+  /** Position in the list, for the load-in stagger. */
   index: number;
+  placement: Placement;
+  /** Tile size plus gap, in px. */
+  cell: number;
+  tile: number;
+  gap: number;
   editing: boolean;
+  selected: boolean;
+  dragging: boolean;
+  canResize: boolean;
   radiusClass: string;
   cardClass: string;
-  onEdit: () => void;
+  onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
   onRemove: () => void;
 }
 
-export default function DashboardTile({ instance, index, editing, radiusClass, cardClass, onEdit, onRemove }: DashboardTileProps) {
-  const def = getWidgetType(instance.type);
-  const spanClass = TILE_SIZE_SPANS[instance.size] || TILE_SIZE_SPANS.small;
+// The card's content re-renders only when the card itself changes, not on
+// every position update while dragging.
+const TileContent = React.memo(
+  function TileContent({ instance, cardClass }: { instance: WidgetInstance; cardClass: string }) {
+    const def = getWidgetType(instance.type);
+    return <def.Render instance={instance} cardClass={cardClass} />;
+  },
+  (a, b) =>
+    a.cardClass === b.cardClass &&
+    a.instance.id === b.instance.id &&
+    a.instance.type === b.instance.type &&
+    a.instance.size === b.instance.size &&
+    a.instance.config === b.instance.config &&
+    a.instance.items === b.instance.items,
+);
 
-  // `disabled` when not editing so dnd-kit's sortable machinery is fully
-  // inert outside edit mode — no listeners are bound to non-handle elements
-  // either way, but this also skips its measuring/transform bookkeeping.
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: instance.id,
-    disabled: !editing,
-  });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    "--tile-index": index,
-  };
+export default function DashboardTile({
+  instance,
+  index,
+  placement,
+  cell,
+  tile,
+  gap,
+  editing,
+  selected,
+  dragging,
+  canResize,
+  radiusClass,
+  cardClass,
+  onPointerDown,
+  onResizeStart,
+  onRemove,
+}: DashboardTileProps) {
+  const label = getWidgetType(instance.type).label;
+  const width = placement.w * tile + (placement.w - 1) * gap;
+  const height = placement.h * tile + (placement.h - 1) * gap;
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       data-tile-id={instance.id}
-      className={`tile-enter ${spanClass} min-h-0 min-w-0 relative ${
-        editing ? `${radiusClass} ring-2 ${isDragging ? "ring-primary opacity-60 z-20" : "ring-primary/40"}` : ""
-      }`}
+      className={`dashboard-tile tile-enter ${radiusClass}`}
+      data-editing={editing || undefined}
+      data-selected={selected || undefined}
+      data-dragging={dragging || undefined}
+      style={
+        {
+          transform: `translate(${placement.x * cell}px, ${placement.y * cell}px)`,
+          width,
+          height,
+          "--tile-index": index,
+          "--wiggle-delay": `${(index * 137) % 400}ms`,
+        } as React.CSSProperties
+      }
+      onPointerDown={onPointerDown}
+      role={editing ? "button" : undefined}
+      tabIndex={editing ? 0 : undefined}
+      aria-label={editing ? `${label}: drag to move, click to edit` : undefined}
     >
-      <div className={editing ? "pointer-events-none h-full w-full select-none" : "h-full w-full"}>
-        <def.Render instance={instance} cardClass={cardClass} />
+      <div className="dashboard-tile-content h-full w-full">
+        <TileContent instance={instance} cardClass={cardClass} />
       </div>
 
       {editing && (
-        <div className="pointer-events-auto absolute left-1 top-1 z-30 flex items-center gap-1 rounded-lg border border-border/60 bg-background/95 px-1 py-1 shadow-lg backdrop-blur-sm">
+        <>
           <button
             type="button"
-            {...attributes}
-            {...listeners}
-            // touch-action:none stops the browser from treating this handle's
-            // touch gestures as a page scroll, which would otherwise fight
-            // dnd-kit's pointer-based drag on touch devices.
-            style={{ touchAction: "none" }}
-            className="flex size-6 cursor-grab items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-accent-foreground active:cursor-grabbing"
-            aria-label="Drag to move tile"
-            title="Drag to move"
-          >
-            <HiOutlineArrowsPointingOut className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
-            aria-label="Configure widget"
-            title={`Configure (${def.label})`}
-          >
-            <HiOutlineCog6Tooth className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
-            aria-label="Remove widget"
+            className="tile-remove"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+            aria-label={`Remove ${label}`}
             title="Remove"
           >
-            <HiOutlineXMark className="size-3.5" />
+            <HiXMark className="size-3" />
           </button>
-        </div>
+          {canResize && (
+            <div className="tile-resize" onPointerDown={onResizeStart} role="presentation" title="Drag to resize" />
+          )}
+        </>
       )}
     </div>
   );

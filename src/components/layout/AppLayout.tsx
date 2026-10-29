@@ -10,7 +10,7 @@ import ThemeProvider, { ThemeContext, type ThemeMode } from "@/components/layout
 import Toggle from "@/components/layout/ThemeToggle";
 import SettingsButton from "@/features/settings/components/SettingsButton";
 import BookmarkDialogs from "@/features/bookmarks/components/BookmarkDialogs";
-import WidgetConfigDialog from "@/features/dashboard/components/WidgetConfigDialog";
+import SidePanel from "@/components/layout/SidePanel";
 import AccountButton from "@/features/auth/AccountButton";
 import AuthBridge from "@/features/auth/AuthBridge";
 import { useIsClerkAvailable } from "@/features/auth/ClerkStatus";
@@ -220,7 +220,7 @@ function AppLayoutInner() {
       {isClerkAvailable && <AuthBridge />}
       <VaultNavigationActions />
       <BookmarkDialogs />
-      <WidgetConfigDialog />
+      <SidePanel />
       <header className="app-header">
         <nav className="app-nav surface-glass" aria-label="Pages">
           {vaultEnabled && (
@@ -264,7 +264,7 @@ function AppLayoutInner() {
               type="button"
               onClick={toggleLayoutEditing}
               className="toolbar-button"
-              title={editingLayout ? "Finish editing layout" : "Edit layout"}
+              title={editingLayout ? "Done editing (E)" : "Edit the dashboard (E)"}
               aria-label="Edit dashboard layout"
               aria-pressed={editingLayout}
             >

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCredentialsStore } from "@/lib/credentials";
+import { ConnectionsLink } from "@/features/settings/components/ConnectionsLink";
 import { TextField } from "./TextField";
 import { defineWidget, type WidgetRenderProps } from "./types";
 
@@ -27,12 +28,10 @@ function PhotoRender({ instance, cardClass }: WidgetRenderProps) {
   );
 }
 
-// The Unsplash access key is one device-wide credential (see
-// src/lib/credentials.ts): setting it from any photo widget applies to all of
-// them, and it stays on this device — it isn't synced or exported.
+// The Unsplash access key lives in Settings › Connections (device-wide,
+// never synced); without one, photos come from Wikimedia Commons.
 function PhotoConfigFields({ config, onChange }: { config: PhotoConfig; onChange: (next: PhotoConfig) => void }) {
   const unsplashCredential = useCredentialsStore((state) => state.unsplash);
-  const setCredential = useCredentialsStore((state) => state.setCredential);
   const value = Array.isArray(config.searchTerms) ? config.searchTerms.join(", ") : "";
 
   const clearCache = () => {
@@ -60,19 +59,13 @@ function PhotoConfigFields({ config, onChange }: { config: PhotoConfig; onChange
           }
         />
       </div>
-      <TextField
-        id="photo-access-key"
-        label="Unsplash access key (all photo widgets, this device only)"
-        value={unsplashCredential || ""}
-        placeholder="Use the Access Key, not the Secret Key"
-        onChange={(value) => setCredential("unsplash", value)}
-      />
+      <ConnectionsLink name="Unsplash" isSet={!!unsplashCredential} />
       <div>
         <Button type="button" variant="outline" onClick={clearCache}>
           Clear cached photo
         </Button>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Drops the saved photo for these search terms so this tile picks up something new. Takes effect once you click Done.
+          Drops the saved photo for these search terms so this tile picks up something new.
         </p>
       </div>
     </div>

@@ -1,16 +1,41 @@
 import { create } from "zustand";
 
+import type { WidgetInstance } from "@/lib/dashboard-dimensions";
+
+const HISTORY_LIMIT = 30;
+
 interface LayoutEditStore {
   editing: boolean;
+  /** The card whose inspector is open. */
+  selectedId: string | null;
+  /** Earlier versions of the card list, newest last, for Undo. */
+  history: WidgetInstance[][];
+  /** An empty cell that was clicked: where the next added card goes. */
+  insertAt: { x: number; y: number } | null;
+  setInsertAt: (cell: { x: number; y: number } | null) => void;
   setEditing: (editing: boolean) => void;
   toggleEditing: () => void;
+  select: (id: string | null) => void;
+  pushHistory: (widgets: WidgetInstance[]) => void;
+  popHistory: () => WidgetInstance[] | null;
 }
 
-// Tracks whether the dashboard grid is in "edit layout" mode. Kept in its own
-// lightweight store so the toggle button (in the top-right chrome) and the grid
-// (in the dashboard page) can share the flag without prop drilling.
-export const useLayoutEditStore = create<LayoutEditStore>((set) => ({
+// Dashboard editing state, shared by the toolbar's Edit button, the grid,
+// the edit bar and the inspector. Not persisted: a reload leaves edit mode.
+export const useLayoutEditStore = create<LayoutEditStore>((set, get) => ({
   editing: false,
-  setEditing: (editing) => set({ editing }),
-  toggleEditing: () => set((state) => ({ editing: !state.editing })),
+  selectedId: null,
+  history: [],
+  insertAt: null,
+  setInsertAt: (insertAt) => set({ insertAt }),
+  setEditing: (editing) => set(editing ? { editing } : { editing, selectedId: null, insertAt: null }),
+  toggleEditing: () => get().setEditing(!get().editing),
+  select: (selectedId) => set({ selectedId }),
+  pushHistory: (widgets) => set((state) => ({ history: [...state.history, widgets].slice(-HISTORY_LIMIT) })),
+  popHistory: () => {
+    const { history } = get();
+    if (!history.length) return null;
+    set({ history: history.slice(0, -1) });
+    return history[history.length - 1];
+  },
 }));

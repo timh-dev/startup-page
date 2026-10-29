@@ -1,7 +1,7 @@
 import React from "react";
 import { HiOutlineCloud, HiOutlineExclamationTriangle } from "react-icons/hi2";
 import { MISSING_API_KEY_MESSAGE } from "@/features/weather/hooks/useWeatherData";
-import { useWidgetConfigDialogStore } from "@/features/dashboard/stores/widgetConfigDialogStore";
+import { useSidePanelStore } from "@/components/layout/sidePanelStore";
 import { useSettingsStore } from "@/features/settings/stores";
 
 const WEATHER_TYPES = new Set(["weather", "weatherV2"]);
@@ -18,7 +18,7 @@ function isTopLevelWidget(widgets: WidgetLike[], id: string) {
  * loading. Drawn on a calm sky so the tile still reads as weather.
  */
 export function WeatherStatus({ error, instanceId }: { error: string | null; instanceId?: string }): React.ReactElement {
-  const openEdit = useWidgetConfigDialogStore((state) => state.openEdit);
+  const openSettings = useSidePanelStore((state) => state.openSettings);
   const rawWidgets = useSettingsStore((state) => state.settings.widgets);
 
   if (!error) {
@@ -62,7 +62,7 @@ export function WeatherStatus({ error, instanceId }: { error: string | null; ins
         {needsKey ? "Add a free OpenWeather API key to see your forecast here." : error}
       </p>
       {canConfigure && (
-        <button type="button" className="weather-status-action" onClick={() => openEdit(instanceId)}>
+        <button type="button" className="weather-status-action" onClick={() => openSettings("connections")}>
           Add API key
         </button>
       )}

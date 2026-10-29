@@ -553,13 +553,580 @@
   }
 }
 
-/* Feature tiles span the grid's width up to 3 columns (see useFitGrid). */
-.dashboard-grid .grid-feature-responsive {
-  grid-column: span 2 / span 2;
+/* --- Dashboard grid: free placement ----------------------------------------
+   Cards are positioned absolutely by cell (see features/dashboard/pages.tsx)
+   so moves and resizes animate. */
+
+.dashboard-tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 0;
+  min-height: 0;
 }
 
-.dashboard-grid[data-wide="true"] .grid-feature-responsive {
-  grid-column: span 3 / span 3;
+.dashboard-grid[data-editing] .dashboard-tile {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    translate var(--duration-base) var(--ease-out),
+    width var(--duration-base) var(--ease-out),
+    height var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.dashboard-grid[data-editing] .dashboard-tile-content {
+  pointer-events: none;
+  animation: tile-wiggle 900ms ease-in-out infinite alternate;
+  animation-delay: calc(var(--wiggle-delay, 0ms) * -1);
+}
+
+@keyframes tile-wiggle {
+  from {
+    rotate: -0.35deg;
+  }
+  to {
+    rotate: 0.35deg;
+  }
+}
+
+.dashboard-tile[data-selected] {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
+}
+
+.dashboard-tile[data-selected] .dashboard-tile-content,
+.dashboard-tile[data-dragging] .dashboard-tile-content {
+  animation: none;
+}
+
+.dashboard-grid[data-editing] .dashboard-tile[data-dragging] {
+  z-index: 40;
+  cursor: grabbing;
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+  scale: 1.03;
+  box-shadow: 0 24px 48px -16px rgb(0 0 0 / 0.35), 0 0 0 2px var(--primary);
+}
+
+/* Remove badge: top-left, like a home screen. */
+.tile-remove {
+  position: absolute;
+  top: -0.45rem;
+  left: -0.45rem;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 9999px;
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  transition: scale var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.tile-remove:hover {
+  scale: 1.1;
+  background: var(--destructive);
+  color: white;
+}
+
+/* Resize corner: an L-shaped grip at the bottom right. */
+.tile-resize {
+  position: absolute;
+  right: 0.3rem;
+  bottom: 0.3rem;
+  z-index: 5;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-right: 3px solid var(--foreground);
+  border-bottom: 3px solid var(--foreground);
+  border-bottom-right-radius: 0.55rem;
+  opacity: 0.55;
+  cursor: nwse-resize;
+  touch-action: none;
+  filter: drop-shadow(0 0 1.5px var(--background));
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.dashboard-tile:hover .tile-resize,
+.tile-resize:active {
+  opacity: 1;
+}
+
+/* Empty cells while editing: click to add a card there. */
+.grid-empty-cell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px dashed color-mix(in oklab, var(--foreground) 14%, transparent);
+  transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.grid-empty-cell:hover,
+.grid-empty-cell[data-active] {
+  border-color: color-mix(in oklab, var(--primary) 70%, transparent);
+  background: color-mix(in oklab, var(--primary) 8%, transparent);
+}
+
+/* Where a dragged card will land. */
+.grid-drop-target {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  border: 2px solid color-mix(in oklab, var(--primary) 70%, transparent);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  pointer-events: none;
+  transition: transform var(--duration-fast) var(--ease-out), width var(--duration-fast) var(--ease-out), height var(--duration-fast) var(--ease-out);
+}
+
+/* A new card being dragged in from the gallery. */
+.grid-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  opacity: 0.92;
+  pointer-events: none;
+  box-shadow: 0 24px 48px -16px rgb(0 0 0 / 0.35), 0 0 0 2px var(--primary);
+  transform: translate(-9999px, -9999px);
+}
+
+/* --- Edit bar --------------------------------------------------------------- */
+
+.edit-bar {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.9rem;
+  border-radius: 9999px;
+  transform: translateX(-50%);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.3);
+  animation: edit-bar-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes edit-bar-in {
+  from {
+    opacity: 0;
+    translate: 0 0.75rem;
+  }
+}
+
+.edit-bar-title {
+  font-weight: 600;
+}
+
+.edit-bar-hint {
+  margin: 0 0.4rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .edit-bar-hint {
+    display: none;
+  }
+}
+
+.edit-bar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.9rem;
+  padding: 0 0.75rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: background-color var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+
+.edit-bar-button:not(:disabled):hover {
+  background: color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+
+.edit-bar-button:disabled {
+  opacity: 0.35;
+}
+
+.edit-bar-button[data-primary] {
+  background: color-mix(in oklab, var(--primary) 14%, transparent);
+}
+
+.edit-bar-button[data-strong] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.edit-bar-button[data-strong]:hover {
+  background: color-mix(in oklab, var(--foreground) 85%, transparent);
+}
+
+/* --- Side panel: settings, gallery, inspector -------------------------------- */
+
+.side-panel {
+  position: fixed;
+  top: 4.75rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(23.5rem, calc(100vw - 2rem));
+  border-radius: 1.25rem;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  animation: side-panel-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes side-panel-in {
+  from {
+    opacity: 0;
+    translate: 1rem 0;
+  }
+}
+
+.side-panel-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 1rem 1rem 0.75rem 1.1rem;
+}
+
+.side-panel-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.side-panel-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 2rem;
+}
+
+.side-panel-subtitle {
+  margin-top: -0.2rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.side-panel-close,
+.side-panel-icon-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.side-panel-close:hover,
+.side-panel-icon-button:hover {
+  background: color-mix(in oklab, var(--foreground) 9%, transparent);
+  color: var(--foreground);
+}
+
+.side-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1.1rem 1.1rem;
+  overscroll-behavior: contain;
+}
+
+.side-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: var(--hairline-width) solid var(--hairline);
+}
+
+.side-panel-done,
+.side-panel-danger,
+.side-panel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2rem;
+  padding: 0 0.85rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.side-panel-done {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.side-panel-danger {
+  color: var(--destructive);
+}
+
+.side-panel-danger:hover {
+  background: color-mix(in oklab, var(--destructive) 12%, transparent);
+}
+
+.side-panel-chip {
+  height: 1.75rem;
+  padding: 0 0.65rem;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  font-size: 0.75rem;
+}
+
+.side-panel-note {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+/* Gallery */
+.gallery-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  margin-bottom: 0.9rem;
+  border-radius: 0.7rem;
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+  color: var(--muted-foreground);
+}
+
+.gallery-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  outline: none;
+}
+
+.gallery-group + .gallery-group {
+  margin-top: 1rem;
+}
+
+.gallery-group .eyebrow {
+  margin-bottom: 0.4rem;
+}
+
+.gallery-grid {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.gallery-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 0.75rem;
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.gallery-item:hover,
+.gallery-item:focus-visible {
+  background: color-mix(in oklab, var(--foreground) 7%, transparent);
+  outline: none;
+}
+
+.gallery-item-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.6rem;
+  background: var(--card);
+  box-shadow: 0 0 0 var(--hairline-width) var(--hairline), var(--elevation-1, 0 1px 2px rgb(0 0 0 / 0.08));
+}
+
+.gallery-item-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.gallery-item-name {
+  font-weight: 550;
+}
+
+.gallery-item-description {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 0.71875rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-item-size {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+}
+
+.gallery-empty {
+  color: var(--muted-foreground);
+}
+
+/* Inspector */
+.inspector-field,
+.inspector-fields {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+}
+
+.inspector-stack {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.inspector-stack-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inspector-stack-item {
+  padding: 0.7rem;
+  border-radius: 0.8rem;
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+
+.inspector-select {
+  flex: 1;
+  min-width: 0;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--card);
+  border: var(--hairline-width) solid var(--hairline);
+  color: inherit;
+  font: inherit;
+}
+
+/* Settings in the panel */
+.settings-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.4rem;
+  padding: 0.2rem;
+  border-radius: 0.8rem;
+  background: color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+.settings-nav-item {
+  flex: 1 1 auto;
+  height: 1.85rem;
+  padding: 0 0.6rem;
+  border-radius: 0.6rem;
+  color: var(--muted-foreground);
+  font-weight: 500;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.settings-nav-item:hover {
+  color: var(--foreground);
+}
+
+.settings-nav-item[aria-current="page"] {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--elevation-1, 0 1px 2px rgb(0 0 0 / 0.08)), 0 0 0 var(--hairline-width) var(--hairline);
+}
+
+.settings-panel-body [data-slot="card"]:first-child {
+  border-top: 0;
+}
+
+.settings-row-description {
+  margin-top: 0.1rem;
+  color: var(--muted-foreground);
+  font-size: 0.71875rem;
+  line-height: 1.35;
+}
+
+.settings-location-now {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted-foreground);
+}
+
+.settings-error {
+  color: var(--destructive);
+  font-size: 0.75rem;
+}
+
+.settings-link {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.settings-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+
+.settings-shortcuts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.45rem 0.8rem;
+  align-items: center;
+}
+
+.settings-shortcuts kbd {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.35rem;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  font: inherit;
+  font-size: 0.71875rem;
+  font-weight: 600;
+}
+
+.settings-shortcuts dd {
+  color: var(--muted-foreground);
 }
 
 /* --- Settings dialog --------------------------------------------------------

@@ -3,6 +3,7 @@ import { HiOutlineCloud, HiOutlineSparkles } from "react-icons/hi2";
 import { Label } from "@/components/ui/label";
 import type { WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
 import { useCredentialsStore } from "@/lib/credentials";
+import { ConnectionsLink } from "@/features/settings/components/ConnectionsLink";
 import { TextField } from "./TextField";
 import { defineWidget, type WidgetRenderProps } from "./types";
 
@@ -41,12 +42,11 @@ function WeatherSourceFields<C extends WeatherSourceConfig>({
   onChange: (next: C) => void;
 }) {
   const openWeatherKey = useCredentialsStore((state) => state.openWeather);
-  const setCredential = useCredentialsStore((state) => state.setCredential);
 
   return (
     <>
       <p className="text-xs text-muted-foreground">
-        Leave the location blank to use your current location.
+        Leave the location blank to use the one in Settings › General.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <TextField
@@ -75,12 +75,7 @@ function WeatherSourceFields<C extends WeatherSourceConfig>({
           <option value="metric">Metric (°C, km/h)</option>
         </select>
       </div>
-      <TextField
-        id={`${idPrefix}-key`}
-        label="OpenWeather API key (all weather widgets, this device only)"
-        value={openWeatherKey || ""}
-        onChange={(value) => setCredential("openWeather", value)}
-      />
+      <ConnectionsLink name="OpenWeather" isSet={!!openWeatherKey} />
     </>
   );
 }
