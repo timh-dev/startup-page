@@ -287,12 +287,15 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
     return ratio > 1.3 ? "landscape" : ratio < 0.77 ? "portrait" : "squarish";
   }
 
-  // Without an Unsplash key: Wikimedia Commons' Featured Pictures, limited
-  // to scenic topics (the general Featured set also holds historical photos
-  // and engravings; Quality Images turned up product shots like a camera
-  // lens). Only high-resolution files whose shape suits the tile are used,
-  // so a crop never leaves a sliver of a panorama. The search term is tried
-  // first, then any scenic picture, then a curated set.
+  // Without an Unsplash key: Wikimedia Commons' Featured Pictures. The search
+  // term (as a phrase) is tried across all of them first, so topics like
+  // "nebula" or "coral reef" find their pictures, then the card's other
+  // topics; then the term within the scenic
+  // categories; then any scenic picture (the general Featured set also holds
+  // historical photos and engravings, and Quality Images turned up product
+  // shots, so a topic-less pick stays scenic); then a curated set. Only
+  // high-resolution files whose shape suits the tile are used, so a crop
+  // never leaves a sliver of a panorama.
   async _fetchFallback(category: string, searchTerms: string[], updateDisplay: boolean) {
     const root = this._rootRef.current?.getBoundingClientRect();
     const tileRatio = root?.width && root.height ? root.width / root.height : 1;
@@ -305,13 +308,23 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
       "Featured_pictures_of_forests",
       "Featured_pictures_of_cityscapes",
     ].join("|");
-    const queries = [`${category} filetype:bitmap incategory:${scenic}`, `filetype:bitmap incategory:${scenic}`];
+    const phrase = (term: string) => (term.includes(" ") ? `"${term.replace(/"/g, "")}"` : term);
+    // This card's other topics come next if the picked one finds nothing
+    // that fits, before any off-topic scenic picture.
+    const others = searchTerms.filter((term) => term !== category).sort(() => Math.random() - 0.5).slice(0, 2);
+    // Topic searches start at the top (the best matches, often fewer than
+    // 50); only the topic-less one jumps to a random page for variety.
+    const queries = [
+      ...[category, ...others].map((term) => ({ query: `${phrase(term)} filetype:bitmap incategory:Featured_pictures_on_Wikimedia_Commons`, offset: 0 })),
+      { query: `${phrase(category)} filetype:bitmap incategory:${scenic}`, offset: 0 },
+      { query: `filetype:bitmap incategory:${scenic}`, offset: Math.floor(Math.random() * 4) * 50 },
+    ];
 
-    for (const query of queries) {
+    for (const { query, offset } of queries) {
       try {
         const response = await fetch(
           `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}` +
-            `&gsrnamespace=6&gsrlimit=50&gsroffset=${Math.floor(Math.random() * 4) * 50}` +
+            `&gsrnamespace=6&gsrlimit=50&gsroffset=${offset}` +
             `&prop=imageinfo&iiprop=url|size&iiurlwidth=${width}&format=json&origin=*`,
         );
         const data = await response.json();

@@ -3043,3 +3043,137 @@ h3.bm-folder-title {
     display: none;
   }
 }
+
+/* ---- Settings: theme picker ---- */
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.scene-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 0.7rem;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background-size: cover;
+  background-position: center;
+  text-align: left;
+  color: white;
+  box-shadow: inset 0 0 0 var(--hairline-width) rgb(255 255 255 / 0.12), var(--elevation-1);
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.scene-tile:hover {
+  transform: translateY(-1px);
+}
+
+.scene-tile[data-picked],
+.scene-tile:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary), var(--elevation-1);
+}
+
+.scene-tile-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0) 35%, rgb(0 0 0 / 0.72));
+}
+
+.scene-tile-text,
+.scene-tile-swatches,
+.scene-tile-current {
+  position: relative;
+}
+
+.scene-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.scene-tile-name {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.scene-tile-tagline {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  opacity: 0.85;
+}
+
+.scene-tile-swatches {
+  display: flex;
+  gap: 3px;
+  margin-top: 0.45rem;
+}
+
+.scene-tile-swatches span {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.5);
+}
+
+.scene-tile-current {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.9);
+  color: #111;
+  font-size: 0.6875rem;
+  font-weight: 650;
+}
+
+.scene-apply {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding: 0.8rem;
+  border-radius: 0.9rem;
+  background: color-mix(in oklab, var(--foreground) 5%, transparent);
+  font-size: 0.8125rem;
+}
+
+.scene-apply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.scene-apply-note {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.scene-applied {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.7rem;
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  font-size: 0.8125rem;
+}
+
+.scene-applied button {
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}

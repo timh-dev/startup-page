@@ -6,6 +6,7 @@ import { useSidePanelStore, type SettingsSection } from "@/components/layout/sid
 import { ThemeContext } from "@/components/layout/ThemeContext";
 import { useSettingsStore, type StartupSettings } from "@/features/settings/stores";
 import { getStorageDiagnostics } from "@/lib/settings";
+import SceneSettings from "./appearance/SceneSettings";
 import ThemeSettings from "./appearance/ThemeSettings";
 import ImageEffectsSettings from "./appearance/ImageEffectsSettings";
 import DataTab from "./DataTab";
@@ -73,6 +74,7 @@ export default function SettingsPanel({ section }: { section: SettingsSection })
         {section === "general" && <GeneralSettings {...props} />}
         {section === "appearance" && (
           <>
+            <SceneSettings {...props} />
             <ThemeSettings {...props} />
             <ImageEffectsSettings {...props} />
           </>

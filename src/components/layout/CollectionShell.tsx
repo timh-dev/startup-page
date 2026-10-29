@@ -2,9 +2,10 @@ import React from "react";
 import { HiEllipsisHorizontal, HiMagnifyingGlass, HiXMark } from "react-icons/hi2";
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import vaultPreviewBg from "@/assets/media/vault-preview-bg.jpg";
+import { sceneWallpaper } from "@/features/scenes/scenes";
+import { useSettingsStore } from "@/features/settings/stores";
 
-// The shell the Vault and Bookmarks pages share: the painted scene behind, a
+// The shell the Vault and Bookmarks pages share: the theme's painting behind, a
 // frosted sidebar (search, sections, folders or tags) and a content pane
 // that scrolls on its own. On narrow screens the sidebar becomes a strip of
 // chips above the content.
@@ -19,8 +20,10 @@ interface CollectionShellProps {
 }
 
 export default function CollectionShell({ label, rail, children, scrollRef }: CollectionShellProps) {
+  // The painting comes from the theme.
+  const scene = useSettingsStore((state) => state.settings.ui?.scene);
   return (
-    <div className="vault-preview-scene" style={{ backgroundImage: `url(${vaultPreviewBg})` }}>
+    <div className="vault-preview-scene" style={{ backgroundImage: `url(${sceneWallpaper(scene)})` }}>
       <div className="vault-preview-scrim" />
       <div className="collection" aria-label={label}>
         <nav className="collection-rail" aria-label={`${label} sections`}>

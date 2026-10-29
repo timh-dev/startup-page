@@ -122,7 +122,7 @@ export default function ThemeSettings({ settings, updateSettings }: SettingsSect
               >
                 <PaletteSwatchPreview swatches={swatches} mode={theme} />
                 <div className="palette-option-name">{ct.name}</div>
-                <div className="palette-option-description">Custom theme</div>
+                <div className="palette-option-description">Custom palette</div>
               </button>
             );
           })}
@@ -131,7 +131,7 @@ export default function ThemeSettings({ settings, updateSettings }: SettingsSect
 
       <Card>
         <CardHeader>
-          <CardTitle>Custom theme</CardTitle>
+          <CardTitle>Custom palette</CardTitle>
           <CardDescription>
             Paste CSS from a shadcn theme generator. Use <code>:root</code> for light and <code>.dark</code> for dark mode variables.
           </CardDescription>

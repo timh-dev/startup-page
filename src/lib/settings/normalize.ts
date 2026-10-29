@@ -4,6 +4,7 @@ import defaultSettings from "../../config/settings.json";
 import { ensureBookmarkIds, flattenGroups } from "@/features/bookmarks/lib/tree";
 import type { WidgetInstance } from "@/lib/dashboard-dimensions";
 import { adoptLegacyCredentials } from "@/lib/credentials";
+import { DEFAULT_SCENE, applyScene } from "@/features/scenes/scenes";
 import { LEGACY_CREDENTIAL_KEYS, stripWidgetCredentials } from "../../../shared/credentials";
 import { SETTINGS_EXPORT_FORMAT, SETTINGS_SCHEMA_VERSION, type Settings } from "./constants";
 
@@ -267,8 +268,9 @@ export function normalizeSettingsShape(settings: Settings): Settings {
 
 // Bookmark ids (and any other shape migrations normalizeSettingsShape applies)
 // need to exist even before a user has ever saved settings, so every "brand
-// new session" fallback below returns this instead of the raw JSON seed.
-export const seedSettings = normalizeSettingsShape(defaultSettings);
+// new session" fallback below returns this instead of the raw JSON seed. A
+// brand-new install starts in the default theme, cards and all.
+export const seedSettings = normalizeSettingsShape(applyScene(normalizeSettingsShape(defaultSettings), DEFAULT_SCENE, "layout"));
 
 export interface StoredSettingsRecord {
   schemaVersion: number;
