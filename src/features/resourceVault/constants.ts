@@ -1,6 +1,18 @@
 import {
+  HiOutlineAcademicCap,
+  HiOutlineBookOpen,
+  HiOutlineBookmarkSquare,
+  HiOutlineBriefcase,
   HiOutlineCodeBracketSquare,
+  HiOutlineCursorArrowRays,
   HiOutlineDocumentText,
+  HiOutlineGlobeAlt,
+  HiOutlineMap,
+  HiOutlinePlayCircle,
+  HiOutlineSpeakerWave,
+  HiOutlineUserGroup,
+  HiOutlineUserPlus,
+  HiOutlineWrenchScrewdriver,
 } from "react-icons/hi2";
 import type { TemplateSubtype, VaultItemKind } from "./types";
 
@@ -32,6 +44,22 @@ export const READ_TAG_COLORS: Record<string, string> = {
   Travel: "read-tag-travel",
   Work: "read-tag-work",
   Reference: "read-tag-reference",
+};
+
+/** What each tag means at a glance; shown with its colour at the front of a link. */
+export const READ_TAG_ICONS: Record<string, typeof HiOutlineBookOpen> = {
+  Read: HiOutlineBookOpen,
+  Watch: HiOutlinePlayCircle,
+  Listen: HiOutlineSpeakerWave,
+  Browse: HiOutlineGlobeAlt,
+  Use: HiOutlineCursorArrowRays,
+  Build: HiOutlineWrenchScrewdriver,
+  Learn: HiOutlineAcademicCap,
+  Join: HiOutlineUserGroup,
+  Follow: HiOutlineUserPlus,
+  Travel: HiOutlineMap,
+  Work: HiOutlineBriefcase,
+  Reference: HiOutlineBookmarkSquare,
 };
 
 export const CODE_LANGUAGES = [
