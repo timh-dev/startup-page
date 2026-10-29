@@ -69,6 +69,12 @@ describe("extractTitle / extractDescription (pure regex extraction)", () => {
     expect(extractTitle(html)).toBe("Reordered OG Title");
   });
 
+  it("decodes numeric entities, once", () => {
+    expect(decodeEntities("I&#x27;m here &#8212; you&#39;ll see")).toBe("I'm here \u2014 you'll see");
+    expect(decodeEntities("&amp;lt;b&amp;gt;")).toBe("&lt;b&gt;");
+    expect(decodeEntities("&bogus; &#0;")).toBe("&bogus; &#0;");
+  });
+
   it("decodes HTML entities in the extracted text", () => {
     const html = `<title>Tom &amp; Jerry &mdash;&nbsp;S1</title>`;
     // &mdash; isn't in the decode list (only the ones actually seen in the

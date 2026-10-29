@@ -2918,7 +2918,9 @@ h3.bm-folder-title {
   font-weight: 500;
 }
 
+/* The site appears on hover only, and takes no room until then. */
 .bm-row-host {
+  display: none;
   flex: none;
   max-width: 45%;
   overflow: hidden;
@@ -2926,12 +2928,10 @@ h3.bm-folder-title {
   white-space: nowrap;
   font-size: 0.6875rem;
   color: var(--muted-foreground);
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
 .bm-row:hover .bm-row-host {
-  opacity: 1;
+  display: block;
   margin-right: 1.6rem;
 }
 
