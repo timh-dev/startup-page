@@ -744,3 +744,37 @@
   font-size: 0.8125rem;
   font-weight: 500;
 }
+
+/* --- Globe widget: poster-style caption ----------------------------------- */
+
+.globe-widget {
+  container-type: size;
+}
+
+.globe-caption {
+  position: absolute;
+  top: clamp(0.7rem, 6cqh, 1.1rem);
+  left: clamp(0.8rem, 6cqw, 1.2rem);
+  z-index: 1;
+  color: rgb(255 255 255 / 0.92);
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+.globe-caption[data-view="limb"] {
+  top: auto;
+  bottom: clamp(0.7rem, 6cqh, 1.1rem);
+}
+
+.globe-caption-place {
+  font-size: clamp(0.8rem, 6.4cqw, 1rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.globe-caption-time {
+  margin-top: 0.15rem;
+  font-size: clamp(0.64rem, 4.4cqw, 0.75rem);
+  color: rgb(255 255 255 / 0.7);
+}

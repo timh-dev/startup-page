@@ -30,6 +30,7 @@ export type WidgetType =
   | "photo"
   | "vault"
   | "solarGraph"
+  | "globe"
   | "video"
   | "iframe"
   | "stack"

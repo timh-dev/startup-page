@@ -7,6 +7,7 @@ import { airQualityWidget } from "./widgets/airQuality";
 import { bookmarkWidget } from "./widgets/bookmark";
 import { clockWidget } from "./widgets/clock";
 import { githubWidget } from "./widgets/github";
+import { globeWidget } from "./widgets/globe";
 import { headlinesWidget } from "./widgets/headlines";
 import { iframeWidget } from "./widgets/iframe";
 import { photoWidget } from "./widgets/photo";
@@ -32,6 +33,7 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   photoWidget,
   vaultWidget,
   solarGraphWidget,
+  globeWidget,
   videoWidget,
   iframeWidget,
   stackWidget,
