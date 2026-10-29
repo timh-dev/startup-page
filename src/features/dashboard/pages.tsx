@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { HiLink } from "react-icons/hi2";
 
 import { useSettingsStore } from "@/features/settings/stores";
@@ -46,6 +47,13 @@ import {
   type SeamPx,
 } from "@/features/dashboard/layout/joins";
 import { registerGalleryDrag } from "@/features/dashboard/layout/galleryDrag";
+
+const ResourceVaultPage = React.lazy(() => import("@/pages/ResourceVaultPage"));
+const BookmarksPage = React.lazy(() => import("@/pages/BookmarksPage"));
+
+type SpecialPage = "vault" | "bookmarks";
+const SPECIAL_PATHS: Record<SpecialPage, string> = { vault: "/resources", bookmarks: "/bookmarks" };
+const SPECIAL_LABELS: Record<SpecialPage, string> = { vault: "Vault", bookmarks: "Bookmarks" };
 
 /** Width of the side panel plus its margin, in rem; the grid makes room for it. */
 export const SIDE_PANEL_REM = 25;
@@ -144,9 +152,17 @@ export default function Index() {
   const pageH = viewport.height;
   // Each page centres its four rows in the window.
   const pageTop = Math.max(pad.top, (pageH - span(PAGE_ROWS)) / 2);
+  // One vertical pager: the first card page, then the Vault and Bookmarks
+  // pages (when turned on), then any further card pages.
+  const specials: SpecialPage[] = React.useMemo(
+    () => [ui.vaultEnabled ?? true ? "vault" : null, ui.bookmarksEnabled ?? true ? "bookmarks" : null].filter(Boolean) as SpecialPage[],
+    [ui.vaultEnabled, ui.bookmarksEnabled],
+  );
+  const screenOf = React.useCallback((cardPage: number) => (cardPage === 0 ? 0 : cardPage + specials.length), [specials.length]);
+  const cardPageAt = (screen: number) => (screen === 0 ? 0 : screen <= specials.length ? null : screen - specials.length);
   const rowTop = React.useCallback(
-    (row: number) => (flow ? row * cell : pageOf(row) * pageH + pageTop + (row % PAGE_ROWS) * cell),
-    [flow, cell, pageH, pageTop],
+    (row: number) => (flow ? row * cell : screenOf(pageOf(row)) * pageH + pageTop + (row % PAGE_ROWS) * cell),
+    [flow, cell, pageH, pageTop, screenOf],
   );
 
   const [preview, setPreviewState] = React.useState<Layout | null>(null);
@@ -159,6 +175,16 @@ export default function Index() {
   const [draggingIds, setDraggingIds] = React.useState<string[]>([]);
   const [ghost, setGhost] = React.useState<{ instance: WidgetInstance; size: { w: number; h: number } } | null>(null);
   const [page, setPage] = React.useState(0);
+  // Join nodes show on the edges of the hovered card; the hover lingers a
+  // moment so the pointer can cross the gap to a node.
+  const [hoverId, setHoverId] = React.useState<string | null>(null);
+  const [nodeHover, setNodeHover] = React.useState<{ a: string; b: string } | null>(null);
+  const hoverTimer = React.useRef(0);
+  const hoverCard = (id: string | null) => {
+    window.clearTimeout(hoverTimer.current);
+    if (id) setHoverId(id);
+    else hoverTimer.current = window.setTimeout(() => setHoverId(null), 450);
+  };
   const ghostRef = React.useRef<HTMLDivElement>(null);
   const gridRef = React.useRef<HTMLDivElement>(null);
   const scrollerRef = React.useRef<HTMLDivElement>(null);
@@ -175,6 +201,7 @@ export default function Index() {
   }, [shown, draggingIds, base]);
 
   const pages = flow ? 1 : pageCount(shown) + (editing ? 1 : 0);
+  const screens = flow ? 1 : pages + specials.length;
   const shownRows = flow ? Math.max(1, rowCount(shown)) : pages * PAGE_ROWS;
 
   // ---- joined cards: groups, outlines, seams ----
@@ -315,8 +342,10 @@ export default function Index() {
   const cellAt = (left: number, top: number, h: number) => {
     const x = Math.round(left / cell);
     if (flow) return { x, y: Math.max(0, Math.round(top / cell)) };
-    const p = Math.max(0, Math.floor((top + span(h) / 2) / pageH));
-    const within = Math.round((top - p * pageH - pageTop) / cell);
+    const screen = Math.max(0, Math.floor((top + span(h) / 2) / pageH));
+    // Over the Vault or Bookmarks page: the nearer card page.
+    const p = cardPageAt(screen) ?? (screen <= specials.length / 2 ? 0 : 1);
+    const within = Math.round((top - screenOf(p) * pageH - pageTop) / cell);
     return { x, y: p * PAGE_ROWS + Math.max(0, Math.min(PAGE_ROWS - h, within)) };
   };
 
@@ -344,18 +373,19 @@ export default function Index() {
   const elementsOf = (ids: string[]) =>
     ids.map((id) => gridRef.current?.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(id)}"]`)).filter(Boolean) as HTMLElement[];
 
-  // Dragging near the top or bottom of the window turns the page.
+  // Dragging near the top or bottom of the window turns to the next card
+  // page (skipping Vault and Bookmarks).
   const autoScroll = (clientY: number) => {
     const scroller = scrollerRef.current;
     if (flow || !scroller || performance.now() - lastAutoScroll.current < 700) return;
     const edge = 56;
-    if (clientY > viewport.height - edge && scroller.scrollTop + pageH < scroller.scrollHeight - 2) {
-      lastAutoScroll.current = performance.now();
-      scroller.scrollBy({ top: pageH, behavior: "smooth" });
-    } else if (clientY < edge + 20 && scroller.scrollTop > 2) {
-      lastAutoScroll.current = performance.now();
-      scroller.scrollBy({ top: -pageH, behavior: "smooth" });
-    }
+    const dir = clientY > viewport.height - edge ? 1 : clientY < edge + 20 ? -1 : 0;
+    if (!dir) return;
+    let target = Math.round(scroller.scrollTop / pageH) + dir;
+    while (target > 0 && target < screens && cardPageAt(target) === null) target += dir;
+    if (target < 0 || target >= screens) return;
+    lastAutoScroll.current = performance.now();
+    scroller.scrollTo({ top: target * pageH, behavior: "smooth" });
   };
 
   const onMove = React.useCallback(
@@ -595,6 +625,57 @@ export default function Index() {
     return () => scroller.removeEventListener("wheel", onWheel);
   }, [flow, pageH]);
 
+  // The URL follows the pager (#/resources on the Vault page, #/bookmarks on
+  // Bookmarks), and the nav, shortcuts and links scroll it.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pathRef = React.useRef(location.pathname);
+  pathRef.current = location.pathname;
+  const fromScroll = React.useRef(false);
+  const firstSync = React.useRef(true);
+  const settleTimer = React.useRef(0);
+  const specialScreen = (kind: SpecialPage) => 1 + specials.indexOf(kind);
+  const pathForScreen = (screen: number) => {
+    if (cardPageAt(screen) !== null) return "/";
+    return SPECIAL_PATHS[specials[screen - 1]];
+  };
+
+  React.useEffect(() => {
+    const instant = firstSync.current;
+    firstSync.current = false;
+    if (fromScroll.current) {
+      fromScroll.current = false;
+      return;
+    }
+    const path = location.pathname;
+    const kind = (Object.keys(SPECIAL_PATHS) as SpecialPage[]).find((k) => SPECIAL_PATHS[k] === path && specials.includes(k));
+    if (flow) {
+      document.getElementById(kind ? `page-${kind}` : "page-home")?.scrollIntoView({ behavior: instant ? "auto" : "smooth" });
+      return;
+    }
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const current = Math.round(scroller.scrollTop / pageH);
+    const target = kind ? specialScreen(kind) : cardPageAt(current) === null ? 0 : null;
+    if (target !== null && target !== current) scroller.scrollTo({ top: target * pageH, behavior: instant ? "auto" : "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.key, flow]);
+
+  const onPagerScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const screen = Math.round(event.currentTarget.scrollTop / pageH);
+    setPage(screen);
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      // Editing keeps the dashboard route (leaving it would end edit mode).
+      if (useLayoutEditStore.getState().editing || dragRef.current) return;
+      const path = pathForScreen(screen);
+      if (path !== pathRef.current) {
+        fromScroll.current = true;
+        navigate(path, { replace: true });
+      }
+    }, 160);
+  };
+
   // Leaving edit mode closes a card's inspector or the gallery.
   React.useEffect(() => {
     if (!editing && panel && panel.kind !== "settings") closePanel();
@@ -609,10 +690,15 @@ export default function Index() {
   }
   const dropTargets = (draggingIds.length ? draggingIds : ghost ? [ghost.instance.id] : []).map((id) => preview?.get(id)).filter(Boolean) as Placement[];
   // Nodes between touching cards, to join or split them.
-  const nodes = editing && !flow && !draggingIds.length && !ghost ? adjacentSeams(shown).map((seam) => seamPx(seam, metrics)) : [];
+  const nodes =
+    editing && !flow && !draggingIds.length && !ghost
+      ? adjacentSeams(shown)
+          .filter((seam) => joined.keys.has(joinKey(seam.a, seam.b)) || seam.a === hoverId || seam.b === hoverId)
+          .map((seam) => seamPx(seam, metrics))
+      : [];
 
   const gridWidth = span(gridColumns);
-  const gridHeight = flow ? span(shownRows) : pages * pageH;
+  const gridHeight = flow ? span(shownRows) : screens * pageH;
   const deselect = (event: React.PointerEvent) => {
     if (editing && event.target === event.currentTarget) {
       select(null);
@@ -677,6 +763,9 @@ export default function Index() {
             radiusClass={radiusClass}
             cardClass={cardClassFor(instance.type)}
             onPointerDown={(event) => startMove(instance.id, event)}
+            onPointerEnter={() => editing && hoverCard(instance.id)}
+            onPointerLeave={() => editing && hoverCard(null)}
+            joinPreview={!!nodeHover && (nodeHover.a === instance.id || nodeHover.b === instance.id)}
             onResizeStart={(event) => startResize(instance.id, event)}
             onRemove={() => removeWidget(instance.id)}
           />
@@ -699,19 +788,32 @@ export default function Index() {
         const isJoined = joined.keys.has(s.key);
         const x = s.orientation === "v" ? s.center : (s.from + s.to) / 2;
         const y = s.orientation === "v" ? (s.from + s.to) / 2 : s.center;
+        const names = `${getWidgetType(widgets.find((w) => w.id === s.a)?.type ?? "clock").label} and ${getWidgetType(widgets.find((w) => w.id === s.b)?.type ?? "clock").label}`;
         return (
           <button
             key={s.key}
             type="button"
             className="join-node"
             data-joined={isJoined || undefined}
-            style={{ transform: `translate(${x}px, ${y}px) translate(-50%, -50%)` }}
-            onClick={() => toggleJoin(s.a, s.b)}
-            title={isJoined ? "Split these cards" : "Join these cards into one shape"}
-            aria-label={isJoined ? "Split these cards" : "Join these cards"}
+            data-label={isJoined ? "Split" : "Join"}
+            style={{ left: x, top: y }}
+            onPointerEnter={() => {
+              hoverCard(hoverId);
+              setNodeHover({ a: s.a, b: s.b });
+            }}
+            onPointerLeave={() => {
+              setNodeHover(null);
+              hoverCard(null);
+            }}
+            onClick={() => {
+              toggleJoin(s.a, s.b);
+              setNodeHover(null);
+            }}
+            title={isJoined ? `Split ${names}` : `Join ${names} into one shape`}
+            aria-label={isJoined ? `Split ${names}` : `Join ${names}`}
             aria-pressed={isJoined}
           >
-            {isJoined && <HiLink className="size-3" />}
+            <HiLink className="size-3.5" />
           </button>
         );
       })}
@@ -726,50 +828,74 @@ export default function Index() {
     </div>
   );
 
+  const specialPage = (kind: SpecialPage) => (
+    <React.Suspense fallback={null}>{kind === "vault" ? <ResourceVaultPage /> : <BookmarksPage />}</React.Suspense>
+  );
+
   if (flow) {
     return (
-      <div
-        className="flex min-h-screen items-start justify-center"
-        style={{ paddingTop: pad.top, paddingBottom: editing ? 5 * rem : pad.bottom, paddingLeft: pad.side, paddingRight: pad.side + panelOffset }}
-        onPointerDown={deselect}
-      >
-        {editBar}
-        {grid}
-        {ghostCard}
-      </div>
+      <>
+        <div
+          id="page-home"
+          className="flex min-h-screen items-start justify-center"
+          style={{ paddingTop: pad.top, paddingBottom: editing ? 5 * rem : pad.bottom, paddingLeft: pad.side, paddingRight: pad.side + panelOffset }}
+          onPointerDown={deselect}
+        >
+          {editBar}
+          {grid}
+          {ghostCard}
+        </div>
+        {specials.map((kind) => (
+          <section key={kind} id={`page-${kind}`} className="dashboard-special-flow" aria-label={SPECIAL_LABELS[kind]}>
+            {specialPage(kind)}
+          </section>
+        ))}
+      </>
     );
   }
 
   return (
     <>
       {editBar}
-      <div
-        ref={scrollerRef}
-        className="dashboard-scroller"
-        onScroll={(event) => setPage(Math.round(event.currentTarget.scrollTop / pageH))}
-        onPointerDown={deselect}
-      >
+      <div ref={scrollerRef} className="dashboard-scroller" onScroll={onPagerScroll} onPointerDown={deselect}>
         <div className="dashboard-pages" style={{ height: gridHeight }} onPointerDown={deselect}>
-          {Array.from({ length: pages }, (_, p) => (
+          {Array.from({ length: screens }, (_, p) => (
             <div key={p} className="dashboard-page-snap" style={{ top: p * pageH, height: pageH }} />
           ))}
           <div style={{ position: "absolute", top: 0, left: Math.max(pad.side, (viewport.width - panelOffset - gridWidth) / 2), transition: "left var(--duration-base) var(--ease-out)" }}>
             {grid}
           </div>
+          {specials.map((kind, i) => (
+            <section
+              key={kind}
+              className="dashboard-special"
+              data-editing={editing || undefined}
+              style={{ top: (i + 1) * pageH, height: pageH }}
+              aria-label={SPECIAL_LABELS[kind]}
+            >
+              {specialPage(kind)}
+              {editing && <div className="dashboard-special-veil">{SPECIAL_LABELS[kind]} page · scroll past to add cards on the next page</div>}
+            </section>
+          ))}
         </div>
       </div>
-      {pages > 1 && (
-        <nav className="page-dots" aria-label="Dashboard pages" style={{ right: panelOffset + 0.9 * rem }}>
-          {Array.from({ length: pages }, (_, p) => (
-            <button
-              key={p}
-              type="button"
-              className="page-dot"
-              aria-current={page === p ? "page" : undefined}
-              aria-label={`Page ${p + 1}`}
-              onClick={() => scrollerRef.current?.scrollTo({ top: p * pageH, behavior: "smooth" })}
-            />
-          ))}
+      {screens > 1 && (
+        <nav className="page-dots" aria-label="Pages" style={{ right: panelOffset + 0.9 * rem }}>
+          {Array.from({ length: screens }, (_, p) => {
+            const kind = cardPageAt(p) === null ? specials[p - 1] : null;
+            return (
+              <button
+                key={p}
+                type="button"
+                className="page-dot"
+                data-kind={kind ?? undefined}
+                aria-current={page === p ? "page" : undefined}
+                aria-label={kind ? SPECIAL_LABELS[kind] : `Cards, page ${(cardPageAt(p) ?? 0) + 1}`}
+                title={kind ? SPECIAL_LABELS[kind] : `Cards ${(cardPageAt(p) ?? 0) + 1}`}
+                onClick={() => scrollerRef.current?.scrollTo({ top: p * pageH, behavior: "smooth" })}
+              />
+            );
+          })}
         </nav>
       )}
       {ghostCard}

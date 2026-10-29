@@ -1650,34 +1650,116 @@ select.debug-input,
   mix-blend-mode: soft-light;
 }
 
-/* The node between two touching cards (edit mode): click to join or split. */
+/* The node between two touching cards (edit mode): shown on the hovered
+   card's edges; click to join or split. Positioned by left/top (a transform
+   would be scaled by the hover effect and push the node away from the
+   pointer). */
 .join-node {
   position: absolute;
-  top: 0;
-  left: 0;
   z-index: 6;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
   border-radius: 9999px;
-  border: 2px solid var(--foreground);
-  background: var(--background);
-  color: var(--background);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
-  opacity: 0.7;
-  transition: opacity var(--duration-fast) var(--ease-out), scale var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+  border: 1.5px solid color-mix(in oklab, var(--foreground) 35%, transparent);
+  background: var(--card);
+  color: var(--muted-foreground);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
+  animation: join-node-in var(--duration-fast) var(--ease-out);
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
 
-.join-node:hover {
+@keyframes join-node-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+.join-node:hover,
+.join-node:focus-visible {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  outline: none;
+}
+
+/* "Join" / "Split" beside the node on hover. */
+.join-node::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 6px);
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.join-node:hover::after,
+.join-node:focus-visible::after {
   opacity: 1;
-  scale: 1.25;
 }
 
 .join-node[data-joined] {
-  width: 1.5rem;
-  height: 1.5rem;
   background: var(--foreground);
-  opacity: 0.9;
+  border-color: var(--foreground);
+  color: var(--background);
+}
+
+/* Both cards a node would join, outlined while it's hovered. */
+.dashboard-tile[data-join-preview]:not([data-joined]) {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
+}
+
+/* --- The Vault and Bookmarks pages in the pager ----------------------------- */
+
+.dashboard-special {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.dashboard-special .vault-preview-scene,
+.dashboard-special .vault-preview-stage {
+  min-height: 100%;
+  height: 100%;
+}
+
+/* While editing cards, these pages are just landmarks in the scroll. */
+.dashboard-special[data-editing] > :not(.dashboard-special-veil) {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: saturate(0.6);
+}
+
+.dashboard-special-veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.dashboard-special-flow {
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Vault and Bookmarks dots are squares, card pages round. */
+.page-dot[data-kind] {
+  border-radius: 0.15rem;
 }

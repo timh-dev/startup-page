@@ -20,6 +20,10 @@ interface DashboardTileProps {
   radiusClass: string;
   cardClass: string;
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
+  /** Outlined while the pointer is on a join node of this card. */
+  joinPreview?: boolean;
   onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
   onRemove: () => void;
 }
@@ -52,6 +56,9 @@ export default function DashboardTile({
   radiusClass,
   cardClass,
   onPointerDown,
+  onPointerEnter,
+  onPointerLeave,
+  joinPreview,
   onResizeStart,
   onRemove,
 }: DashboardTileProps) {
@@ -71,6 +78,7 @@ export default function DashboardTile({
       data-selected={selected || undefined}
       data-dragging={dragging || undefined}
       data-joined={mask ? "true" : undefined}
+      data-join-preview={joinPreview || undefined}
       style={
         {
           transform: `translate(${rect.x}px, ${rect.y}px)`,
@@ -83,6 +91,8 @@ export default function DashboardTile({
         } as React.CSSProperties
       }
       onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       role={editing ? "button" : undefined}
       tabIndex={editing ? 0 : undefined}
       aria-label={editing ? `${label}: drag to move, click to edit` : undefined}

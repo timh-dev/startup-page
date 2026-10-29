@@ -1,5 +1,5 @@
 import React from "react";
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { KBarProvider, useRegisterActions } from "kbar";
 import { HiOutlineArchiveBox, HiOutlineBookmark, HiOutlineHome, HiOutlineSquares2X2 } from "react-icons/hi2";
 
@@ -276,17 +276,9 @@ function AppLayoutInner() {
           <SettingsButton />
         </div>
       </header>
-      {/* Dashboard stays mounted across navigation so the WebGL context is never destroyed.
-          Shader compilation (1–3 s GPU sync) only happens once on first load, not on every
-          return visit from /bookmarks or /resources. */}
-      <div style={{ display: isDashboard ? "block" : "none" }} aria-hidden={!isDashboard}>
-        <DashboardPage />
-      </div>
-      {!isDashboard && (
-        <div key={location.pathname} className="page-enter">
-          <Outlet />
-        </div>
-      )}
+      {/* One vertical pager: card pages with the Vault and Bookmarks pages
+          after the first. The route follows it (#/resources, #/bookmarks). */}
+      <DashboardPage />
     </section>
   );
 }
