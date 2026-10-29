@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { getFlashEnvelope } from "@/features/weather/lightning";
+import { ambientFrameMs } from "@/lib/power";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -812,7 +813,7 @@ export default function VolumetricCloudscape({
       // crisply; otherwise stay at the power-saving cadence.
       const p = propsRef.current;
       const flash = p.lightningIntensity > 0 ? getFlashEnvelope(Date.now(), p.lightningIntensity) : 0;
-      if (flash < 0.01 && now - lastFrameTime < CLOUD_FRAME_MS) return;
+      if (flash < 0.01 && now - lastFrameTime < ambientFrameMs(CLOUD_FRAME_MS)) return;
       lastFrameTime = now;
 
       const d = new Date();

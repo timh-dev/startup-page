@@ -10,6 +10,7 @@ import { renderSun } from './renderSun';
 import { renderHorizonGlow } from './renderHorizonGlow';
 import { renderMarkers } from './renderMarkers';
 import { createAdaptiveResolution } from '@/lib/adaptive-resolution';
+import { ambientFrameMs, prefersReducedMotion } from '@/lib/power';
 
 const SWEEP_SPEED = 0.075;
 const SWEEP_INTERVAL = 22; // ms per sweep step
@@ -113,7 +114,12 @@ export default function SolarGraph() {
     function startAnimation() {
       const targetLst = state.solar?.currentTime ?? getCurrentLst();
 
-      // Startup sweep: animate from 0 to current time
+      // Startup sweep: animate from 0 to current time (skipped with reduced
+      // motion, which starts at the current time).
+      if (prefersReducedMotion()) {
+        state.lst = targetLst;
+        state.sweeping = false;
+      }
       sweepTimer = setInterval(() => {
         if (state.sweeping) {
           state.lst += SWEEP_SPEED;
@@ -137,7 +143,7 @@ export default function SolarGraph() {
         state.animFrameId = requestAnimationFrame(frame);
         if (resolution.sample(timestamp)) resize();
         const elapsed = timestamp - state.lastTimestamp;
-        const targetMs = state.hovering ? 1000 / 60 : TARGET_FRAME_MS;
+        const targetMs = state.hovering ? 1000 / 60 : ambientFrameMs(TARGET_FRAME_MS);
         if (elapsed < targetMs) return;
         if (!canvas.clientWidth) return; // ancestor has display:none — skip draw
         const dt = elapsed / 1000;

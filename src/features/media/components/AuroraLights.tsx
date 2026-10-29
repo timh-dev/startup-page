@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
+import { ambientFrameMs } from "@/lib/power";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -238,7 +239,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
         glReady = true;
       }
 
-      if (now - lastFrameTime < AURORA_FRAME_MS) return;
+      if (now - lastFrameTime < ambientFrameMs(AURORA_FRAME_MS)) return;
       lastFrameTime = now;
 
       gl.clearColor(0, 0, 0, 0);

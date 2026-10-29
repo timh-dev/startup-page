@@ -1,11 +1,17 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAdaptiveResolution } from "./adaptive-resolution";
+
+const power = vi.hoisted(() => ({ onBattery: false }));
+vi.mock("./power", () => ({ isOnBattery: () => power.onBattery }));
 
 function setDensity(value: number) {
   Object.defineProperty(window, "devicePixelRatio", { value, configurable: true });
 }
 
-afterEach(() => setDensity(1));
+afterEach(() => {
+  setDensity(1);
+  power.onBattery = false;
+});
 
 function run(resolution: ReturnType<typeof createAdaptiveResolution>, frames: number, gapMs: number, start = 1000) {
   let changed = false;
@@ -55,5 +61,17 @@ describe("createAdaptiveResolution", () => {
     const resolution = createAdaptiveResolution();
     run(resolution, 100, 1000);
     expect(resolution.scale).toBe(2);
+  });
+
+  it("renders at the screen density on battery, and follows power changes", () => {
+    setDensity(2);
+    power.onBattery = true;
+    const resolution = createAdaptiveResolution({ supersample: 2, max: 4 });
+    expect(resolution.scale).toBe(2);
+
+    power.onBattery = false;
+    expect(resolution.sample(1000)).toBe(true);
+    expect(resolution.scale).toBe(4);
+    expect(resolution.sample(1016)).toBe(false);
   });
 });

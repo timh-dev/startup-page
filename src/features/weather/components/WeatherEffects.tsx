@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { getFlashEvent, getFlashEnvelope, makeRng } from "@/features/weather/lightning";
 import type { PrecipitationStyle, WeatherVisualProfile } from "@/features/weather/types/weather";
+import { prefersReducedMotion } from "@/lib/power";
 
 const MAX_DPR = 2;
 
@@ -40,6 +41,12 @@ function useAnimatedCanvas(
     function frame(now: number) {
       animationFrame = requestAnimationFrame(frame);
       if (!canvas.clientWidth) return; // hidden — skip work
+      // Falling rain and snow are motion for its own sake; leave them out.
+      if (prefersReducedMotion()) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        lastNow = now;
+        return;
+      }
       const dt = Math.min((now - lastNow) / 1000, 0.05);
       lastNow = now;
       drawRef.current(ctx, canvas.width, canvas.height, dt, now / 1000);
