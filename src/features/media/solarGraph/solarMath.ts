@@ -1,3 +1,4 @@
+import { debugNow, debugTimeZone, wallClock } from "@/lib/debug";
 // Solar position math — NOAA Solar Calculator equations
 // Based on Meeus, "Astronomical Algorithms" (2nd ed.)
 // Reference: https://gml.noaa.gov/grad/solcalc/solareqns.PDF
@@ -33,14 +34,15 @@ export function linspace(start: number, stop: number, n: number) {
   return arr;
 }
 
+// "Now" and the time zone come from the debugger when it's set (another
+// time or place), else the real clock and the browser's zone.
 export function getDayOfYear() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const { year, month, day } = wallClock(debugNow(), debugTimeZone());
+  return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 0)) / 86_400_000);
 }
 
 function tzOffsetHours() {
-  return -new Date().getTimezoneOffset() / 60;
+  return wallClock(debugNow(), debugTimeZone()).offsetHours;
 }
 
 // Equation of time in minutes (Spencer 1971 / NOAA simplified form)
@@ -89,8 +91,8 @@ export function sunElevation(lat: number, lng: number, localHour: number, doy: n
 }
 
 export function getCurrentLst() {
-  const now = new Date();
-  return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const { hours, minutes, seconds } = wallClock(debugNow(), debugTimeZone());
+  return hours + minutes / 60 + seconds / 3600;
 }
 
 // ── Fixed-curve day mapping (Apple Watch Solar Graph style) ─────────────────

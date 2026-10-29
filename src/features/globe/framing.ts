@@ -19,9 +19,15 @@ export interface Shot {
   /**
    * How far inside the planet's edge the viewer's location sits, as a
    * fraction of the radius, on the line from the planet's centre to the
-   * middle of the tile; null puts it at the centre of the disc.
+   * middle of the tile; null places it by `offset` instead.
    */
   inset: number | null;
+  /**
+   * With no inset: where the viewer's location sits on the disc, from its
+   * centre in radii (x right, y down). Off centre, the edge of the planet
+   * (and its atmosphere's glow) is always near the location.
+   */
+  offset?: [number, number];
 }
 
 type Vec3 = [number, number, number];
@@ -40,7 +46,9 @@ const normalize = (a: Vec3): Vec3 => {
  */
 export function shotFor(view: GlobeView, aspect: number): Shot {
   if (view === "globe") {
-    return { planetX: 0.5, planetY: 0.56, planetRadius: 0.34, fov: 20, inset: null };
+    // The location sits about halfway out toward the lower left, and the
+    // planet moves up and right so that spot stays near the tile's middle.
+    return { planetX: 0.58, planetY: 0.5, planetRadius: 0.34, fov: 20, inset: null, offset: [-0.4, 0.38] };
   }
   // Wider tiles push the planet further right so the arc still runs corner
   // to corner.
@@ -49,7 +57,12 @@ export function shotFor(view: GlobeView, aspect: number): Shot {
 
 /** View-space point where the viewer's location goes for a shot. */
 export function targetFor(shot: Shot, aspect: number): Vec3 {
-  if (shot.inset === null) return [0, 0, 1];
+  if (shot.inset === null) {
+    if (!shot.offset) return [0, 0, 1];
+    const x = shot.planetX + (shot.offset[0] * shot.planetRadius) / aspect;
+    const y = shot.planetY + shot.offset[1] * shot.planetRadius;
+    return pointOnPlanet(shot, aspect, x, y) ?? [0, 0, 1];
+  }
   // In tile-height units, from the planet's centre toward the tile's middle.
   const dx = (0.5 - shot.planetX) * aspect;
   const dy = 0.5 - shot.planetY;

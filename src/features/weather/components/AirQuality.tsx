@@ -1,4 +1,5 @@
 import React from "react";
+import { useDebugStore } from "@/lib/debug";
 import { getOrRequestLocation } from "@/lib/geolocation";
 
 const AQI_LEVELS = [
@@ -17,6 +18,8 @@ function getLevel(aqi: number) {
 export default function AirQuality() {
   const [data, setData] = React.useState<{ aqi: number; pm25: string; pm10: string } | null>(null);
   const [status, setStatus] = React.useState("loading");
+  // The debugger's place, when set, instead of the browser's location.
+  const debugPlace = useDebugStore((state) => state.location);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -41,6 +44,11 @@ export default function AirQuality() {
       }
     }
 
+    if (debugPlace) {
+      load(debugPlace.latitude, debugPlace.longitude);
+      return () => { cancelled = true; };
+    }
+
     void getOrRequestLocation().then((coords) => {
       if (cancelled) return;
       if (coords) {
@@ -51,7 +59,7 @@ export default function AirQuality() {
     });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [debugPlace]);
 
   if (status !== "ready" || !data) {
     const msg = status === "loading" ? "Loading air quality…"

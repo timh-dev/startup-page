@@ -15,6 +15,7 @@ import AccountButton from "@/features/auth/AccountButton";
 import AuthBridge from "@/features/auth/AuthBridge";
 import { useIsClerkAvailable } from "@/features/auth/ClerkStatus";
 import CommandPalette from "@/components/layout/CommandPalette";
+import DebugPanel from "@/components/layout/DebugPanel";
 import useKBarActions from "@/features/dashboard/hooks/useKBarActions";
 import DashboardPage from "@/features/dashboard/pages";
 import { useQuickAddStore } from "@/features/resourceVault/stores/quickAddStore";
@@ -24,6 +25,7 @@ function KBarWrapper({ children }: { children: React.ReactNode }) {
   return (
     <>
       <CommandPalette />
+      <DebugPanel />
       {children}
     </>
   );

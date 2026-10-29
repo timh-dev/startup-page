@@ -5,6 +5,7 @@ import { getOrRequestLocation } from "@/lib/geolocation";
 import { useWeatherStore } from "@/features/weather/stores/weatherStore";
 import { getOpenWeatherCondition, formatWeatherDescription } from "@/features/weather/utils";
 import type { WeatherData } from "@/features/weather/types/weather";
+import { useDebugStore } from "@/lib/debug";
 
 const WEATHER_TTL_MS = 10 * 60 * 1000;
 
@@ -192,10 +193,17 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
   const overrideUnits = overrides.units;
   // Re-runs when the key is entered, so the widget loads without a reload.
   const apiKey = useCredentialsStore((state) => state.openWeather);
+  // The debugger's place, when set, wins over everything else.
+  const debugPlace = useDebugStore((state) => state.location);
+  const debugLat = debugPlace?.latitude;
+  const debugLon = debugPlace?.longitude;
 
   useEffect(() => {
     const instance = useWeatherStore.getState().instances[instanceId];
-    if (instance?.lastFetchedAt && Date.now() - instance.lastFetchedAt < WEATHER_TTL_MS && instance.data) return;
+    const fresh = instance?.lastFetchedAt && Date.now() - instance.lastFetchedAt < WEATHER_TTL_MS && instance.data;
+    // A fresh fetch for another place doesn't count (the debugger moved).
+    const samePlace = debugLat == null || (instance?.lat === debugLat && instance?.lon === debugLon);
+    if (fresh && samePlace) return;
 
     const settings = readSettings() as Record<string, unknown>;
     const unit = overrideUnits || (settings.unit as string) || (settings.units as string) || "imperial";
@@ -218,8 +226,8 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
       }
     }
 
-    const lat = overrideLat ?? (settings.latitude as number | undefined);
-    const lon = overrideLon ?? (settings.longitude as number | undefined);
+    const lat = debugLat ?? overrideLat ?? (settings.latitude as number | undefined);
+    const lon = debugLon ?? overrideLon ?? (settings.longitude as number | undefined);
 
     if (lat && lon) {
       void load(lat, lon);
@@ -233,5 +241,5 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
         setError(instanceId, "Location unavailable — set coordinates in this widget's settings");
       }
     });
-  }, [instanceId, overrideLat, overrideLon, overrideUnits, apiKey, setData, setError, setLocation, setCoords, setLastFetchedAt]);
+  }, [instanceId, overrideLat, overrideLon, overrideUnits, apiKey, debugLat, debugLon, setData, setError, setLocation, setCoords, setLastFetchedAt]);
 }

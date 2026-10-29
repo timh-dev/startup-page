@@ -5,6 +5,7 @@ import { useWeatherData, type WeatherOverrides } from "@/features/weather/hooks/
 import { WeatherStatus } from "./WeatherStatus";
 import { getEffectiveWind, getOpenWeatherCondition, getOpenWeatherVisualProfile } from "@/features/weather/utils";
 import type { WeatherCondition, WeatherData } from "@/features/weather/types/weather";
+import { debugNowMs } from "@/lib/debug";
 
 type FrostedCategory = "sunny" | "cloudy" | "windy" | "rainy" | "snowy";
 
@@ -389,7 +390,7 @@ export default function WeatherFrostedCard(props: WeatherFrostedCardProps = {}):
     return <LiveFrostedCard instanceId={props.instanceId ?? ""} overrides={props.overrides} />;
   }
 
-  const clockTime = props.clockTime ?? Date.now();
+  const clockTime = props.clockTime ?? debugNowMs();
   return (
     <FrostedContent
       data={props.data}

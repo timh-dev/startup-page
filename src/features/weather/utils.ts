@@ -14,6 +14,7 @@ import type {
   TimeKey,
   WeatherVisualProfile,
 } from "./types/weather";
+import { debugTimeZone, wallClock } from "@/lib/debug";
 
 export function getConditionCategory(weather: string): WeatherCondition {
   if (weather in CONDITION_GRADIENTS) return weather as WeatherCondition;
@@ -99,8 +100,8 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
 }
 
 function getAuroraIntensity(clockTime: number): number {
-  const date = new Date(clockTime);
-  const hour = date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
+  const wall = wallClock(new Date(clockTime), debugTimeZone());
+  const hour = wall.hours + wall.minutes / 60 + wall.seconds / 3600;
 
   // Through the dark of the night, strongest around midnight.
   if (hour >= 20) return 0.75 + smoothstep(20, 22.5, hour) * 0.25;
@@ -557,9 +558,9 @@ export function resolveWeather(
   const cloudFraction = getCloudFraction(ow?.id, data.current?.cloud_cover);
   const cloudDensity  = getCloudDensity(visual, cloudFraction);
   const windEffective = getEffectiveWind(visual, data.current?.wind_speed, data.unit);
-  const clockDate = new Date(clockTime);
-  const clockHour =
-    clockDate.getHours() + clockDate.getMinutes() / 60 + clockDate.getSeconds() / 3600;
+  // Local hour at the place shown (the debugger's place, else the browser's zone).
+  const clockWall = wallClock(new Date(clockTime), debugTimeZone());
+  const clockHour = clockWall.hours + clockWall.minutes / 60 + clockWall.seconds / 3600;
 
   const gradient     = CONDITION_GRADIENTS[condition]?.[timeKey] ?? CONDITION_GRADIENTS.Clouds.day;
   const skyGradient  = getSkyGradient(condition, timePhase);

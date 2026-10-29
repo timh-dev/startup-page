@@ -11,6 +11,7 @@ import { renderHorizonGlow } from './renderHorizonGlow';
 import { renderMarkers } from './renderMarkers';
 import { createAdaptiveResolution } from '@/lib/adaptive-resolution';
 import { ambientFrameMs } from '@/lib/power';
+import { debugLocation, useDebugStore } from '@/lib/debug';
 
 const TARGET_FRAME_MS = 1000 / 30; // idle at 30 fps; hover upgrades to 60
 
@@ -140,13 +141,14 @@ export default function SolarGraph() {
       state.lastTimestamp = performance.now();
       startAnimation();
     } else {
+      const place = debugLocation();
       initSolar(
-        settings.latitude  ?? 40.7128,
-        settings.longitude ?? -74.006
+        place?.latitude ?? settings.latitude ?? 40.7128,
+        place?.longitude ?? settings.longitude ?? -74.006
       );
 
       // Refine with real geolocation if no saved coordinates.
-      if (!settings.latitude) {
+      if (!place && !settings.latitude) {
         void getOrRequestLocation().then((coords) => {
           if (coords) state.solar = calculateSolarContext(coords.lat, coords.lon);
         });
@@ -210,6 +212,13 @@ export default function SolarGraph() {
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseleave', onMouseLeave);
 
+    // The debugger (another time or place) re-centres the chart at once.
+    const unsubscribeDebug = useDebugStore.subscribe((next, prev) => {
+      if (next.location === prev.location && next.timeOffsetMs === prev.timeOffsetMs) return;
+      const current = useSettingsStore.getState().settings;
+      initSolar(next.location?.latitude ?? current.latitude ?? 40.7128, next.location?.longitude ?? current.longitude ?? -74.006);
+    });
+
     // React to coordinate changes from the settings panel without a reload.
     let lastLat = settings.latitude;
     let lastLng = settings.longitude;
@@ -218,6 +227,7 @@ export default function SolarGraph() {
       if (latitude !== lastLat || longitude !== lastLng) {
         lastLat = latitude;
         lastLng = longitude;
+        if (useDebugStore.getState().location) return; // the debugger's place wins
         initSolar(latitude ?? 40.7128, longitude ?? -74.006);
       }
     });
@@ -241,6 +251,7 @@ export default function SolarGraph() {
       if (state._realTimeTimer) clearInterval(state._realTimeTimer);
       resizeObserver.disconnect();
       unsubscribeSettings();
+      unsubscribeDebug();
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseleave', onMouseLeave);
       document.removeEventListener('visibilitychange', onVisibilityChange);

@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useSettingsStore } from "@/features/settings/stores";
+import { debugNow, useDebugStore, wallClock, type DebugLocation } from "@/lib/debug";
 
 // The browser's time zone as a place ("Chicago"), falling back to its UTC
-// offset ("GMT+5:30") when the zone has no city. No timezone picker exists
-// yet, so this always reflects local time.
-function getPlaceLabel(date: Date) {
+// offset ("GMT+5:30") when the zone has no city. With the debugger set to a
+// place, that place and its local time instead.
+function getPlaceLabel(offsetHours: number, place: DebugLocation | null) {
+  if (place) return place.label;
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   const city = zone.includes("/") ? zone.split("/").pop()!.replace(/_/g, " ") : "";
-  return city || getGmtLabel(date);
+  return city || getGmtLabel(offsetHours);
 }
 
-function getGmtLabel(date: Date) {
-  const totalMinutes = -date.getTimezoneOffset();
+function getGmtLabel(offsetHours: number) {
+  const totalMinutes = Math.round(offsetHours * 60);
   const sign = totalMinutes >= 0 ? "+" : "-";
   const absMinutes = Math.abs(totalMinutes);
   const hours = Math.floor(absMinutes / 60);
@@ -20,11 +22,13 @@ function getGmtLabel(date: Date) {
   return `GMT${sign}${hours}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}`;
 }
 
-function getClockParts(date: Date, use24Hour: boolean) {
-  const hours24 = date.getHours();
+function getClockParts(date: Date, use24Hour: boolean, place: DebugLocation | null) {
+  const timeZone = place?.timeZone;
+  const wall = wallClock(date, timeZone);
+  const hours24 = wall.hours;
   const hours12 = hours24 % 12 || 12;
-  const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
+  const minutes = wall.minutes;
+  const seconds = wall.seconds;
   const displayHours = use24Hour ? String(hours24).padStart(2, "0") : String(hours12);
 
   // TICK_LABELS below lays out 5 equal flex columns spanning the row, so
@@ -39,9 +43,9 @@ function getClockParts(date: Date, use24Hour: boolean) {
   return {
     time: `${displayHours}:${String(minutes).padStart(2, "0")}`,
     period: hours24 >= 12 ? "PM" : "AM",
-    weekday: date.toLocaleDateString(undefined, { weekday: "long" }),
-    dateLabel: date.toLocaleDateString(undefined, { month: "long", day: "numeric" }),
-    placeLabel: getPlaceLabel(date),
+    weekday: date.toLocaleDateString(undefined, { weekday: "long", timeZone }),
+    dateLabel: date.toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone }),
+    placeLabel: getPlaceLabel(wall.offsetHours, place),
     hourDeg: ((hours12 % 12) + minutes / 60) * 30,
     minuteDeg: minutes * 6,
     secondDeg: seconds * 6,
@@ -194,14 +198,17 @@ function YearClock({ now }: { now: Date }) {
 export default function Clock() {
   const clockFormat = useSettingsStore((state) => state.settings.ui?.clockFormat) || "12h";
   const use24Hour = clockFormat === "24h";
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState(() => debugNow());
   const [mode, setMode] = useState("digital");
-  const parts = useMemo(() => getClockParts(now, use24Hour), [now, use24Hour]);
+  const place = useDebugStore((state) => state.location);
+  const timeOffset = useDebugStore((state) => state.timeOffsetMs);
+  const parts = useMemo(() => getClockParts(now, use24Hour, place), [now, use24Hour, place]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    setNow(debugNow());
+    const interval = window.setInterval(() => setNow(debugNow()), 1000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [timeOffset]);
 
   const nextMode = mode === "digital" ? "analog" : mode === "analog" ? "year" : "digital";
 

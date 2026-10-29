@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { getFlashEnvelope } from "@/features/weather/lightning";
 import { ambientFrameMs } from "@/lib/power";
+import { debugNow, debugTimeZone, wallClock } from "@/lib/debug";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -909,8 +910,8 @@ export default function VolumetricCloudscape({
       if (flash < 0.01 && now - lastFrameTime < ambientFrameMs(CLOUD_FRAME_MS)) return;
       lastFrameTime = now;
 
-      const d = new Date();
-      const hourNow = p.hour ?? d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+      const d = wallClock(debugNow(), debugTimeZone());
+      const hourNow = p.hour ?? d.hours + d.minutes / 60 + d.seconds / 3600;
       const coverageValue = getCoverageValue(p.coverage);
       // Default density follows coverage when not supplied (legacy callers)
       const densityValue = p.density ?? Math.min(1, 0.25 + coverageValue * 0.5);

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ForecastDay, WeatherData } from "@/features/weather/types/weather";
+import { debugNowMs, useDebugStore } from "@/lib/debug";
 
 export interface SelectedWeatherDay {
   day: ForecastDay;
@@ -63,7 +64,7 @@ function withInstance(
 
 export const useWeatherStore = create<WeatherStore>((set) => ({
   instances: {},
-  clockTime: Date.now(),
+  clockTime: debugNowMs(),
   setData: (id, data) => set((state) => withInstance(state, id, { data })),
   setError: (id, error) => set((state) => withInstance(state, id, { error })),
   setLocation: (id, location) => set((state) => withInstance(state, id, { location })),
@@ -72,9 +73,14 @@ export const useWeatherStore = create<WeatherStore>((set) => ({
   openWeatherCard: (id, selectedDay = null) =>
     set((state) => withInstance(state, id, { selectedDay, detailOpen: true })),
   closeWeatherCard: (id) => set((state) => withInstance(state, id, { detailOpen: false })),
-  tickClock: () => set({ clockTime: Date.now() }),
+  tickClock: () => set({ clockTime: debugNowMs() }),
 }));
 
 export function useWeatherInstance(id: string): WeatherInstanceState {
   return useWeatherStore((state) => state.instances[id] || EMPTY_INSTANCE);
 }
+
+// The debugger's time applies at once, not on the next tick.
+useDebugStore.subscribe((next, prev) => {
+  if (next.timeOffsetMs !== prev.timeOffsetMs || next.location !== prev.location) useWeatherStore.getState().tickClock();
+});

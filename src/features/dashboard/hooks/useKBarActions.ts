@@ -10,6 +10,7 @@ import {
   createSettingsExportFilename,
 } from "@/lib/settings";
 import { useSettingsStore } from "@/features/settings/stores";
+import { useDebugStore } from "@/lib/debug";
 
 // Search-provider bangs: "!yt lofi beats" → YouTube search
 const SEARCH_BANGS: Record<string, { label: string; url: (q: string) => string }> = {
@@ -140,6 +141,16 @@ export default function useKBarActions() {
         const input = document.getElementById("search-input");
         if (input) input.focus();
       },
+    });
+
+    // --- Debugger ---
+    list.push({
+      id: "open-debugger",
+      name: "Debugger: change the time or place",
+      shortcut: [],
+      keywords: "debug time travel location timezone sun",
+      section: "Settings",
+      perform: () => useDebugStore.getState().setPanelOpen(true),
     });
 
     // --- Settings ---

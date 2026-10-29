@@ -9,6 +9,7 @@ import { WeatherCurrentPanel } from "./WeatherCurrentPanel";
 import { WeatherForecastPanel } from "./WeatherForecastPanel";
 import WeatherFrostedCard from "./WeatherFrostedCard";
 import type { WeatherData } from "@/features/weather/types/weather";
+import { debugNowMs } from "@/lib/debug";
 
 interface WeatherBoxProps {
   instanceId?: string;
@@ -100,7 +101,7 @@ export function WeatherBox(props: WeatherBoxProps = {}): React.ReactElement {
       data={props.data}
       error={props.error ?? null}
       location={props.location ?? "Weather"}
-      clockTime={props.clockTime ?? Date.now()}
+      clockTime={props.clockTime ?? debugNowMs()}
       instanceId={props.instanceId}
     />
   );
