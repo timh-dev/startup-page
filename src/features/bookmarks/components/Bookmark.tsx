@@ -166,7 +166,7 @@ function BookmarkFavicon({ name, url }: { name: string; url: string }) {
 
   if (isSelfHostedUrl(url)) {
     return (
-      <span className="bookmark-favicon-chip">
+      <span className="bookmark-favicon-chip bookmark-favicon-status">
         <LocalServiceStatus url={url} className="size-2 rounded-full" />
       </span>
     );

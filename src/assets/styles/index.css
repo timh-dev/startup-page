@@ -2261,6 +2261,12 @@ button.bookmark-more:hover {
   border-radius: 0.2rem;
 }
 
+/* Self-hosted services show a status dot, which needs no chip. */
+.dark .bookmark-favicon-status {
+  background: transparent;
+  box-shadow: none;
+}
+
 .bookmark-favicon-letter,
 .dark .bookmark-favicon-letter {
   padding: 0;
