@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 
 import { useSettingsStore } from "@/features/settings/stores";
 import { debugNow, useDebugStore, wallClock, type DebugLocation } from "@/lib/debug";
@@ -150,7 +151,7 @@ function YearClock({ now }: { now: Date }) {
 
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      if (!w || !h) return;
+      if (!w || !h || !isOnScreen(canvas)) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
         canvas.width = Math.round(w * dpr);
@@ -184,6 +185,7 @@ function YearClock({ now }: { now: Date }) {
     frameId = requestAnimationFrame(draw);
     return () => {
       if (frameId) cancelAnimationFrame(frameId);
+      forgetOnScreen(canvas);
     };
   }, [year, month, date]);
 

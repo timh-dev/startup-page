@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { getFlashEnvelope } from "@/features/weather/lightning";
 import { ambientFrameMs } from "@/lib/power";
@@ -881,7 +882,7 @@ export default function VolumetricCloudscape({
     function render(now: number) {
       animationFrame = requestAnimationFrame(render);
       if (resolution.sample(now)) resize();
-      if (!canvas.clientWidth) return; // hidden (ancestor display:none) — skip GPU work
+      if (!canvas.clientWidth || !isOnScreen(canvas)) return; // hidden or off screen: skip GPU work
 
       if (!glReady) {
         // Non-blocking poll with KHR extension; one-time stall without it (but deferred from mount).
@@ -950,6 +951,7 @@ export default function VolumetricCloudscape({
     animationFrame = requestAnimationFrame(render);
     return () => {
       cancelAnimationFrame(animationFrame);
+      forgetOnScreen(canvas);
       resizeObserver.disconnect();
       gl.deleteBuffer(buffer);
       gl.deleteTexture(textTexture);

@@ -1187,8 +1187,8 @@
 }
 
 @keyframes weather-star-twinkle {
-  0%, 100% { opacity: 0.3; }
-  50%       { opacity: 0.9; }
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1; }
 }
 
 @keyframes weather-fog-roll-fwd {

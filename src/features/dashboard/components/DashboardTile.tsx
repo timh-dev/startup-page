@@ -4,6 +4,7 @@ import { HiXMark } from "react-icons/hi2";
 import type { WidgetInstance } from "@/lib/dashboard-dimensions";
 import { getWidgetType } from "@/features/dashboard/widgetRegistry";
 import type { Rect } from "@/features/dashboard/layout/joins";
+import { watchOnScreen } from "@/lib/on-screen";
 
 interface DashboardTileProps {
   instance: WidgetInstance;
@@ -67,6 +68,14 @@ export default function DashboardTile({
 }: DashboardTileProps) {
   const label = getWidgetType(instance.type).label;
   const ref = React.useRef<HTMLDivElement>(null);
+
+  // Off screen (another page, scrolled away): CSS animations inside pause
+  // (see .dashboard-tile[data-offscreen]). Set directly, without a re-render.
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    return watchOnScreen(el, (onScreen) => el.toggleAttribute("data-offscreen", !onScreen));
+  }, []);
 
   return (
     <div

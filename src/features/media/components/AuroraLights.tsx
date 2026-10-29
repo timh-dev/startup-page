@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { ambientFrameMs } from "@/lib/power";
 import { motionTime } from "@/lib/motion";
@@ -231,7 +232,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
     function render(now: number) {
       animationFrame = requestAnimationFrame(render);
       if (canvasResolution.sample(now)) resize();
-      if (!canvas.clientWidth) return; // hidden (ancestor display:none) — skip GPU work
+      if (!canvas.clientWidth || !isOnScreen(canvas)) return; // hidden or off screen: skip GPU work
 
       if (!glReady) {
         if (khrParallel && !gl.getProgramParameter(program, khrParallel.COMPLETION_STATUS_KHR)) return;
@@ -266,6 +267,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
 
     return () => {
       cancelAnimationFrame(animationFrame);
+      forgetOnScreen(canvas);
       resizeObserver.disconnect();
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);

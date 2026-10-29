@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 import { readSettings } from '@/lib/settings';
 import { getOrRequestLocation } from '@/lib/geolocation';
 import { useSettingsStore } from '@/features/settings/stores';
@@ -14,7 +15,7 @@ import { ambientFrameMs } from '@/lib/power';
 import { debugLocation, debugTimeZone, useDebugStore, wallClock } from '@/lib/debug';
 import { replayNow, useMotionStore } from '@/lib/motion';
 
-const TARGET_FRAME_MS = 1000 / 30; // idle at 30 fps; hover upgrades to 60
+const TARGET_FRAME_MS = 1000 / 20; // idle at 20 fps (the sky changes slowly); hover upgrades to 60
 
 interface SolarGraphState {
   lst: number;
@@ -78,9 +79,10 @@ export default function SolarGraph() {
       startAnimation();
     }
 
-    // Supersampled: rendered at up to twice the screen's density and scaled
-    // down, for smoother curves and gradients; steps down if frames run slow.
-    const resolution = createAdaptiveResolution({ supersample: 2, max: 4 });
+    // Supersampled on standard screens (twice their density) for smoother
+    // curves; a high-density screen is already sharp, so never past 2x (4x
+    // was four times the pixels to fill every frame). Steps down if slow.
+    const resolution = createAdaptiveResolution({ supersample: 2, max: 2 });
 
     // Resize handler
     function resize() {
@@ -134,7 +136,7 @@ export default function SolarGraph() {
         else if (state.replaying) state.lst = getCurrentLst();
         state.replaying = !!replayed;
         if (!resized && !replayed && elapsed < targetMs) return;
-        if (!canvas.clientWidth) return; // ancestor has display:none — skip draw
+        if (!canvas.clientWidth || !isOnScreen(canvas)) return; // hidden or off screen: skip draw
         const dt = (elapsed / 1000) * useMotionStore.getState().speed;
         state.lastTimestamp = timestamp;
         state.animationTime += dt;
@@ -279,6 +281,7 @@ export default function SolarGraph() {
 
     return () => {
       if (state.animFrameId) cancelAnimationFrame(state.animFrameId);
+      forgetOnScreen(canvas);
       if (state._realTimeTimer) clearInterval(state._realTimeTimer);
       resizeObserver.disconnect();
       unsubscribeSettings();

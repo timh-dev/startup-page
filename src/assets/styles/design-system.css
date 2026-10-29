@@ -3424,3 +3424,10 @@ h3.bm-folder-title {
     display: none;
   }
 }
+
+/* A card off screen keeps still: its CSS animations pause until it's back. */
+.dashboard-tile[data-offscreen] *,
+.dashboard-tile[data-offscreen] *::before,
+.dashboard-tile[data-offscreen] *::after {
+  animation-play-state: paused !important;
+}

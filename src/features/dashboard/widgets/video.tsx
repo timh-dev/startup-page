@@ -27,9 +27,33 @@ function VideoRender({ instance, cardClass }: WidgetRenderProps) {
   // that refuses gets a plain load instead.
   const [cors, setCors] = React.useState(true);
 
+  // Paused while off screen (another page, scrolled away) or the tab is
+  // hidden: decoding video nobody sees is most of a dashboard's idle cost.
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video || typeof IntersectionObserver === "undefined") return undefined;
+    let onScreen = true;
+    const update = () => {
+      if (onScreen && !document.hidden) void video.play().catch(() => {});
+      else video.pause();
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting;
+      update();
+    });
+    observer.observe(video);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [src, cors]);
+
   return (
     <div className={`${cardClass || ""} relative overflow-hidden`}>
       <video
+        ref={videoRef}
         className="absolute max-w-none object-cover"
         style={{
           width: `${100 * zoom}%`,

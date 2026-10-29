@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 import { getFlashEvent, getFlashEnvelope, makeRng } from "@/features/weather/lightning";
 import type { PrecipitationStyle, WeatherVisualProfile } from "@/features/weather/types/weather";
 import { prefersReducedMotion } from "@/lib/power";
 import { motionTime, useMotionStore } from "@/lib/motion";
+
+const EFFECTS_FRAME_MS = 1000 / 30;
 
 const MAX_DPR = 2;
 
@@ -41,13 +44,16 @@ function useAnimatedCanvas(
 
     function frame(now: number) {
       animationFrame = requestAnimationFrame(frame);
-      if (!canvas.clientWidth) return; // hidden — skip work
+      if (!canvas.clientWidth || !isOnScreen(canvas)) return; // hidden or off screen: skip work
       // Falling rain and snow are motion for its own sake; leave them out.
       if (prefersReducedMotion()) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         lastNow = now;
         return;
       }
+      // 30 fps is plenty for rain and snow, and halves the work on a
+      // 60 Hz screen (a quarter on 120 Hz).
+      if (now - lastNow < EFFECTS_FRAME_MS) return;
       const speed = useMotionStore.getState().speed;
       const dt = Math.min((now - lastNow) / 1000, 0.05) * speed;
       lastNow = now;
@@ -58,6 +64,7 @@ function useAnimatedCanvas(
     animationFrame = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(animationFrame);
+      forgetOnScreen(canvas);
       resizeObserver.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -498,36 +505,30 @@ export function LightningStorm({ intensity = 0.6 }: { intensity?: number }): Rea
 // Stars / fog / atmosphere (unchanged DOM implementations)
 // ---------------------------------------------------------------------------
 
+// 220 stars in three layers, each painted once as background gradients and
+// twinkling as a whole (its opacity animates), out of step with the others.
+// Three animations instead of one per star, which kept the compositor busy.
+const STAR_LAYERS = 3;
 export function Stars(): React.ReactElement {
-  const stars = useMemo(
+  const layers = useMemo(
     () =>
-      Array.from({ length: 220 }, () => {
-        const sizeValue = Math.random() < 0.78 ? 0.38 + Math.random() * 0.62 : 1 + Math.random() * 0.85;
+      Array.from({ length: STAR_LAYERS }, (_, layer) => {
+        const gradients = Array.from({ length: Math.ceil(220 / STAR_LAYERS) }, () => {
+          const size = Math.random() < 0.78 ? 0.38 + Math.random() * 0.62 : 1 + Math.random() * 0.85;
+          const alpha = (0.45 + Math.random() * 0.55).toFixed(2);
+          return `radial-gradient(circle at ${(Math.random() * 100).toFixed(2)}% ${(Math.random() * 86).toFixed(2)}%, rgb(255 255 255 / ${alpha}) ${(size / 2).toFixed(2)}px, transparent ${(size / 2 + 0.6).toFixed(2)}px)`;
+        });
         return {
-          left:     `${Math.random() * 100}%`,
-          top:      `${Math.random() * 86}%`,
-          size:     `${sizeValue}px`,
-          opacity:  0.36 + Math.random() * 0.58,
-          duration: `${2 + Math.random() * 3}s`,
-          delay:    `${Math.random() * 3}s`,
+          backgroundImage: gradients.join(", "),
+          animation: `weather-star-twinkle ${(2.6 + layer * 1.1).toFixed(1)}s ease-in-out ${(layer * 0.9).toFixed(1)}s infinite`,
         };
       }),
     []
   );
   return (
     <div className="weather-stars-layer absolute inset-0 z-[8] overflow-hidden pointer-events-none">
-      {stars.map((s, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full bg-white"
-          style={{
-            left: s.left, top: s.top,
-            width: s.size, height: s.size,
-            opacity: s.opacity,
-            animation: `weather-star-twinkle ${s.duration} ease-in-out infinite`,
-            animationDelay: s.delay,
-          }}
-        />
+      {layers.map((style, i) => (
+        <div key={i} className="absolute inset-0" style={style} />
       ))}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 import { HiOutlineClock } from "react-icons/hi2";
 
 import landMaskUrl from "@/assets/world/land-mask.png";
@@ -141,7 +142,7 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     // redraws when the scene does.
     const loop = (timestamp: number) => {
       frame = requestAnimationFrame(loop);
-      if (!canvas.clientWidth || document.hidden) return;
+      if (!canvas.clientWidth || !isOnScreen(canvas)) return;
       const at = replayNow();
       if (at) {
         replayingRef.current = true;
@@ -168,6 +169,7 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     return () => {
       alive = false;
       cancelAnimationFrame(frame);
+      forgetOnScreen(canvas);
       observer.disconnect();
       renderer.dispose();
       rendererRef.current = null;
