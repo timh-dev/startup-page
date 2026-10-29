@@ -2,20 +2,22 @@ import React from "react";
 import { HiCheck, HiChevronUpDown, HiPlus } from "react-icons/hi2";
 import { DEFAULT_READ_TAGS, READ_TAG_COLORS } from "@/features/resourceVault/constants";
 import { usePopoverDismiss } from "@/features/resourceVault/hooks/usePopoverDismiss";
-import { getAuthToken } from "@/lib/authToken";
-
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+import { fetchLinkPreview } from "@/features/resourceVault/linkPreview";
 
 export interface LinkDraft {
   title: string;
   description: string;
   url: string;
   tag: string;
+  /** The page's share image, from the link preview. */
+  image?: string | null;
 }
 
 interface LinkComposerProps {
   /** The link being edited, or null to add one. Remount (via key) to switch items. */
-  editingItem: LinkDraft | null;
+  editingItem: Partial<LinkDraft> | null;
+  /** Starting values for a new link (e.g. what was typed in the add field). */
+  initial?: Partial<LinkDraft>;
   /** Tag for a new link: the last one used, so a run of similar links keeps it. */
   defaultTag: string;
   onSubmit: (item: LinkDraft) => void;
@@ -23,12 +25,13 @@ interface LinkComposerProps {
   onCancel: (tag: string) => void;
 }
 
-export default function LinkComposer({ editingItem, defaultTag, onSubmit, onCancel }: LinkComposerProps) {
+export default function LinkComposer({ editingItem, initial, defaultTag, onSubmit, onCancel }: LinkComposerProps) {
   const [draft, setDraft] = React.useState<LinkDraft>(() => ({
-    title: editingItem?.title || "",
+    title: editingItem?.title || initial?.title || "",
     description: editingItem?.description || "",
-    url: editingItem?.url || "",
+    url: editingItem?.url || initial?.url || "",
     tag: editingItem?.tag || defaultTag,
+    image: editingItem?.image ?? null,
   }));
   const [composerTagMenuOpen, setComposerTagMenuOpen] = React.useState(false);
   const composerTagMenuRef = React.useRef<HTMLDivElement>(null);
@@ -76,53 +79,40 @@ export default function LinkComposer({ editingItem, defaultTag, onSubmit, onCanc
       description: draft.description.trim(),
       url: draft.url.trim(),
       tag: draft.tag,
+      image: draft.image ?? null,
     });
   };
 
-  // Fetches the target page's <title>/description through the
-  // /api/link-preview endpoint. Silently no-ops on any failure (network
-  // error, 404 because this deployment has no /api at all, timeout, etc.) —
-  // auto-fill is a convenience, never a requirement, so the user can always
-  // just type the title themselves.
+  // Fills in the title, note, tag and image from the page (see
+  // fetchLinkPreview); never overwrites what the user already typed or picked.
   const maybeFetchLinkPreview = React.useCallback(async (rawUrl: string) => {
     const trimmed = rawUrl.trim();
     if (!/^https?:\/\//i.test(trimmed)) {
       return;
     }
-
-    // Previews need a signed-in user (the endpoint isn't an open proxy);
-    // signed out, the user just types the title themselves.
-    const token = await getAuthToken();
-    if (!token) {
+    setFetchingPreview(true);
+    const data = await fetchLinkPreview(trimmed);
+    setFetchingPreview(false);
+    if (!data) {
       return;
     }
+    setDraft((current) => (
+      current.url.trim() === trimmed
+        ? {
+            ...current,
+            title: current.title.trim() ? current.title : (data.title || current.title),
+            description: current.description.trim() ? current.description : (data.description || current.description),
+            tag: !tagManuallySetRef.current && data.tag ? data.tag : current.tag,
+            image: data.image ?? current.image,
+          }
+        : current
+    ));
+  }, []);
 
-    setFetchingPreview(true);
-    try {
-      const response = await fetch(`${API_URL}/api/link-preview?url=${encodeURIComponent(trimmed)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        return;
-      }
-      const data = await response.json();
-      const suggestedTag = DEFAULT_READ_TAGS.includes(data.tag) ? data.tag : null;
-      setDraft((current) => (
-        current.url.trim() === trimmed
-          ? {
-              ...current,
-              title: current.title.trim() ? current.title : (data.title || current.title),
-              description: current.description.trim() ? current.description : (data.description || current.description),
-              tag: !tagManuallySetRef.current && suggestedTag ? suggestedTag : current.tag,
-            }
-          : current
-      ));
-    } catch (_error) {
-      // No /api available (static/self-hosted deployment) or the fetch
-      // failed — leave the composer exactly as the user left it.
-    } finally {
-      setFetchingPreview(false);
-    }
+  // Opened with a link already typed: fill in from it straight away.
+  React.useEffect(() => {
+    if (!editingItem && initial?.url) void maybeFetchLinkPreview(initial.url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleUrlPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {

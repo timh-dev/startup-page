@@ -205,7 +205,6 @@ export function DashboardSettings({ settings, updateSettings }: SettingsSectionP
           <Row label="Bookmarks">
             <Switch checked={ui.bookmarksEnabled ?? true} onCheckedChange={(checked) => setUiValue(updateSettings, "bookmarksEnabled", checked)} aria-label="Bookmarks page" />
           </Row>
-          <RangeControl label="Bookmark folder size (rem)" value={ui.bookmarkPillSize ?? 3.25} min={2.5} max={5} step={0.25} onChange={(value: number) => setUiValue(updateSettings, "bookmarkPillSize", value)} />
         </CardContent>
       </Card>
     </>

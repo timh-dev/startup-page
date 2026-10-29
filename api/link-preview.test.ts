@@ -23,6 +23,7 @@ import {
   GET,
   decodeEntities,
   extractDescription,
+  extractImage,
   extractOgType,
   extractTitle,
   faviconUrlFor,
@@ -144,6 +145,21 @@ describe("suggestTag", () => {
   it("returns null when nothing matches", () => {
     expect(suggestTag(new URL("https://example.com/post"))).toBeNull();
     expect(suggestTag(new URL("https://example.com/post"), "website")).toBeNull();
+  });
+});
+
+describe("extractImage", () => {
+  const base = new URL("https://example.com/posts/a");
+
+  it("reads og:image, then twitter:image, made absolute", () => {
+    expect(extractImage('<meta property="og:image" content="/img/share.png">', base)).toBe("https://example.com/img/share.png");
+    expect(extractImage('<meta content="https://cdn.x.com/a.jpg" property="og:image">', base)).toBe("https://cdn.x.com/a.jpg");
+    expect(extractImage('<meta name="twitter:image" content="https://cdn.x.com/b.jpg">', base)).toBe("https://cdn.x.com/b.jpg");
+  });
+
+  it("ignores missing and non-http images", () => {
+    expect(extractImage("<title>x</title>", base)).toBeNull();
+    expect(extractImage('<meta property="og:image" content="javascript:alert(1)">', base)).toBeNull();
   });
 });
 

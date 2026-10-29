@@ -1,38 +1,67 @@
 /*eslint-disable*/
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { HiOutlineBookOpen } from "react-icons/hi2";
+import { useLocation } from "react-router-dom";
+import { HiOutlineCheckCircle, HiOutlineInboxStack, HiOutlineMagnifyingGlassCircle } from "react-icons/hi2";
 import { useSettingsStore } from "@/features/settings/stores";
-import VaultGlassView from "@/features/resourceVault/components/VaultGlassView";
+import LinksPane from "@/features/resourceVault/components/links/LinksPane";
+import type { LinkItem } from "@/features/resourceVault/components/links/LinkRow";
 import VaultItemsSection from "@/features/resourceVault/components/VaultItemsSection";
 import { normalizeResourceVaultItems, normalizeVaultItems } from "@/features/resourceVault/utils";
-import { VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
+import { DEFAULT_READ_TAGS, READ_TAG_COLORS, VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
 import { useQuickAddStore, type VaultSection } from "@/features/resourceVault/stores/quickAddStore";
-import type { VaultItem } from "@/features/resourceVault/types";
-import PaperPageShell from "@/components/layout/PaperPageShell";
-import vaultPreviewBg from "@/assets/media/vault-preview-bg.jpg";
+import type { VaultItem, VaultItemKind } from "@/features/resourceVault/types";
+import CollectionShell, { CollectionHeader, RailGroup, RailItem, RailSearch } from "@/components/layout/CollectionShell";
 
-const VALID_SECTIONS: VaultSection[] = ["links", ...VAULT_KIND_ORDER];
+/** What the main pane shows: the reading list (to explore, done) or a library kind. */
+type VaultView = "todo" | "done" | VaultItemKind;
+const VIEW_KEY = "startup-page.vault-view";
 
-function isValidSection(value: unknown): value is VaultSection {
-  return VALID_SECTIONS.includes(value as VaultSection);
+function initialView(routed: unknown): VaultView {
+  if (routed === "links") return "todo";
+  if (VAULT_KIND_ORDER.includes(routed as VaultItemKind)) return routed as VaultItemKind;
+  try {
+    const stored = window.localStorage.getItem(VIEW_KEY);
+    if (stored === "todo" || stored === "done" || VAULT_KIND_ORDER.includes(stored as VaultItemKind)) return stored as VaultView;
+  } catch {
+    // Storage blocked: start on the reading list.
+  }
+  return "todo";
 }
 
-// Renders inside AppLayout, which already mounts ThemeProvider and the
-// persistent nav/theme-toggle/settings chrome — this page only needs to
-// supply the scenic background + paper card + vault UI, not its own theme
-// wiring or back/theme controls.
+// The Vault: a reading list (links to explore, and done) and a library of
+// code snippets and templates. The sidebar switches between them and filters
+// links by tag; its search looks through everything at once.
 export default function ResourceVaultPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const settings = useSettingsStore((state) => state.settings);
   const persistSettingsToStore = useSettingsStore((state) => state.persistSettings);
 
   const routedSection = (location.state as { section?: unknown } | null)?.section;
   const routedFocusSearch = Boolean((location.state as { focusSearch?: unknown } | null)?.focusSearch);
-  const [activeSection, setActiveSection] = React.useState<VaultSection>(
-    isValidSection(routedSection) ? routedSection : "links",
-  );
+  const [view, setViewState] = React.useState<VaultView>(() => initialView(routedSection));
+  const [tag, setTag] = React.useState<string | null>(null);
+  const [query, setQuery] = React.useState("");
+  const searchRef = React.useRef<HTMLInputElement>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const setView = (next: VaultView) => {
+    setViewState(next);
+    setQuery("");
+    scrollRef.current?.scrollTo({ top: 0 });
+    try {
+      window.localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Not remembered; that's fine.
+    }
+  };
+
+  React.useEffect(() => {
+    if (routedSection !== undefined) setViewState(initialView(routedSection));
+  }, [routedSection]);
+
+  React.useEffect(() => {
+    if (routedFocusSearch) searchRef.current?.focus();
+  }, [routedFocusSearch]);
 
   const persistSettings = async (nextSettings: any) => {
     await persistSettingsToStore(nextSettings);
@@ -44,11 +73,12 @@ export default function ResourceVaultPage() {
     const current = useSettingsStore.getState().settings;
     const items = Array.isArray(current.readItems) ? current.readItems : [];
     const nextItem = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: item.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title: item.title,
       description: item.description,
       url: item.url,
       tag: item.tag,
+      image: item.image ?? null,
       status: "todo",
       createdAt: new Date().toISOString(),
     };
@@ -78,15 +108,7 @@ export default function ResourceVaultPage() {
     await persistSettings({
       ...current,
       readItems: items.map((item: any) =>
-        item.id === itemId
-          ? {
-              ...item,
-              title: nextItem.title,
-              description: nextItem.description,
-              url: nextItem.url,
-              tag: nextItem.tag,
-            }
-          : item,
+        item.id === itemId ? { ...item, ...nextItem, id: item.id, status: item.status } : item,
       ),
     });
   };
@@ -196,68 +218,124 @@ export default function ResourceVaultPage() {
     URL.revokeObjectURL(url);
   };
 
-  const quickAddPending = useQuickAddStore((state) => state.pending && state.section === activeSection);
+  const quickAddSection = useQuickAddStore((state) => (state.pending ? state.section : null));
   const consumeQuickAdd = useQuickAddStore((state) => state.consumeQuickAdd);
+  // The command palette asked to add something: show where it goes.
+  React.useEffect(() => {
+    if (quickAddSection === "links" && view !== "todo") setView("todo");
+    else if (quickAddSection && quickAddSection !== "links" && quickAddSection !== view) setView(quickAddSection as VaultItemKind);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickAddSection]);
+
+  const links = React.useMemo(() => normalizeResourceVaultItems(settings.readItems) as LinkItem[], [settings.readItems]);
+  const library = React.useMemo(() => normalizeVaultItems(settings.vaultItems), [settings.vaultItems]);
+  const todoCount = links.filter((item) => item.status !== "done").length;
+  const doneCount = links.length - todoCount;
+  const tagCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of links) counts[item.tag] = (counts[item.tag] || 0) + 1;
+    return counts;
+  }, [links]);
+
+  const linkHandlers = {
+    onAddItem: handleAddReadItem,
+    onUpdateItem: handleUpdateReadItem,
+    onToggleItem: handleToggleReadItem,
+    onDeleteItem: handleDeleteReadItem,
+  };
+  const libraryHandlers = (kind: VaultItemKind) => ({
+    onAddItem: handleAddVaultItem,
+    onUpdateItem: handleUpdateVaultItem,
+    onDeleteItem: handleDeleteVaultItem,
+    onExportItems: () => handleExportVaultItems(kind),
+    onImportItems: handleImportVaultItems,
+  });
+
+  const needle = query.trim().toLowerCase();
+  const matches = (values: unknown[]) => values.some((value) => String(value || "").toLowerCase().includes(needle));
+  const resultCount = needle
+    ? links.filter((item) => matches([item.title, item.description, item.url, item.tag])).length +
+      library.filter((item) => matches([item.title, item.description, item.body, item.subject, item.trigger, item.language, item.templateType])).length
+    : 0;
+
+  const rail = (
+    <>
+      <RailSearch inputRef={searchRef} value={query} onChange={setQuery} placeholder="Search the vault" />
+      <RailGroup title="Reading list">
+        <RailItem label="To explore" icon={HiOutlineInboxStack} count={todoCount} active={!needle && view === "todo"} onClick={() => setView("todo")} />
+        <RailItem label="Completed" icon={HiOutlineCheckCircle} count={doneCount} active={!needle && view === "done"} onClick={() => setView("done")} />
+      </RailGroup>
+      <RailGroup title="Library">
+        {VAULT_KIND_ORDER.map((kind) => (
+          <RailItem
+            key={kind}
+            label={VAULT_KIND_DEFS[kind].label}
+            icon={VAULT_KIND_DEFS[kind].icon}
+            count={library.filter((item) => item.kind === kind).length}
+            active={!needle && view === kind}
+            onClick={() => setView(kind)}
+          />
+        ))}
+      </RailGroup>
+      {links.length > 0 && (
+        <RailGroup title="Tags">
+          {DEFAULT_READ_TAGS.filter((name) => tagCounts[name]).map((name) => (
+            <RailItem
+              key={name}
+              label={name}
+              dotClass={READ_TAG_COLORS[name]}
+              count={tagCounts[name]}
+              active={tag === name}
+              onClick={() => {
+                setTag(tag === name ? null : name);
+                if (view !== "todo" && view !== "done") setView("todo");
+              }}
+            />
+          ))}
+        </RailGroup>
+      )}
+    </>
+  );
 
   return (
-    <PaperPageShell backgroundImage={vaultPreviewBg}>
-      <div className="vg-section-tabs" role="tablist" aria-label="Vault section">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeSection === "links"}
-          className={`vg-section-tab ${activeSection === "links" ? "vg-section-tab-active" : ""}`}
-          onClick={() => setActiveSection("links")}
-        >
-          <HiOutlineBookOpen className="size-4" />
-          Links
-        </button>
-        {VAULT_KIND_ORDER.map((kind) => {
-          const def = VAULT_KIND_DEFS[kind];
-          const Icon = def.icon;
-          return (
-            <button
-              type="button"
-              key={kind}
-              role="tab"
-              aria-selected={activeSection === kind}
-              className={`vg-section-tab ${activeSection === kind ? "vg-section-tab-active" : ""}`}
-              onClick={() => setActiveSection(kind)}
-            >
-              <Icon className="size-4" />
-              {def.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeSection === "links" ? (
-        <VaultGlassView
+    <CollectionShell label="Vault" rail={rail} scrollRef={scrollRef}>
+      {needle ? (
+        <div className="collection-pane">
+          <CollectionHeader eyebrow="Search" title={`“${query.trim()}”`} count={resultCount} />
+          <LinksPane embedded items={settings.readItems} status="all" tag={null} onTag={setTag} query={query} {...linkHandlers} />
+          {VAULT_KIND_ORDER.map((kind) => (
+            <VaultItemsSection key={kind} embedded kind={kind} items={settings.vaultItems} query={query} {...libraryHandlers(kind)} />
+          ))}
+          {!resultCount && (
+            <div className="collection-empty">
+              <HiOutlineMagnifyingGlassCircle className="collection-empty-icon" />
+              <p className="collection-empty-title">Nothing matches</p>
+              <p className="collection-empty-hint">Search looks through links, code and templates: titles, notes, addresses and contents.</p>
+            </div>
+          )}
+        </div>
+      ) : view === "todo" || view === "done" ? (
+        <LinksPane
           items={settings.readItems}
-          onBack={() => navigate("/")}
-          onAddItem={handleAddReadItem}
+          status={view}
+          tag={tag}
+          onTag={setTag}
+          {...linkHandlers}
           onExportItems={handleExportReadItems}
           onImportItems={handleImportReadItems}
-          onToggleItem={handleToggleReadItem}
-          onUpdateItem={handleUpdateReadItem}
-          onDeleteItem={handleDeleteReadItem}
-          autoFocusSearch={routedFocusSearch}
+          quickAddPending={quickAddSection === "links"}
+          onQuickAddConsumed={consumeQuickAdd}
         />
       ) : (
         <VaultItemsSection
-          kind={activeSection}
+          key={view}
+          kind={view}
           items={settings.vaultItems}
-          onBack={() => navigate("/")}
-          onAddItem={handleAddVaultItem}
-          onUpdateItem={handleUpdateVaultItem}
-          onDeleteItem={handleDeleteVaultItem}
-          onExportItems={() => handleExportVaultItems(activeSection)}
-          onImportItems={handleImportVaultItems}
-          quickAddPending={quickAddPending}
+          {...libraryHandlers(view)}
+          quickAddPending={quickAddSection === view}
           onQuickAddConsumed={consumeQuickAdd}
-          autoFocusSearch={routedFocusSearch}
         />
       )}
-    </PaperPageShell>
+    </CollectionShell>
   );
 }

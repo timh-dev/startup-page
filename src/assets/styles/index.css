@@ -2127,13 +2127,6 @@
 /* Header/toolbar chrome now reuses the shared .vg-header/.vg-toolbar/etc.
    classes (see the VaultGlassView block below) so Bookmarks and Vault look
    identical there — only the pill-cloud layout below is bespoke to Bookmarks. */
-.bookmark-vault-list {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.8rem 0.65rem;
-  padding-top: 1.25rem;
-}
 
 .bookmark-header {
   min-width: 0;
@@ -2284,22 +2277,6 @@ button.bookmark-more:hover {
 }
 
 /* Lettered stand-in on the Bookmarks page (pills and folder view). */
-.bookmark-favicon-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.3rem;
-  background: linear-gradient(160deg, color-mix(in oklab, var(--primary) 78%, white), var(--primary));
-  color: var(--primary-foreground);
-  font-size: 0.6rem;
-  font-weight: 650;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.bookmark-favicon-fallback[hidden] {
-  display: none;
-}
 
 .bookmark-name {
   font-size: clamp(0.72rem, 6.6cqh, 0.8125rem);
@@ -2323,7 +2300,6 @@ button.bookmark-more:hover {
 }
 
 @container (max-height: 7.75rem) {
-
   .bookmark-link {
     padding-block: clamp(0.15rem, 1.7cqh, 0.25rem);
   }
@@ -2545,7 +2521,6 @@ button.bookmark-more:hover {
   }
 }
 
-
 .timer-digit-roller {
   display: inline-block;
   overflow: hidden;
@@ -2652,185 +2627,8 @@ button.bookmark-more:hover {
 
 /* The card starts below the floating header and leaves the same margin at
    the bottom, so it never butts against the nav. */
-.vault-preview-stage {
-  position: relative;
-  z-index: 1;
-  min-height: 100vh;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 5.25rem 1.5rem 1.75rem;
-}
-
-.vault-preview-paper {
-  position: relative;
-  isolation: isolate;
-  width: min(92vw, 66rem);
-  /* Fixed (not max-) height so the card doesn't resize as filtering/search
-     changes how many items are visible — empty space just stays empty. */
-  height: calc(100vh - 7rem);
-  border-radius: 1.75rem;
-  overflow: hidden;
-  background: var(--card);
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    0 14px 30px -14px rgba(0, 0, 0, 0.35),
-    0 40px 80px -24px rgba(0, 0, 0, 0.5);
-  font-family: var(--font-sans);
-  color: var(--foreground);
-}
-
-.dark .vault-preview-paper {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 14px 32px -14px rgba(0, 0, 0, 0.55),
-    0 40px 90px -20px rgba(0, 0, 0, 0.75);
-}
-
-.vault-preview-paper-scroll {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  overflow-y: auto;
-  padding: 2.5rem 3rem 2.5rem;
-}
-
-@media (max-width: 720px) {
-  .vault-preview-stage {
-    padding: 4.5rem 0.75rem 0.75rem;
-  }
-
-  .vault-preview-paper-scroll {
-    padding: 1.5rem 1.25rem 1.25rem;
-  }
-
-  .vault-preview-paper {
-    width: 100%;
-    border-radius: 1.125rem;
-    height: calc(100vh - 5.25rem);
-  }
-}
 
 /* --- VaultGlassView: cleaned-up vault UI, grouped by date --- */
-
-.vg-view {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.vg-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
-}
-
-.vg-eyebrow {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-  margin-bottom: 0.2rem;
-}
-
-.vg-title {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: clamp(1.2rem, 2.4vw, 1.55rem);
-  line-height: 1.1;
-}
-
-.vg-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 auto;
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-  border-radius: 9999px;
-  color: color-mix(in oklab, var(--card-foreground) 78%, transparent);
-  background: color-mix(in oklab, var(--card) 40%, transparent);
-  transition: background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
-}
-
-.vg-back:hover {
-  background: color-mix(in oklab, var(--accent) 55%, transparent);
-  color: var(--card-foreground);
-}
-
-.vg-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.vg-search {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex: 1 1 12rem;
-  min-width: 0;
-  height: 2.15rem;
-  padding-inline: 0.7rem;
-  border-radius: 0.7rem;
-  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--card) 55%, transparent);
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-search input {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  color: var(--foreground);
-  font-size: 0.85rem;
-}
-
-.vg-search input::placeholder {
-  color: color-mix(in oklab, var(--muted-foreground) 80%, transparent);
-}
-
-.vg-search button {
-  display: inline-flex;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  height: 2.15rem;
-  padding-inline: 0.6rem;
-  border-radius: 0.7rem;
-  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--card) 55%, transparent);
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--card-foreground) 88%, transparent);
-  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
-  white-space: nowrap;
-}
-
-.vg-tool-btn:hover {
-  background: color-mix(in oklab, var(--accent) 55%, transparent);
-  border-color: color-mix(in oklab, var(--ring) 35%, var(--border));
-}
-
-.vg-tool-group {
-  display: inline-flex;
-  gap: 0.35rem;
-}
-
-.vg-tag-filter {
-  position: relative;
-}
 
 .vg-popover {
   position: absolute;
@@ -2867,39 +2665,6 @@ button.bookmark-more:hover {
 .vg-popover-option-active {
   background: color-mix(in oklab, var(--accent) 75%, transparent);
   font-weight: 600;
-}
-
-.vg-count {
-  margin-left: auto;
-  font-size: 0.7rem;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-import-message {
-  margin-top: -0.6rem;
-  font-size: 0.75rem;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-add-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  align-self: flex-start;
-  height: 2.15rem;
-  padding-inline: 0.85rem;
-  border-radius: 0.7rem;
-  border: 1px dashed color-mix(in oklab, var(--border) 80%, transparent);
-  color: color-mix(in oklab, var(--card-foreground) 80%, transparent);
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
-}
-
-.vg-add-trigger:hover {
-  background: color-mix(in oklab, var(--accent) 50%, transparent);
-  border-color: color-mix(in oklab, var(--ring) 35%, var(--border));
-  border-style: solid;
 }
 
 .vg-composer {
@@ -3024,200 +2789,13 @@ button.bookmark-more:hover {
   background: color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
-.vg-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  align-self: flex-start;
-  padding: 0.2rem;
-  border-radius: 0.75rem;
-  background: color-mix(in oklab, var(--card) 45%, transparent);
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-}
-
-.vg-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 0.55rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-tab span {
-  font-size: 0.68rem;
-  padding: 0 0.35rem;
-  border-radius: 9999px;
-  background: color-mix(in oklab, var(--muted) 70%, transparent);
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-tab-active {
-  background: color-mix(in oklab, var(--background) 85%, transparent);
-  color: var(--foreground);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-.vg-tab-active span {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.vg-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.vg-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.vg-group-label {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-group-label span {
-  font-size: 0.68rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-.vg-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.vg-item {
-  position: relative;
-  display: flex;
-  /* Single line by default — only an expanded description (see
-     .vg-item-expanded) is allowed to push onto its own line. */
-  flex-wrap: nowrap;
-  align-items: baseline;
-  gap: 0.55rem;
-  padding: 0.5rem 0.6rem 0.5rem 0.85rem;
-  border-radius: 0.6rem;
-  transition: background var(--duration-fast) var(--ease-out);
-}
-
-.vg-item-expanded {
-  flex-wrap: wrap;
-}
-
-.vg-item:hover {
-  background: color-mix(in oklab, var(--accent) 42%, transparent);
-}
-
 /* Category color lives here now — a left-edge accent instead of a small dot,
    so the tag reads at a glance without adding another UI element. Falls
    back to a neutral tone for unknown tags. */
-.vg-item::before {
-  content: "";
-  position: absolute;
-  left: 0.15rem;
-  top: 0.4rem;
-  bottom: 0.4rem;
-  width: 3px;
-  border-radius: 9999px;
-  background: var(--read-tag-color, color-mix(in oklab, var(--muted-foreground) 45%, transparent));
-}
-
-.vg-item-check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: 9999px;
-  border: 1.5px solid color-mix(in oklab, var(--muted-foreground) 45%, transparent);
-  color: var(--primary-foreground);
-  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
-}
-
-.vg-item-check:hover {
-  border-color: color-mix(in oklab, var(--ring) 50%, var(--border));
-}
-
-.vg-item-check-done {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.vg-item-main {
-  display: flex;
-  align-items: baseline;
-  /* Can shrink (and ellipsis-truncate via .vg-item-title) like everything
-     else on the row — the row always stays on one line; only an expanded
-     description is allowed to wrap (see .vg-item-expanded). */
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-.vg-item-rule {
-  content: "";
-  flex: 1 100 1rem;
-  min-width: 0.75rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 22%, transparent);
-  transform: translateY(-0.22rem);
-}
-
-.vg-item-title {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vg-item-description {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.82rem;
-  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
-  background: none;
-  border: none;
-  padding: 0;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.vg-item-description:hover {
-  color: color-mix(in oklab, var(--foreground) 85%, transparent);
-  text-decoration: underline dotted;
-}
 
 /* Clicked open: breaks onto its own full-width line below the compact row
    (flex-basis: 100% + .vg-item's flex-wrap forces the wrap) instead of
    trying to keep sharing the row with the tag/date/actions. */
-.vg-item-description-expanded {
-  flex-basis: 100%;
-  order: 5;
-  margin-top: 0.2rem;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  line-height: 1.4;
-  cursor: pointer;
-}
 
 /* Template/Code rows (VaultItemsSection) use a two-line card layout instead
    of the single-line row Links use: body content there is prose/code, not a
@@ -3226,20 +2804,6 @@ button.bookmark-more:hover {
    almost nothing). Scoped to .vg-item-card so it doesn't touch the Links
    row (VaultGlassView), which shares the base .vg-item / .vg-item-title /
    etc. classes but keeps its original single-line layout. */
-.vg-item-card {
-  flex-direction: column;
-  align-items: stretch;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.vg-item-top {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: nowrap;
-  gap: 0.55rem;
-  min-width: 0;
-}
 
 /* Deliberately NOT flex-grow: the top row has no other flexible sibling to
    fight for space with anymore (body preview lives on its own line below),
@@ -3248,107 +2812,6 @@ button.bookmark-more:hover {
    to content and only shrink-to-ellipsis if the row is genuinely too
    narrow — same as the base .vg-item-main rule; restated here for clarity
    since this selector is what actually applies inside .vg-item-card. */
-.vg-item-card .vg-item-main {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-.vg-item-title-btn {
-  display: inline-flex;
-  min-width: 0;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.vg-item-title-btn:hover .vg-item-title {
-  text-decoration: underline dotted;
-}
-
-.vg-item-card .vg-item-description {
-  flex: none;
-  width: 100%;
-}
-
-.vg-item-tag {
-  flex: 0 0 auto;
-  font-size: 0.7rem;
-  font-weight: 500;
-  /* --muted-foreground is a genuinely low-contrast gray by design — even at
-     near-full opacity it reads faint. Basing this on --foreground instead
-     (at partial opacity) keeps it visually secondary while staying legible
-     in both themes. */
-  color: color-mix(in oklab, var(--foreground) 62%, transparent);
-}
-
-.vg-item-date {
-  flex: 0 0 auto;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--foreground) 70%, transparent);
-}
-
-.vg-item-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.15rem;
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-out);
-}
-
-.vg-item:hover .vg-item-actions,
-.vg-item:focus-within .vg-item-actions {
-  opacity: 1;
-}
-
-.vg-item-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 0.45rem;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-item-action:hover {
-  background: color-mix(in oklab, var(--accent) 65%, transparent);
-  color: var(--card-foreground);
-}
-
-.vg-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 2.75rem 1rem;
-  text-align: center;
-}
-
-.vg-empty-icon {
-  width: 2.1rem;
-  height: 2.1rem;
-  margin-bottom: 0.4rem;
-  color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
-}
-
-.vg-empty-title {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.95rem;
-  color: color-mix(in oklab, var(--foreground) 80%, transparent);
-}
-
-.vg-empty-hint {
-  font-size: 0.78rem;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
 
 /* --- Undo-after-delete toast --- */
 
@@ -3414,41 +2877,12 @@ button.bookmark-more:hover {
     flex-direction: column;
   }
 
-  .vg-item {
-    flex-wrap: wrap;
-  }
-
   /* Code/Template rows (.vg-item-card) pack title + meta chips + date +
      4 action buttons into one nowrap row (.vg-item-top) — on a narrow phone
      that fixed-width content alone can exceed the row, squeezing the title
      to near-zero. Wrapping the row and pushing actions onto their own
      full-width line keeps the title readable and gives the actions more
      breathing room as a dedicated tap row. */
-  .vg-item-top {
-    flex-wrap: wrap;
-  }
-
-  .vg-item-actions {
-    opacity: 1;
-    flex-basis: 100%;
-    justify-content: flex-end;
-    gap: 0.4rem;
-  }
-
-  .vg-item-action {
-    width: 2rem;
-    height: 2rem;
-  }
-
-  .vg-item-check {
-    width: 1.2rem;
-    height: 1.2rem;
-  }
-
-  .vg-back {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
 }
 
 /* --- Vault items: snippets/commands/templates/expansions/prompts/docs --- */
@@ -3577,174 +3011,114 @@ button.bookmark-more:hover {
    the same .dark ancestor class the rest of the app's dark-mode overrides
    use. Token class names follow Prism's own convention, grouped exactly
    like every standard Prism theme (prism-okaidia.css etc.) groups them. */
-.vg-item-body-mono .token.comment,
 .vg-preview-code .token.comment,
-.vg-item-body-mono .token.prolog,
 .vg-preview-code .token.prolog,
-.vg-item-body-mono .token.doctype,
 .vg-preview-code .token.doctype,
-.vg-item-body-mono .token.cdata,
 .vg-preview-code .token.cdata {
   color: #a0a1a7;
   font-style: italic;
 }
 
-.vg-item-body-mono .token.punctuation,
 .vg-preview-code .token.punctuation {
   color: color-mix(in oklab, var(--foreground) 65%, transparent);
 }
 
-.vg-item-body-mono .token.property,
 .vg-preview-code .token.property,
-.vg-item-body-mono .token.tag,
 .vg-preview-code .token.tag,
-.vg-item-body-mono .token.boolean,
 .vg-preview-code .token.boolean,
-.vg-item-body-mono .token.number,
 .vg-preview-code .token.number,
-.vg-item-body-mono .token.constant,
 .vg-preview-code .token.constant,
-.vg-item-body-mono .token.symbol,
 .vg-preview-code .token.symbol,
-.vg-item-body-mono .token.deleted,
 .vg-preview-code .token.deleted {
   color: #986801;
 }
 
-.vg-item-body-mono .token.selector,
 .vg-preview-code .token.selector,
-.vg-item-body-mono .token.attr-name,
 .vg-preview-code .token.attr-name,
-.vg-item-body-mono .token.string,
 .vg-preview-code .token.string,
-.vg-item-body-mono .token.char,
 .vg-preview-code .token.char,
-.vg-item-body-mono .token.builtin,
 .vg-preview-code .token.builtin,
-.vg-item-body-mono .token.inserted,
 .vg-preview-code .token.inserted {
   color: #50a14f;
 }
 
-.vg-item-body-mono .token.operator,
 .vg-preview-code .token.operator,
-.vg-item-body-mono .token.entity,
 .vg-preview-code .token.entity,
-.vg-item-body-mono .token.url,
 .vg-preview-code .token.url,
-.vg-item-body-mono .token.attr-value,
 .vg-preview-code .token.attr-value {
   color: #0184bc;
 }
 
-.vg-item-body-mono .token.atrule,
 .vg-preview-code .token.atrule,
-.vg-item-body-mono .token.keyword,
 .vg-preview-code .token.keyword {
   color: #a626a4;
 }
 
-.vg-item-body-mono .token.function,
 .vg-preview-code .token.function,
-.vg-item-body-mono .token.class-name,
 .vg-preview-code .token.class-name {
   color: #4078f2;
 }
 
-.vg-item-body-mono .token.regex,
 .vg-preview-code .token.regex,
-.vg-item-body-mono .token.important,
 .vg-preview-code .token.important,
-.vg-item-body-mono .token.variable,
 .vg-preview-code .token.variable {
   color: #e45649;
 }
 
-.vg-item-body-mono .token.important,
 .vg-preview-code .token.important,
-.vg-item-body-mono .token.bold,
 .vg-preview-code .token.bold {
   font-weight: 700;
 }
 
-.vg-item-body-mono .token.italic,
 .vg-preview-code .token.italic {
   font-style: italic;
 }
 
-.dark .vg-item-body-mono .token.comment,
 .dark .vg-preview-code .token.comment,
-.dark .vg-item-body-mono .token.prolog,
 .dark .vg-preview-code .token.prolog,
-.dark .vg-item-body-mono .token.doctype,
 .dark .vg-preview-code .token.doctype,
-.dark .vg-item-body-mono .token.cdata,
 .dark .vg-preview-code .token.cdata {
   color: #5c6370;
 }
 
-.dark .vg-item-body-mono .token.property,
 .dark .vg-preview-code .token.property,
-.dark .vg-item-body-mono .token.tag,
 .dark .vg-preview-code .token.tag,
-.dark .vg-item-body-mono .token.boolean,
 .dark .vg-preview-code .token.boolean,
-.dark .vg-item-body-mono .token.number,
 .dark .vg-preview-code .token.number,
-.dark .vg-item-body-mono .token.constant,
 .dark .vg-preview-code .token.constant,
-.dark .vg-item-body-mono .token.symbol,
 .dark .vg-preview-code .token.symbol,
-.dark .vg-item-body-mono .token.deleted,
 .dark .vg-preview-code .token.deleted {
   color: #d19a66;
 }
 
-.dark .vg-item-body-mono .token.selector,
 .dark .vg-preview-code .token.selector,
-.dark .vg-item-body-mono .token.attr-name,
 .dark .vg-preview-code .token.attr-name,
-.dark .vg-item-body-mono .token.string,
 .dark .vg-preview-code .token.string,
-.dark .vg-item-body-mono .token.char,
 .dark .vg-preview-code .token.char,
-.dark .vg-item-body-mono .token.builtin,
 .dark .vg-preview-code .token.builtin,
-.dark .vg-item-body-mono .token.inserted,
 .dark .vg-preview-code .token.inserted {
   color: #98c379;
 }
 
-.dark .vg-item-body-mono .token.operator,
 .dark .vg-preview-code .token.operator,
-.dark .vg-item-body-mono .token.entity,
 .dark .vg-preview-code .token.entity,
-.dark .vg-item-body-mono .token.url,
 .dark .vg-preview-code .token.url,
-.dark .vg-item-body-mono .token.attr-value,
 .dark .vg-preview-code .token.attr-value {
   color: #56b6c2;
 }
 
-.dark .vg-item-body-mono .token.atrule,
 .dark .vg-preview-code .token.atrule,
-.dark .vg-item-body-mono .token.keyword,
 .dark .vg-preview-code .token.keyword {
   color: #c678dd;
 }
 
-.dark .vg-item-body-mono .token.function,
 .dark .vg-preview-code .token.function,
-.dark .vg-item-body-mono .token.class-name,
 .dark .vg-preview-code .token.class-name {
   color: #61afef;
 }
 
-.dark .vg-item-body-mono .token.regex,
 .dark .vg-preview-code .token.regex,
-.dark .vg-item-body-mono .token.important,
 .dark .vg-preview-code .token.important,
-.dark .vg-item-body-mono .token.variable,
 .dark .vg-preview-code .token.variable {
   color: #e06c75;
 }
@@ -3797,40 +3171,6 @@ button.bookmark-more:hover {
   color: var(--read-tag-color, inherit);
   background: color-mix(in oklab, var(--read-tag-color, var(--muted)) 20%, transparent);
   font-weight: 600;
-}
-
-.vg-item-body-mono {
-  font-family: var(--font-mono, ui-monospace, monospace);
-}
-
-.vg-section-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  padding-bottom: 0.9rem;
-  margin-bottom: 0.2rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
-}
-
-.vg-section-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
-}
-
-.vg-section-tab:hover {
-  background: color-mix(in oklab, var(--accent) 50%, transparent);
-}
-
-.vg-section-tab-active {
-  background: color-mix(in oklab, var(--accent) 70%, transparent);
-  color: var(--foreground);
 }
 
 /* --- Vault launcher: homepage widget tile grid --- */

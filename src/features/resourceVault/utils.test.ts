@@ -5,6 +5,7 @@ import {
   groupLabelFor,
   normalizeResourceVaultItems,
   normalizeVaultItems,
+  relativeAge,
   startOfDay,
   tidyCode,
 } from "./utils";
@@ -193,5 +194,17 @@ describe("normalizeResourceVaultItems", () => {
 
   it("accepts a { readItems: [...] } wrapper as well as a bare array", () => {
     expect(normalizeResourceVaultItems({ readItems: [{ title: "x" }] })).toHaveLength(1);
+  });
+});
+
+describe("relativeAge", () => {
+  const now = new Date("2026-10-29T12:00:00Z");
+  it("counts minutes, hours, days and weeks, then shows the date", () => {
+    expect(relativeAge("2026-10-29T11:59:50Z", now)).toBe("now");
+    expect(relativeAge("2026-10-29T11:48:00Z", now)).toBe("12m");
+    expect(relativeAge("2026-10-29T09:00:00Z", now)).toBe("3h");
+    expect(relativeAge("2026-10-27T12:00:00Z", now)).toBe("2d");
+    expect(relativeAge("2026-10-08T12:00:00Z", now)).toBe("3w");
+    expect(relativeAge("2026-08-01T12:00:00Z", now)).toMatch(/Aug/);
   });
 });

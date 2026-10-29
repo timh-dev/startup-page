@@ -64,9 +64,8 @@ function VaultNavigationActions() {
         name: "Add a Resource",
         shortcut: ["a"],
         section: "Navigation",
-        // Set the flag before navigating — VaultGlassView (whether it's
-        // already mounted or about to mount) opens its composer as soon as
-        // it observes this, from any page in the dashboard.
+        // Set the flag before navigating: the Vault (already mounted or about
+        // to mount) switches to the reading list and focuses its add field.
         perform: () => {
           useQuickAddStore.getState().requestQuickAdd();
           navigate("/resources");

@@ -2,8 +2,11 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import VaultGlassView from "./VaultGlassView";
+import LinksPane from "./links/LinksPane";
 import VaultItemsSection from "./VaultItemsSection";
+
+// Signed out: no link previews, so quick-add keeps the title made from the URL.
+vi.mock("@/lib/authToken", () => ({ getAuthToken: async () => null }));
 
 afterEach(() => {
   vi.useRealTimers();
@@ -18,7 +21,6 @@ function renderItems(items: unknown[], handlers: Partial<Parameters<typeof Vault
     onDeleteItem: vi.fn(),
     onExportItems: vi.fn(),
     onImportItems: vi.fn(async () => {}),
-    onBack: vi.fn(),
     ...handlers,
   };
   render(<MemoryRouter><VaultItemsSection {...props} /></MemoryRouter>);
@@ -30,7 +32,7 @@ describe("VaultItemsSection", () => {
     const user = userEvent.setup();
     const props = renderItems([]);
 
-    await user.click(screen.getByRole("button", { name: /add a code/i }));
+    await user.click(screen.getByRole("button", { name: /new snippet/i }));
     await user.type(screen.getByPlaceholderText("Title"), "List files");
     await user.type(screen.getByPlaceholderText(/paste a snippet/i), "ls -la");
     await user.click(screen.getByRole("button", { name: "Add item" }));
@@ -80,27 +82,50 @@ describe("VaultItemsSection", () => {
   });
 });
 
-describe("VaultGlassView (links)", () => {
-  function renderLinks(items: unknown[]) {
+describe("LinksPane", () => {
+  function renderLinks(items: unknown[], extra: Record<string, unknown> = {}) {
     const props = {
       items,
+      status: "todo" as const,
+      tag: null,
+      onTag: vi.fn(),
       onAddItem: vi.fn(),
-      onBack: vi.fn(),
       onDeleteItem: vi.fn(),
       onExportItems: vi.fn(),
       onImportItems: vi.fn(async () => {}),
       onToggleItem: vi.fn(),
       onUpdateItem: vi.fn(),
+      ...extra,
     };
-    render(<MemoryRouter><VaultGlassView {...props} /></MemoryRouter>);
+    render(<MemoryRouter><LinksPane {...props} /></MemoryRouter>);
     return props;
   }
 
-  it("adds a link with the picked tag, and keeps that tag for the next one", async () => {
+  it("saves a pasted link straight away, titled from its address", async () => {
     const user = userEvent.setup();
     const props = renderLinks([]);
 
-    await user.click(screen.getByRole("button", { name: /add a resource/i }));
+    await user.type(screen.getByRole("textbox", { name: "Add a link" }), "example.com/how-clouds-work{Enter}");
+
+    expect(props.onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/how-clouds-work", title: "How clouds work · example.com", tag: "Read" }),
+    );
+  });
+
+  it("saves plain text as a title, with the filtered tag", async () => {
+    const user = userEvent.setup();
+    const props = renderLinks([], { tag: "Watch" });
+
+    await user.type(screen.getByRole("textbox", { name: "Add a link" }), "That talk on sky rendering{Enter}");
+
+    expect(props.onAddItem).toHaveBeenCalledWith(expect.objectContaining({ title: "That talk on sky rendering", url: "", tag: "Watch" }));
+  });
+
+  it("adds a link with details and the picked tag, and keeps that tag for the next one", async () => {
+    const user = userEvent.setup();
+    const props = renderLinks([]);
+
+    await user.click(screen.getByRole("button", { name: /details/i }));
     await user.type(screen.getByPlaceholderText("Title"), "Docs");
     await user.click(screen.getByRole("button", { expanded: false, name: "" }));
     const listbox = screen.getByRole("listbox", { name: "Choose tag" });
@@ -111,7 +136,7 @@ describe("VaultGlassView (links)", () => {
 
     expect(props.onAddItem).toHaveBeenCalledWith(expect.objectContaining({ title: "Docs", tag: tagName }));
 
-    await user.click(screen.getByRole("button", { name: /add a resource/i }));
+    await user.click(screen.getByRole("button", { name: /details/i }));
     await user.type(screen.getByPlaceholderText("Title"), "More docs");
     await user.click(screen.getByRole("button", { name: "Add resource" }));
     expect(props.onAddItem).toHaveBeenLastCalledWith(expect.objectContaining({ title: "More docs", tag: tagName }));
@@ -128,5 +153,13 @@ describe("VaultGlassView (links)", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(props.onUpdateItem).toHaveBeenCalledWith("l1", expect.objectContaining({ title: "New", tag: "Read", url: "https://example.com" }));
+  });
+
+  it("checks a link off", async () => {
+    const user = userEvent.setup();
+    const props = renderLinks([{ id: "l1", title: "Read me", url: "https://example.com", tag: "Read", status: "todo", createdAt: "2026-10-01T00:00:00.000Z" }]);
+
+    await user.click(screen.getByRole("checkbox", { name: /mark "read me" done/i }));
+    expect(props.onToggleItem).toHaveBeenCalledWith("l1");
   });
 });

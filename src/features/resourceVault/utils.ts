@@ -1,3 +1,4 @@
+import { safeImageUrl } from "./linkPreview";
 import { DEFAULT_READ_TAGS, TEMPLATE_SUBTYPES, VAULT_KIND_ORDER } from "./constants";
 import type { VaultItem, VaultItemKind } from "./types";
 
@@ -6,6 +7,20 @@ export function formatItemDate(value: string | null | undefined) {
   const month = date.toLocaleString(undefined, { month: "short" }).toUpperCase();
   const day = String(date.getDate()).padStart(2, "0");
   return `${month} ${day}`;
+}
+
+/** How long ago, briefly: "now", "12m", "3h", "2d", "3w", then the date ("Oct 3", "Oct 3, 2025"). */
+export function relativeAge(value: string | null | undefined, now = new Date()) {
+  const date = value ? new Date(value) : now;
+  const minutes = Math.max(0, Math.round((now.getTime() - date.getTime()) / 60000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d`;
+  if (days < 28) return `${Math.round(days / 7)}w`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: date.getFullYear() === now.getFullYear() ? undefined : "numeric" });
 }
 
 export function startOfDay(date: Date) {
@@ -140,6 +155,7 @@ export function normalizeResourceVaultItems(value: unknown) {
         description: String(item?.description || "").trim(),
         url: String(item?.url || "").trim(),
         tag: DEFAULT_READ_TAGS.includes(item?.tag) ? item.tag : "Read",
+        image: safeImageUrl(item?.image),
         status,
         createdAt,
         completedAt,
