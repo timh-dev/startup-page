@@ -7,7 +7,7 @@ const HORIZON_COLOR = '#f0ebd8';
 // Fixed curve geometry — identical for every location and date. The noon
 // peak and midnight trough leave breathing room for the sun glow and
 // tooltips; the horizon line moves within this band by season.
-const PEAK_FRAC = 0.16;
+export const PEAK_FRAC = 0.16;
 const TROUGH_FRAC = 0.88;
 const CURVE_SAMPLES = 256;
 
