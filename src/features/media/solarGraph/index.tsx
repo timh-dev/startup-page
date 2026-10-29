@@ -2,13 +2,12 @@ import { useRef, useEffect } from 'react';
 import { readSettings } from '@/lib/settings';
 import { getOrRequestLocation } from '@/lib/geolocation';
 import { useSettingsStore } from '@/features/settings/stores';
-import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour, hourToDayFraction, type SolarContext } from './solarMath';
+import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour, type SolarContext } from './solarMath';
 import { renderSky } from './renderSky';
 import { createStarField, renderStars, type Star } from './renderStars';
-import { getHorizonY, PEAK_FRAC, renderCurve, solarToCanvas } from './renderCurve';
+import { getHorizonY, renderCurve } from './renderCurve';
 import { renderSun } from './renderSun';
 import { renderHorizonGlow } from './renderHorizonGlow';
-import { createPhysicalSky, type PhysicalSky } from './physicalSky';
 import { renderMarkers } from './renderMarkers';
 import { createAdaptiveResolution } from '@/lib/adaptive-resolution';
 import { ambientFrameMs } from '@/lib/power';
@@ -33,7 +32,6 @@ interface SolarGraphState {
 
 export default function SolarGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const skyRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<SolarGraphState>({
     lst: 0,
     stars: null,
@@ -58,11 +56,6 @@ export default function SolarGraph() {
     const canvas: HTMLCanvasElement = canvasEl;
     const ctx: CanvasRenderingContext2D = context;
     const state = stateRef.current;
-
-    // The physically based sky renders behind the 2D chart, and only when
-    // its view changes. Without WebGL the 2D sky and horizon glow are used.
-    let physicalSky: PhysicalSky | null = skyRef.current ? createPhysicalSky(skyRef.current) : null;
-    let skyKey = '';
 
     // Resolve location
     const settings = readSettings();
@@ -174,50 +167,27 @@ export default function SolarGraph() {
       const cachedElev = sunElevation(solar.lat, solar.lng, effectiveLst, solar.doy);
 
       ctx.clearRect(0, 0, w, h);
-      const horizonY = getHorizonY(h, solar);
 
-      if (physicalSky) {
-        renderPhysicalSky(physicalSky, w, h, effectiveLst, solar, horizonY, cachedElev);
-      } else {
-        // 1. Sky background
-        renderSky(ctx, w, h);
-      }
+      // 1. Sky background
+      renderSky(ctx, w, h);
 
       // 2. Stars
       renderStars(ctx, w, h, state.stars, state.animationTime, effectiveLst, solar, cachedElev);
 
-      // 3. Atmosphere along the horizon (behind the curve); the physical
-      // sky already has it.
-      if (!physicalSky) renderHorizonGlow(ctx, w, h, effectiveLst, solar, horizonY, cachedElev);
+      // 3. Atmosphere along the horizon (behind the curve)
+      const horizonY = getHorizonY(h, solar);
+      renderHorizonGlow(ctx, w, h, effectiveLst, solar, horizonY, cachedElev);
 
       // 4. Solar curve + horizon line
       renderCurve(ctx, w, h, solar);
 
       // 5. Sun
-      renderSun(ctx, w, h, effectiveLst, solar, horizonY, cachedElev, !!physicalSky);
+      renderSun(ctx, w, h, effectiveLst, solar, horizonY, cachedElev);
 
       // 6. Markers (only when hovering)
       if (state.hovering) {
         renderMarkers(ctx, w, h, effectiveLst, solar, horizonY, state.lst);
       }
-    }
-
-    // The sky looks toward the sun: the chart's horizon is 0° and the noon
-    // peak is today's highest elevation, with the same angular scale across.
-    // Above the horizon the sun's direction comes from where it is drawn, so
-    // the glow centres on the drawn disc; below, its real depth sets the
-    // twilight.
-    function renderPhysicalSky(sky: PhysicalSky, w: number, h: number, lst: number, solar: SolarContext, horizonY: number, elevation: number) {
-      const todayMax = Math.max(...solar.curveElevations);
-      const peakY = h * PEAK_FRAC;
-      const degPerPx = todayMax > 1 ? Math.min(0.5, Math.max(0.05, todayMax / Math.max(1, horizonY - peakY))) : 0.15;
-      const { x: sunX, y: sunY } = solarToCanvas(lst, w, h, solar);
-      const sunElevation = sunY < horizonY ? (horizonY - sunY) * degPerPx : elevation;
-      const evening = hourToDayFraction(lst, solar) > 0.5;
-      const key = `${w}x${h}|${sunX.toFixed(1)}|${sunElevation.toFixed(2)}|${degPerPx.toFixed(4)}|${evening}`;
-      if (key === skyKey) return;
-      skyKey = key;
-      sky.render({ width: w, height: h, scale: 1, horizonY, sunX, degPerPx, sunElevation, evening });
     }
 
     // Mouse event handlers for hover interaction
@@ -274,19 +244,14 @@ export default function SolarGraph() {
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseleave', onMouseLeave);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      physicalSky?.dispose();
-      physicalSky = null;
     };
   }, []);
 
   return (
-    <div id="container" className="relative w-full h-full rounded-[inherit] overflow-hidden bg-[#020308]">
-      {/* Rendered at one pixel per CSS pixel: the sky is smooth gradients,
-          and the crisp curve, sun and labels are drawn on the canvas above. */}
-      <canvas ref={skyRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />
+    <div id="container" className="w-full h-full rounded-[inherit] overflow-hidden">
       <canvas
         ref={canvasRef}
-        className="relative w-full h-full rounded-[inherit]"
+        className="w-full h-full rounded-[inherit]"
         id="canvas"
         style={{ cursor: 'crosshair' }}
       />

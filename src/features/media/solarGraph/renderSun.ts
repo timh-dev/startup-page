@@ -36,9 +36,7 @@ function drawGlow(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius:
 
 // Render the sun: a bright core with circular glow layers that grow and
 // strengthen with elevation.
-// With the physical sky behind it, the atmosphere already scatters the
-// sun's haze, so only the disc and a tight halo are drawn here.
-export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: number, lst: number, solar: SolarContext, horizonY: number, elev?: number, physicalSky = false) {
+export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: number, lst: number, solar: SolarContext, horizonY: number, elev?: number) {
   if (elev === undefined) elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
   // Position comes from the fixed curve; the real elevation still drives
   // color temperature and glow shape below.
@@ -81,28 +79,26 @@ export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: 
   ctx.clip();
   ctx.globalCompositeOperation = 'lighter';
 
-  if (!physicalSky) {
-    // Layer 0: very broad atmospheric veil.
-    const veilRadius = 150 + elFactor * 170;
-    const veilAlpha = 0.07 + elFactor * 0.1;
-    drawGlow(ctx, sunX, sunY, veilRadius, [
-      [0, `rgba(${ar},${ag},${ab},${veilAlpha})`],
-      [0.28, `rgba(${ar},${ag},${ab},${veilAlpha * 0.45})`],
-      [0.68, `rgba(${ar},${ag},${ab},${veilAlpha * 0.12})`],
-      [1, `rgba(${ar},${ag},${ab},0)`],
-    ]);
+  // Layer 0: very broad atmospheric veil.
+  const veilRadius = 150 + elFactor * 170;
+  const veilAlpha = 0.07 + elFactor * 0.1;
+  drawGlow(ctx, sunX, sunY, veilRadius, [
+    [0, `rgba(${ar},${ag},${ab},${veilAlpha})`],
+    [0.28, `rgba(${ar},${ag},${ab},${veilAlpha * 0.45})`],
+    [0.68, `rgba(${ar},${ag},${ab},${veilAlpha * 0.12})`],
+    [1, `rgba(${ar},${ag},${ab},0)`],
+  ]);
 
-    // Layer 1: wide bloom, stronger at noon.
-    const bloomRadius = 90 + elFactor * 110;
-    const bloomAlpha = 0.3 + elFactor * 0.26;
-    drawGlow(ctx, sunX, sunY, bloomRadius, [
-      [0, `rgba(${ar},${ag},${ab},${bloomAlpha})`],
-      [0.1, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.68})`],
-      [0.32, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.24})`],
-      [0.72, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.06})`],
-      [1, `rgba(${ar},${ag},${ab},0)`],
-    ]);
-  }
+  // Layer 1: wide bloom, stronger at noon.
+  const bloomRadius = 90 + elFactor * 110;
+  const bloomAlpha = 0.3 + elFactor * 0.26;
+  drawGlow(ctx, sunX, sunY, bloomRadius, [
+    [0, `rgba(${ar},${ag},${ab},${bloomAlpha})`],
+    [0.1, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.68})`],
+    [0.32, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.24})`],
+    [0.72, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.06})`],
+    [1, `rgba(${ar},${ag},${ab},0)`],
+  ]);
 
   // Layer 2: mid glow, slightly warmer.
   const midRadius = 46 + elFactor * 34;
