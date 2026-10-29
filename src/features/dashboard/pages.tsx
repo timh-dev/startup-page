@@ -46,6 +46,9 @@ import {
 import { registerGalleryDrag } from "@/features/dashboard/layout/galleryDrag";
 import { edgeColors, type Side } from "@/features/dashboard/layout/edgeColor";
 
+/** Joined cards of these kinds become one: a single video or photo across the group. */
+const MERGEABLE = new Set<WidgetType>(["video", "photo"]);
+
 /** Points sampled along each seam: the gap's colour follows each card's edge. */
 const SEAM_SAMPLES = 8;
 
@@ -68,6 +71,13 @@ function useViewport() {
   }, []);
   return size;
 }
+
+/** The lead card's widget, drawn once across a merged group. */
+const MergedContent = React.memo(function MergedContent({ instance, size }: { instance: WidgetInstance; size: string }) {
+  const def = getWidgetType(instance.type);
+  // Re-mount when the group's size changes, so photos refetch at the new size.
+  return <def.Render key={size} instance={instance} cardClass="h-full w-full relative overflow-hidden" />;
+});
 
 function newInstance(type: WidgetType): WidgetInstance {
   const def = getWidgetType(type);
@@ -212,8 +222,9 @@ export default function Index() {
     const seams = flow ? [] : activeSeams(rendered, joins);
     const groups = groupsOf(seams);
     const px = seams.map((seam) => seamPx(seam, metrics));
-    const members = new Map<string, { mask: string }>();
-    const outlines: Array<{ key: string; d: string; seams: SeamPx[] }> = [];
+    const members = new Map<string, { mask?: string; merged?: boolean }>();
+    const outlines: Array<{ key: string; d: string; seams: SeamPx[]; merged: boolean }> = [];
+    const merged: Array<{ key: string; ids: string[]; lead: WidgetInstance; box: Rect; mask: string }> = [];
     const radius = ui.cardStyle === "soft" ? 1.75 * rem : ui.cardStyle === "sharp" ? 0.625 * rem : 1.125 * rem;
     const done = new Set<string>();
     for (const [id, ids] of groups) {
@@ -222,7 +233,21 @@ export default function Index() {
       const groupSeams = px.filter((s) => ids.includes(s.a));
       const rects = ids.map((m) => rectOf(rendered.get(m)!, metrics));
       const d = groupOutline([...rects, ...groupSeams.map((s) => bridgeRect(s, gap))], radius);
-      outlines.push({ key: ids.slice().sort().join("|"), d, seams: groupSeams });
+      const key = ids.slice().sort().join("|");
+      // All the same kind of media: the group becomes one video or photo,
+      // shown by the first card (in dashboard order) across the whole shape.
+      const groupWidgets = widgets.filter((w) => ids.includes(w.id));
+      const kind = groupWidgets[0]?.type;
+      if (kind && MERGEABLE.has(kind) && groupWidgets.every((w) => w.type === kind)) {
+        const x0 = Math.min(...rects.map((r) => r.x));
+        const y0 = Math.min(...rects.map((r) => r.y));
+        const box = { x: x0, y: y0, w: Math.max(...rects.map((r) => r.x + r.w)) - x0, h: Math.max(...rects.map((r) => r.y + r.h)) - y0 };
+        merged.push({ key, ids, lead: groupWidgets[0], box, mask: svgMask(d, box) });
+        outlines.push({ key, d, seams: groupSeams, merged: true });
+        for (const m of ids) members.set(m, { merged: true });
+        continue;
+      }
+      outlines.push({ key, d, seams: groupSeams, merged: false });
       for (const m of ids) {
         // The card stays exactly where it is: the group outline rounds its
         // outer corners, and each joined edge fades into the gap's gradient.
@@ -236,21 +261,23 @@ export default function Index() {
         members.set(m, { mask: layers.join(", ") });
       }
     }
-    return { seams: px, members, outlines, keys: new Set(seams.map((s) => joinKey(s.a, s.b))), radius };
-  }, [flow, rendered, joins, metrics, gap, fade, rem, ui.cardStyle]);
+    // Only seams between different kinds get the sampled gradient.
+    const blended = px.filter((s) => !members.get(s.a)?.merged);
+    return { seams: px, blended, members, outlines, merged, keys: new Set(seams.map((s) => joinKey(s.a, s.b))), radius };
+  }, [flow, rendered, joins, widgets, metrics, gap, fade, rem, ui.cardStyle]);
 
   // Each joined card's colours along its joined edges (from its photo,
   // video, sky or background), sampled now and every few seconds as the
   // content changes. Keyed by seam: [card a's colours, card b's colours].
   const [edgeColorMap, setEdgeColorMap] = React.useState<Record<string, Array<Array<string | null>>>>({});
   React.useEffect(() => {
-    if (!joined.seams.length) return undefined;
+    if (!joined.blended.length) return undefined;
     const sample = () => {
       const grid = gridRef.current;
       if (!grid) return;
       const origin = grid.getBoundingClientRect();
       const next: Record<string, Array<Array<string | null>>> = {};
-      for (const s of joined.seams) {
+      for (const s of joined.blended) {
         const v = s.orientation === "v";
         const start = (v ? origin.top : origin.left) + s.from;
         const end = (v ? origin.top : origin.left) + s.to;
@@ -376,8 +403,14 @@ export default function Index() {
   const lastPointer = React.useRef<{ clientX: number; clientY: number } | null>(null);
   const lastAutoScroll = React.useRef(0);
 
-  const elementsOf = (ids: string[]) =>
-    ids.map((id) => gridRef.current?.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(id)}"]`)).filter(Boolean) as HTMLElement[];
+  // A dragged group's cards, plus its merged video or photo if it has one.
+  const elementsOf = (ids: string[]) => {
+    const grid = gridRef.current;
+    if (!grid) return [];
+    const tiles = ids.map((id) => grid.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(id)}"]`));
+    const mergedEl = ids.length ? grid.querySelector<HTMLElement>(`[data-merged-ids~="${CSS.escape(ids[0])}"]`) : null;
+    return [...tiles, mergedEl].filter(Boolean) as HTMLElement[];
+  };
 
   // Dragging near the top or bottom of the window turns to the next card
   // page (skipping Vault and Bookmarks).
@@ -757,7 +790,7 @@ export default function Index() {
           <filter id="join-soften" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation={Math.max(4, gap * 0.45)} />
           </filter>
-          {joined.seams.flatMap((s, si) => {
+          {joined.blended.flatMap((s, si) => {
             const v = s.orientation === "v";
             const [sideA = [], sideB = []] = edgeColorMap[s.key] ?? [];
             const start = s.center - gap / 2 - fade;
@@ -777,7 +810,8 @@ export default function Index() {
               {/* A strip per sample along the seam, blurred together. */}
               <g filter="url(#join-soften)">
                 {outline.seams.flatMap((s) => {
-                  const si = joined.seams.indexOf(s);
+                  const si = joined.blended.indexOf(s);
+                  if (si < 0) return [];
                   const v = s.orientation === "v";
                   const across = gap / 2 + fade + 2;
                   const length = s.to - s.from;
@@ -812,6 +846,7 @@ export default function Index() {
             instance={instance}
             rect={rect}
             mask={member?.mask}
+            merged={member?.merged}
             editing={editing}
             selected={selectedId === instance.id}
             dragging={draggingIds.includes(instance.id)}
@@ -827,6 +862,25 @@ export default function Index() {
           />
         );
       })}
+
+      {/* Merged groups: one video or photo across the whole joined shape. */}
+      {joined.merged.map((group) => (
+        <div
+          key={group.key}
+          className={`dashboard-merged ${cardClassFor(group.lead.type)}`}
+          data-merged-ids={group.ids.join(" ")}
+          data-editing={editing || undefined}
+          style={{
+            transform: `translate(${group.box.x}px, ${group.box.y}px)`,
+            width: group.box.w,
+            height: group.box.h,
+            maskImage: group.mask,
+            WebkitMaskImage: group.mask,
+          }}
+        >
+          <MergedContent instance={group.lead} size={`${group.box.w}x${group.box.h}`} />
+        </div>
+      ))}
 
       {nodes.map((s) => {
         const isJoined = joined.keys.has(s.key);

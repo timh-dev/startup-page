@@ -13,6 +13,8 @@ interface DashboardTileProps {
   rect: Rect;
   /** For a joined card: its group's outline plus fades on its joined edges (CSS mask layers). */
   mask?: string;
+  /** Part of a merged video or photo group: the group draws the content once. */
+  merged?: boolean;
   editing: boolean;
   selected: boolean;
   dragging: boolean;
@@ -49,6 +51,7 @@ export default function DashboardTile({
   index,
   rect,
   mask,
+  merged,
   editing,
   selected,
   dragging,
@@ -73,7 +76,8 @@ export default function DashboardTile({
       data-editing={editing || undefined}
       data-selected={selected || undefined}
       data-dragging={dragging || undefined}
-      data-joined={mask ? "true" : undefined}
+      data-joined={mask || merged ? "true" : undefined}
+      data-merged={merged || undefined}
       data-join-preview={joinPreview || undefined}
       style={
         {
@@ -97,10 +101,10 @@ export default function DashboardTile({
       aria-label={editing ? `${label}: drag to move, click to edit` : undefined}
     >
       <div className="dashboard-tile-content h-full w-full">
-        <TileContent instance={instance} cardClass={cardClass} />
+        {!merged && <TileContent instance={instance} cardClass={cardClass} />}
       </div>
 
-      {editing && !mask && (
+      {editing && !mask && !merged && (
         <button
           type="button"
           className="tile-remove"
@@ -114,7 +118,7 @@ export default function DashboardTile({
           <HiXMark className="size-3" />
         </button>
       )}
-      {editing && canResize && !mask && <div className="tile-resize" onPointerDown={onResizeStart} role="presentation" title="Drag to resize" />}
+      {editing && canResize && !mask && !merged && <div className="tile-resize" onPointerDown={onResizeStart} role="presentation" title="Drag to resize" />}
     </div>
   );
 }

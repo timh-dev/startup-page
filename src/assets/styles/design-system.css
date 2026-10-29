@@ -1740,3 +1740,22 @@ select.debug-input,
 .page-dot[data-kind] {
   border-radius: 0.15rem;
 }
+
+/* A merged group's single video or photo, over its (empty) cards. */
+.dashboard-merged {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  border-radius: 0 !important;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  transition: transform var(--duration-base) var(--ease-out), width var(--duration-base) var(--ease-out), height var(--duration-base) var(--ease-out);
+}
+
+/* While editing, the cards underneath take the pointer (drag, nodes). */
+.dashboard-merged[data-editing] {
+  pointer-events: none;
+}
