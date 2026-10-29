@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { HiChevronRight, HiMagnifyingGlass, HiOutlineBookOpen, HiPlus } from "react-icons/hi2";
 import { VAULT_KIND_DEFS, VAULT_KIND_ORDER } from "@/features/resourceVault/constants";
 import { useQuickAddStore, type VaultSection } from "@/features/resourceVault/stores/quickAddStore";
+import { useFitCount } from "@/lib/use-fit-count";
 
 const LAUNCHER_TILES: Array<{ section: VaultSection; label: string; icon: typeof HiOutlineBookOpen; colorClass: string }> = [
   { section: "links", label: "Links", icon: HiOutlineBookOpen, colorClass: "read-tag-reference" },
@@ -31,6 +32,13 @@ export default function VaultLauncher() {
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [addMenuOpen]);
+
+  // Rows that don't fit collapse into a "+N more" link to the vault.
+  const listRef = React.useRef<HTMLUListElement>(null);
+  const fit = useFitCount(listRef, listRef, LAUNCHER_TILES.length);
+  const shown = fit < LAUNCHER_TILES.length ? Math.max(0, fit - 1) : LAUNCHER_TILES.length;
+  const visibleTiles = LAUNCHER_TILES.slice(0, shown);
+  const hiddenCount = LAUNCHER_TILES.length - shown;
 
   const openSection = (section: VaultSection) => {
     navigate("/resources", { state: { section } });
@@ -88,8 +96,8 @@ export default function VaultLauncher() {
         </div>
       </div>
 
-      <ul className="vault-launcher-list">
-        {LAUNCHER_TILES.map(({ section, label, icon: Icon, colorClass }) => (
+      <ul ref={listRef} className="vault-launcher-list">
+        {visibleTiles.map(({ section, label, icon: Icon, colorClass }) => (
           <li key={section}>
             <button type="button" className="vault-launcher-row" onClick={() => openSection(section)} title={`Open ${label}`}>
               <span className={`vault-launcher-row-icon ${colorClass}`}>
@@ -100,6 +108,13 @@ export default function VaultLauncher() {
             </button>
           </li>
         ))}
+        {hiddenCount > 0 && (
+          <li>
+            <button type="button" className="bookmark-more" onClick={() => navigate("/resources")}>
+              +{hiddenCount} more
+            </button>
+          </li>
+        )}
       </ul>
     </div>
   );

@@ -4,9 +4,12 @@ import { MISSING_API_KEY_MESSAGE } from "@/features/weather/hooks/useWeatherData
 import { useWidgetConfigDialogStore } from "@/features/dashboard/stores/widgetConfigDialogStore";
 import { useSettingsStore } from "@/features/settings/stores";
 
-function isTopLevelWidget(id: string) {
-  const widgets = useSettingsStore.getState().settings.widgets;
-  return Array.isArray(widgets) && widgets.some((widget: { id: string }) => widget.id === id);
+const WEATHER_TYPES = new Set(["weather", "weatherV2"]);
+
+type WidgetLike = { id: string; type?: string };
+
+function isTopLevelWidget(widgets: WidgetLike[], id: string) {
+  return widgets.some((widget) => widget.id === id);
 }
 
 /**
@@ -16,6 +19,7 @@ function isTopLevelWidget(id: string) {
  */
 export function WeatherStatus({ error, instanceId }: { error: string | null; instanceId?: string }): React.ReactElement {
   const openEdit = useWidgetConfigDialogStore((state) => state.openEdit);
+  const rawWidgets = useSettingsStore((state) => state.settings.widgets);
 
   if (!error) {
     return (
@@ -30,8 +34,23 @@ export function WeatherStatus({ error, instanceId }: { error: string | null; ins
   }
 
   const needsKey = error === MISSING_API_KEY_MESSAGE;
+  const widgets: WidgetLike[] = Array.isArray(rawWidgets) ? rawWidgets : [];
+  const topLevel = !!instanceId && isTopLevelWidget(widgets, instanceId);
   // Widgets inside a stack aren't individually editable from the dialog.
-  const canConfigure = needsKey && instanceId && isTopLevelWidget(instanceId);
+  const canConfigure = needsKey && topLevel;
+
+  // One setup prompt per dashboard: a weather widget inside a stack stays
+  // quiet when a top-level weather widget is already asking for the key.
+  if (needsKey && !topLevel && widgets.some((widget) => widget.type && WEATHER_TYPES.has(widget.type))) {
+    return (
+      <div className="weather-status" aria-label="Weather needs an API key">
+        <span className="weather-status-icon" aria-hidden="true">
+          <HiOutlineCloud />
+        </span>
+        <p className="weather-status-body">Hourly forecast appears once weather is connected.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="weather-status">

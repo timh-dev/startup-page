@@ -439,14 +439,40 @@
   gap: 0.2rem;
   padding: 0.2rem;
   border-radius: 9999px;
-  transform: translateX(-50%);
-  opacity: 0.55;
-  transition: opacity var(--duration-base) var(--ease-out);
+  transform: translate(-50%, 0.25rem);
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
 }
 
+/* The switcher appears on hover so it never sits on top of the widget's
+   content; touch screens, with no hover, always show it. */
 .group\/stack:hover .stack-controls,
 .stack-controls:focus-within {
   opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (hover: none) {
+  .stack-controls {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.stack-control-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  max-width: 11rem;
+  padding: 0 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+}
+
+.stack-control-count {
+  color: var(--muted-foreground);
 }
 
 .stack-control-arrow {
@@ -479,15 +505,6 @@
 .stack-control-dot[aria-current="true"] {
   width: 1rem;
   background-color: var(--foreground);
-}
-
-/* Lists that scroll inside a tile fade out at the bottom instead of cutting
-   a row in half. */
-.bookmark-list,
-.vault-launcher-list {
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1.1rem), transparent);
-  mask-image: linear-gradient(to bottom, black calc(100% - 1.1rem), transparent);
-  padding-bottom: 0.6rem;
 }
 
 /* --- Photo credit ----------------------------------------------------------- */

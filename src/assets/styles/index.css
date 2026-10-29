@@ -1658,20 +1658,37 @@
   flex-direction: column;
 }
 
-/* Vertical red line. Negative top/bottom insets (by exactly the card's own
-   padding) extend it past .clock-plain-inner's box to the true card edges,
-   while its horizontal position stays relative to .clock-plain-inner —
-   matching the dot's reference frame exactly. */
-.clock-plain-inner::before {
+/* The "now" line runs only through the empty spine between the date and
+   the time, so it never crosses text; a short tick marks the same moment on
+   the hour rule below. Both share .clock-plain-inner's width, so a given
+   --clock-now-x lands on the same pixel column as the dot. */
+.clock-plain-spine::before,
+.clock-plain-rule::after {
   content: "";
   position: absolute;
   left: var(--clock-now-x, 50%);
-  top: calc(-1 * var(--clock-pad));
-  bottom: calc(-1 * var(--clock-pad));
   width: 1px;
-  /* Same lighter red as the dot's own halo ring, for consistency. */
-  background: color-mix(in oklab, var(--destructive) 18%, transparent);
-  z-index: 0;
+  background: color-mix(in oklab, var(--destructive) 28%, transparent);
+  transform: translateX(-50%);
+}
+
+.clock-plain-spine::before {
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in oklab, var(--destructive) 45%, transparent) 25%,
+    color-mix(in oklab, var(--destructive) 45%, transparent) 75%,
+    transparent
+  );
+}
+
+.clock-plain-rule::after {
+  top: -3px;
+  height: 7px;
+  background: var(--destructive);
+  border-radius: 1px;
 }
 
 .clock-plain-top,
@@ -1723,7 +1740,7 @@
 .clock-plain-dot {
   position: absolute;
   left: var(--clock-now-x, 50%);
-  top: 38%;
+  top: 50%;
   width: clamp(0.5rem, 3.2cqw, 0.7rem);
   height: clamp(0.5rem, 3.2cqw, 0.7rem);
   border-radius: 9999px;
@@ -1753,6 +1770,7 @@
 }
 
 .clock-plain-rule {
+  position: relative;
   height: 1px;
   background: color-mix(in oklab, var(--border) 75%, transparent);
 }
@@ -2180,6 +2198,23 @@
   gap: 1px;
 }
 
+.bookmark-more {
+  display: block;
+  width: 100%;
+  padding: clamp(0.25rem, 2.6cqh, 0.4rem) clamp(0.4rem, 4cqw, 0.55rem);
+  border-radius: 0.6rem;
+  color: var(--muted-foreground);
+  font-size: clamp(0.68rem, 5.6cqh, 0.75rem);
+  font-weight: 500;
+  text-align: left;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+button.bookmark-more:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+  color: var(--foreground);
+}
+
 .bookmark-link {
   display: flex;
   align-items: center;
@@ -2194,27 +2229,42 @@
   background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
 }
 
-/* Favicons sit in a small white "app icon" chip, so every site's icon gets
-   the same frame regardless of its own background. */
+/* Favicons show as-is with rounded corners on light cards, so full-bleed
+   icons (Medium's black square) read as a clean tile instead of a square
+   floating inside a frame. Dark cards put them on a white chip, which dark
+   logos like GitHub's need to stay visible. */
 .bookmark-favicon-chip {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
+  width: clamp(1.1rem, 10cqh, 1.3rem);
+  height: clamp(1.1rem, 10cqh, 1.3rem);
+  border-radius: 0.35rem;
+  overflow: hidden;
+}
+
+.bookmark-favicon-chip > img {
+  border-radius: inherit;
+}
+
+.dark .bookmark-favicon-chip {
   width: clamp(1.25rem, 11cqh, 1.5rem);
   height: clamp(1.25rem, 11cqh, 1.5rem);
   padding: 0.2rem;
   border-radius: 0.45rem;
-  background: color-mix(in oklab, white 92%, var(--card));
+  background: color-mix(in oklab, white 88%, var(--card));
   box-shadow: 0 0 0 var(--hairline-width) var(--hairline), 0 1px 2px rgb(0 0 0 / 0.08);
 }
 
-.dark .bookmark-favicon-chip {
-  background: color-mix(in oklab, white 88%, var(--card));
+.dark .bookmark-favicon-chip > img {
+  border-radius: 0.2rem;
 }
 
-.bookmark-favicon-letter {
+.bookmark-favicon-letter,
+.dark .bookmark-favicon-letter {
   padding: 0;
+  box-shadow: inset 0 0 0 var(--hairline-width) rgb(255 255 255 / 0.18);
   background: linear-gradient(160deg, oklch(0.72 0.09 var(--letter-hue, 220)), oklch(0.58 0.1 var(--letter-hue, 220)));
   color: white;
   font-size: clamp(0.6rem, 6cqh, 0.75rem);
@@ -3805,10 +3855,12 @@
 }
 
 .vault-launcher-list {
+  flex: 1 1 auto;
   display: grid;
+  align-content: start;
   gap: 1px;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .vault-launcher-row {
@@ -3816,7 +3868,7 @@
   align-items: center;
   gap: 0.6rem;
   width: 100%;
-  padding: 0.22rem 0.45rem;
+  padding: 0.15rem 0.45rem;
   border-radius: 0.6rem;
   color: var(--card-foreground);
   text-align: left;
