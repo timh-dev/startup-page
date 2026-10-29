@@ -3740,6 +3740,31 @@ button.bookmark-more:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
+/* A short card (one row, 2 x 1): the condition on one line, no rules, a
+   slimmer ribbon. */
+@container (max-height: 12rem) {
+  .weather-v2-content {
+    gap: 0.3rem;
+  }
+
+  .weather-v2-headline {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 0.875rem;
+  }
+
+  .weather-v2-headline-tail,
+  .weather-v2-rule {
+    display: none;
+  }
+
+  .weather-v2-ribbon {
+    min-height: 1.4rem;
+  }
+}
+
 /* --- Sunny --- */
 
 .weather-v2-bg-sunny-base {

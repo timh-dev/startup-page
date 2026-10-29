@@ -295,7 +295,7 @@ function FrostedContent({ data, clockTime, centerTime, hourSpan }: FrostedConten
         <p className="weather-v2-headline">
           {CATEGORY_LABEL[category]}{" "}
           <Icon className="weather-v2-headline-icon" aria-hidden="true" />{" "}
-          {headlineTail}
+          <span className="weather-v2-headline-tail">{headlineTail}</span>
         </p>
 
         <div className="weather-v2-rule" aria-hidden="true" />
@@ -347,8 +347,36 @@ function FrostedContent({ data, clockTime, centerTime, hourSpan }: FrostedConten
 }
 
 const LIVE_HOUR_SPAN = 6;
+/** Hours either side of the centre on a narrow card (seven points, not thirteen). */
+const NARROW_HOUR_SPAN = 3;
+const NARROW_WIDTH = 420;
+
+/** Fewer hours when the card is narrow (a 2 x 1 card), so the temperatures stay readable. */
+function useHourSpan(ref: React.RefObject<HTMLDivElement | null>) {
+  const [span, setSpan] = React.useState(LIVE_HOUR_SPAN);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const update = () => setSpan(el.clientWidth && el.clientWidth < NARROW_WIDTH ? NARROW_HOUR_SPAN : LIVE_HOUR_SPAN);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return span;
+}
 
 function LiveFrostedCard({ instanceId, overrides }: { instanceId: string; overrides?: WeatherOverrides }): React.ReactElement {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const hourSpan = useHourSpan(ref);
+  return (
+    <div ref={ref} className="h-full w-full">
+      <LiveFrostedContent instanceId={instanceId} overrides={overrides} hourSpan={hourSpan} />
+    </div>
+  );
+}
+
+function LiveFrostedContent({ instanceId, overrides, hourSpan }: { instanceId: string; overrides?: WeatherOverrides; hourSpan: number }): React.ReactElement {
   useWeatherData(instanceId, overrides);
   const { data, error, selectedDay } = useWeatherInstance(instanceId);
   const clockTime = useWeatherStore((state) => state.clockTime);
@@ -366,7 +394,7 @@ function LiveFrostedCard({ instanceId, overrides }: { instanceId: string; overri
   // same weatherStore instance) has no "now" of its own — center on its noon.
   const centerTime = selectedDay ? new Date(`${selectedDay.day.date}T12:00:00`).getTime() : clockTime;
 
-  return <FrostedContent data={data} clockTime={clockTime} centerTime={centerTime} hourSpan={LIVE_HOUR_SPAN} />;
+  return <FrostedContent data={data} clockTime={clockTime} centerTime={centerTime} hourSpan={hourSpan} />;
 }
 
 export interface WeatherFrostedCardProps {
