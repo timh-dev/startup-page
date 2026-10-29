@@ -180,7 +180,7 @@ export default function BookmarkView({ bookmarks, activeCategoryId, onBack, pill
   const pillHeight = Math.max(2.5, Math.min(Number(pillSize) || 3.25, 5)) * 16;
   const iconWrapSize = Math.max(28, pillHeight - 14);
   const iconSize = Math.max(16, pillHeight * 0.38);
-  const textSize = Math.max(14, pillHeight * 0.34);
+  const textSize = Math.max(13, pillHeight * 0.28);
   const gap = Math.max(8, pillHeight * 0.2);
   const pillStyle: React.CSSProperties = {
     height: `${pillHeight}px`,
@@ -350,7 +350,7 @@ export default function BookmarkView({ bookmarks, activeCategoryId, onBack, pill
           title="Create a new folder"
         >
           <HiOutlineFolderPlus className="size-4" />
-          New Folder
+          New folder
         </button>
         <button
           type="button"
@@ -359,7 +359,7 @@ export default function BookmarkView({ bookmarks, activeCategoryId, onBack, pill
           title="Add a bookmark"
         >
           <HiPlus className="size-4" />
-          Add Bookmark
+          Add bookmark
         </button>
 
         <div className="vg-tool-group">

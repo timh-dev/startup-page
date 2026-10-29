@@ -6,11 +6,9 @@ import {
   HiChevronLeft,
   HiChevronRight,
   HiEllipsisVertical,
-  HiMinus,
   HiOutlineFolderPlus,
   HiOutlinePencil,
   HiOutlineTrash,
-  HiPlus,
 } from "react-icons/hi2";
 import {
   DropdownMenu,
@@ -81,7 +79,7 @@ export default function FolderPill({
         onClick={onToggleCollapse}
         {...listeners}
         {...attributes}
-        className={`inline-flex cursor-grab items-center justify-between gap-2 rounded-full shadow-lg transition active:cursor-grabbing hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring ${colorClass} ${
+        className={`inline-flex cursor-grab items-center justify-between gap-2 rounded-full transition active:cursor-grabbing hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring ${colorClass} ${
           isOver ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : ""
         }`}
         style={pillStyle}
@@ -93,11 +91,15 @@ export default function FolderPill({
             className="inline-flex shrink-0 items-center justify-center rounded-full bg-background/25 text-current"
             style={{ width: `${Math.max(20, iconSize * 1.05)}px`, height: `${Math.max(20, iconSize * 1.05)}px` }}
           >
-            {isCollapsed ? (
-              <HiPlus style={{ width: `${Math.max(12, iconSize * 0.62)}px`, height: `${Math.max(12, iconSize * 0.62)}px` }} />
-            ) : (
-              <HiMinus style={{ width: `${Math.max(12, iconSize * 0.62)}px`, height: `${Math.max(12, iconSize * 0.62)}px` }} />
-            )}
+            {/* A chevron that turns down when open; "+" read as "add". */}
+            <HiChevronRight
+              className="transition-transform duration-200"
+              style={{
+                width: `${Math.max(12, iconSize * 0.62)}px`,
+                height: `${Math.max(12, iconSize * 0.62)}px`,
+                transform: isCollapsed ? undefined : "rotate(90deg)",
+              }}
+            />
           </span>
           {nested ? (
             <span className="rounded-full bg-background/35 px-2 py-0.5 text-[0.65em] uppercase tracking-wide text-current">

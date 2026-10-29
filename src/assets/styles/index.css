@@ -2639,24 +2639,31 @@ button.bookmark-more:hover {
   pointer-events: none;
 }
 
+/* Dim the painting at night so a dark card isn't set against a bright sky. */
+.dark .vault-preview-scrim {
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.62) 0%, rgba(4, 6, 12, 0.5) 40%, rgba(4, 6, 12, 0.7) 100%);
+}
+
+/* The card starts below the floating header and leaves the same margin at
+   the bottom, so it never butts against the nav. */
 .vault-preview-stage {
   position: relative;
   z-index: 1;
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 3.5rem 1.5rem;
+  padding: 5.25rem 1.5rem 1.75rem;
 }
 
 .vault-preview-paper {
   position: relative;
   isolation: isolate;
-  width: min(94vw, 72rem);
+  width: min(92vw, 66rem);
   /* Fixed (not max-) height so the card doesn't resize as filtering/search
      changes how many items are visible — empty space just stays empty. */
-  height: 86vh;
-  border-radius: 1rem;
+  height: calc(100vh - 7rem);
+  border-radius: 1.75rem;
   overflow: hidden;
   background: var(--card);
   border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
@@ -2678,20 +2685,24 @@ button.bookmark-more:hover {
 .vault-preview-paper-scroll {
   position: relative;
   z-index: 1;
-  height: 86vh;
+  height: 100%;
   overflow-y: auto;
-  padding: 2.25rem 2.5rem 2rem;
+  padding: 2.5rem 3rem 2.5rem;
 }
 
 @media (max-width: 720px) {
+  .vault-preview-stage {
+    padding: 4.5rem 0.75rem 0.75rem;
+  }
+
   .vault-preview-paper-scroll {
     padding: 1.5rem 1.25rem 1.25rem;
-    height: 90vh;
   }
 
   .vault-preview-paper {
-    border-radius: 0.85rem;
-    height: 90vh;
+    width: 100%;
+    border-radius: 1.125rem;
+    height: calc(100vh - 5.25rem);
   }
 }
 
