@@ -253,18 +253,19 @@ vec3 drawMoon(vec2 uv, vec3 col) {
 // ---- volumetric clouds ----
 uniform sampler2D u_noise; // 256x256: R = lattice value, G = R offset by (37, 239)
 
-const int CLOUD_STEPS = 32;
+const int CLOUD_STEPS = 44;
 const int LIGHT_STEPS = 4;
-const float MAX_DISTANCE_KM = 26.0;
-const float MAX_PATH_KM = 10.0;
-const float HAZE_KM = 13.0;
-// Radians: the bottom edge looks a few degrees above the horizon (looking
-// straight along the layer aliases into streaks), the top ~55° up.
-const float BOTTOM_ELEVATION = 0.07;
-const float FOV_Y = 0.95;
+// The camera sits at cloud level looking straight ahead (+z), so clouds
+// fill the frame side-on and drift across it, nearer ones faster. Clouds
+// occupy depths DEPTH_NEAR..DEPTH_FAR in front of it (units ~1 km).
+const float DEPTH_NEAR = 2.0;
+const float DEPTH_FAR = 12.0;
+const float MAX_DISTANCE_KM = 12.0;
+const float HAZE_KM = 7.0;
+const float TAN_HALF_FOV = 0.5; // vertical, ~53° field of view
 
 struct CloudLayer {
-  float base;       // km
+  float base;       // km below (-) or above (+) the camera
   float top;        // km
   float scale;      // noise frequency per km
   float threshold;  // density offset at full coverage
@@ -275,23 +276,27 @@ struct CloudLayer {
 
 CloudLayer cloudLayer() {
   // 1 stratocumulus, 2 cumulus, 3 stratus, 4 nimbostratus, 5 cumulonimbus, 6 supercell
-  // Noise scale sets the size of the cloud cells: decks seen from below
-  // show rolls roughly half a kilometre to a kilometre across.
-  if (u_style < 1.5) return CloudLayer(1.3, 2.3, 0.95, 0.34, 1.6, 22.0, 0.35);
-  if (u_style < 2.5) return CloudLayer(1.1, 3.2, 0.70, 0.38, 1.0, 26.0, 1.0);
-  if (u_style < 3.5) return CloudLayer(0.5, 1.0, 0.85, 0.26, 2.0, 16.0, 0.0);
-  if (u_style < 4.5) return CloudLayer(0.6, 3.2, 0.75, 0.26, 1.6, 30.0, 0.2);
-  if (u_style < 5.5) return CloudLayer(0.8, 7.5, 0.55, 0.30, 0.8, 34.0, 0.8);
-  return CloudLayer(0.6, 9.0, 0.50, 0.28, 0.7, 38.0, 0.7);
+  // Bands are relative to the camera's height: we look along the layer, so
+  // thin decks run as a band across the middle of the frame and towers
+  // rise above it.
+  // Looking along the layer the eye passes through kilometres of cloud, so
+  // broken clouds need higher thresholds than from below to keep gaps.
+  // Rain and storm decks sit just above the camera: we see the underside
+  // overhead, receding into the distance, rather than standing inside it.
+  if (u_style < 1.5) return CloudLayer(-1.1, 0.9, 1.20, 0.40, 1.3, 22.0, 0.35);
+  if (u_style < 2.5) return CloudLayer(-1.3, 2.0, 1.00, 0.42, 1.0, 26.0, 1.0);
+  if (u_style < 3.5) return CloudLayer(-0.5, 0.45, 0.95, 0.28, 1.8, 16.0, 0.0);
+  if (u_style < 4.5) return CloudLayer(0.05, 3.5, 0.85, 0.28, 1.3, 30.0, 0.2);
+  if (u_style < 5.5) return CloudLayer(-0.4, 5.0, 0.70, 0.34, 0.8, 34.0, 0.8);
+  return CloudLayer(-0.5, 6.0, 0.65, 0.32, 0.7, 38.0, 0.7);
 }
 
-// View direction for a screen position: looking up and across like a
-// camera on the ground, the bottom edge just above the horizon.
+// View direction for a screen position: a pinhole camera at cloud level
+// looking straight ahead along +z.
 vec3 viewRay(vec2 screen) {
   float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-  float elevation = BOTTOM_ELEVATION + screen.y * FOV_Y;
-  float azimuth = (screen.x - 0.5) * FOV_Y * aspect;
-  return vec3(sin(azimuth) * cos(elevation), sin(elevation), cos(azimuth) * cos(elevation));
+  vec2 ndc = screen * 2.0 - 1.0;
+  return normalize(vec3(ndc.x * aspect * TAN_HALF_FOV, ndc.y * TAN_HALF_FOV, 1.0));
 }
 
 // Value noise from a 2D texture read as 3D: slice z is the texture offset by
@@ -321,17 +326,18 @@ float fbm2(vec3 p) {
 }
 
 float heightProfile(float h, CloudLayer layer) {
-  // Flat, defined bases and rounded tops; decks stay full through the layer.
-  float bottom = smoothstep(0.0, mix(0.18, 0.08, layer.billow), h);
-  float top = 1.0 - smoothstep(mix(0.55, 0.35, layer.billow), 1.0, h);
+  // Fades at both ends of the band, so clouds round off instead of being
+  // cut by its edges; cumulus keeps a flatter base and a taller dome.
+  float bottom = smoothstep(0.0, mix(0.35, 0.2, layer.billow), h);
+  float top = 1.0 - smoothstep(mix(0.45, 0.3, layer.billow), 1.0, h);
   return bottom * top;
 }
 
 vec3 cloudCoords(vec3 pos, CloudLayer layer, float wt) {
   vec3 q = pos * layer.scale;
   q.y *= layer.stretch;
-  // Wind: clouds drift across and slowly away, and churn a little.
-  return q + vec3(wt * 0.11, u_time * 0.004, wt * 0.035);
+  // Wind carries the clouds sideways across the view; they churn slowly.
+  return q + vec3(wt * 0.16, 0.0, u_time * 0.006);
 }
 
 float coverageThreshold(CloudLayer layer, float coverage) {
@@ -366,9 +372,11 @@ float henyeyGreenstein(float mu, float g) {
   return (1.0 - gg) / (12.566 * pow(max(1.0 + gg - 2.0 * g * mu, 1e-4), 1.5));
 }
 
-// Interleaved gradient noise: a cheap blue-ish noise for ray jitter.
-float blueNoise(vec2 px) {
-  return fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))) + u_time * 0.618);
+// A small random offset for each ray's start, enough to break up banding
+// between steps. Interleaved gradient noise was tried first, but its
+// regular pattern showed as hatching on the clouds at this resolution.
+float rayJitter(vec2 px) {
+  return fract(sin(dot(px, vec2(12.9898, 78.233))) * 43758.5453) * 0.35;
 }
 
 void main() {
@@ -402,12 +410,12 @@ void main() {
 
   // ---- clouds: volumetric raymarching ----
   // After Maxime Heckel's "Real-time dreamy Cloudscapes with Volumetric
-  // Raymarching": rays from a camera on the ground march through a 3D cloud
-  // layer; density is fbm noise (sampled from a noise texture) shaped by
+  // Raymarching": rays from a camera at cloud level march through a 3D cloud
+  // layer in front of it; density is fbm noise (sampled from a noise texture) shaped by
   // coverage and a height profile; each sample marches toward the light for
   // self-shadowing (Beer's law) and is lit with a two-lobe Henyey-Greenstein
-  // phase, so edges toward the sun glow; blue-noise jitter on the ray start
-  // hides banding from the low step count.
+  // phase, so edges toward the sun glow; a small jitter on the ray start
+  // hides banding between steps.
   CloudLayer layer = cloudLayer();
   vec3 rd = viewRay(uv);
   vec3 lightDir = viewRay(lp);
@@ -416,15 +424,26 @@ void main() {
   vec3  clouds = vec3(0.0);
   float transmittance = 1.0;
 
-  if (coverage > 0.01 && rd.y > 0.02) {
-    float tEnter = layer.base / rd.y;
-    float tExit  = min(layer.top / rd.y, tEnter + MAX_PATH_KM);
-    if (tEnter < MAX_DISTANCE_KM) {
+  // The stretch of the ray inside the cloud volume: between the near and far
+  // depths, and within the layer's height band.
+  float tEnter = DEPTH_NEAR / rd.z;
+  float tExit = DEPTH_FAR / rd.z;
+  if (abs(rd.y) > 1e-4) {
+    float tA = layer.base / rd.y;
+    float tB = layer.top / rd.y;
+    tEnter = max(tEnter, min(tA, tB));
+    tExit = min(tExit, max(tA, tB));
+  } else if (layer.base > 0.0 || layer.top < 0.0) {
+    tExit = -1.0;
+  }
+
+  if (coverage > 0.01) {
+    if (tEnter < tExit) {
       float dt = (tExit - tEnter) / float(CLOUD_STEPS);
-      float t = tEnter + dt * blueNoise(gl_FragCoord.xy);
+      float t = tEnter + dt * rayJitter(gl_FragCoord.xy);
 
       float mu = dot(rd, lightDir);
-      vec3 sunColor = cloudLight() * (1.3 * dirStrength) * hueL;
+      vec3 sunColor = cloudLight() * (0.8 * dirStrength) * hueL;
       vec3 ambientLow = cloudShadow();
       vec3 ambientHigh = mix(cloudShadow(), skyColor(0.9), 0.55);
       float extinction = layer.extinction * mix(0.75, 1.4, density);
@@ -434,7 +453,11 @@ void main() {
         float heightFrac = (pos.y - layer.base) / (layer.top - layer.base);
         // Far away, one pixel spans kilometres of noise; fade it out rather
         // than let it alias.
-        float d = cloudDensity(pos, layer, coverage, wt, heightFrac) * (1.0 - smoothstep(MAX_DISTANCE_KM * 0.45, MAX_DISTANCE_KM, t));
+        // Far away, and where a ray grazes along a deck, one pixel spans
+        // kilometres of noise; fade it out rather than let it alias.
+        float grazing = smoothstep(0.02, 0.12, abs(rd.y)) + step(layer.base, 0.0) * step(0.0, layer.top);
+        float d = cloudDensity(pos, layer, coverage, wt, heightFrac)
+                * (1.0 - smoothstep(MAX_DISTANCE_KM * 0.45, MAX_DISTANCE_KM, t)) * min(grazing, 1.0);
         if (d > 0.001) {
           float lightDepth = 0.0;
           float lightStep = (layer.top - layer.base) * 0.06;
@@ -466,13 +489,14 @@ void main() {
                          + sunColor * sunlight * mix(1.0, powder, 0.5)
                          + vec3(0.72, 0.80, 1.0) * u_flash * 0.9;
           // Overcast and storm decks are opaque within a step or two, so what
-          // shows is the underside where rays enter. Shade it by noise
-          // sampled where the ray hits, at two scales (broad rolls and the
-          // lumps within them), so it has texture in perspective, shrinking
-          // toward the horizon.
+          // shows is the surface where rays enter. Shade it by noise sampled
+          // where the ray hits, at two scales (broad rolls and the lumps
+          // within them), so it has texture in perspective.
           vec3 q = cloudCoords(pos, layer, wt);
-          float rolls = fbm4(vec3(q.x * 2.6, 3.7, q.z * 2.6)) * 0.6
-                      + fbm2(vec3(q.x * 7.0, 9.1, q.z * 7.0)) * 0.4;
+          // Sampled in 3D: a plane would stay constant along depth and smear
+          // into streaks toward the vanishing point on a receding ceiling.
+          float rolls = fbm4(q * 2.6 + vec3(0.0, 3.7, 0.0)) * 0.6
+                      + fbm2(q * 7.0 + vec3(0.0, 9.1, 0.0)) * 0.4;
           float deckShade = mix(0.32, 1.5, smoothstep(0.28, 0.72, rolls) * 0.85 + skyLight * 0.15);
           luminance *= mix(1.0, deckShade, smoothstep(2.5, 3.5, u_style));
           float sampleT = exp(-d * extinction * dt);
