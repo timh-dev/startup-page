@@ -102,8 +102,9 @@ function getAuroraIntensity(clockTime: number): number {
   const date = new Date(clockTime);
   const hour = date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
 
-  if (hour >= 21) return 0.72 + smoothstep(22, 22.5, hour) * 0.28;
-  if (hour <= 2) return 1 - smoothstep(1.5, 2, hour) * 0.28;
+  // Through the dark of the night, strongest around midnight.
+  if (hour >= 20) return 0.75 + smoothstep(20, 22.5, hour) * 0.25;
+  if (hour <= 4) return 1 - smoothstep(2, 4, hour) * 0.25;
   return 0;
 }
 

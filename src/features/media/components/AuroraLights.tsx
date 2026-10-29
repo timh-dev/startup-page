@@ -111,9 +111,11 @@ void main() {
   vec2 p = vec2((uv.x - 0.5) * aspect + 0.5, uv.y);
 
   float t = u_time * 0.5;
-  float lowerFade = smoothstep(0.16, 0.3, uv.y);
-  float upperFade = 1.0 - smoothstep(0.95, 1.0, uv.y);
-  float sideFade = smoothstep(0.0, 0.05, uv.x) * (1.0 - smoothstep(0.95, 1.0, uv.x));
+  // Wide fades so the aurora dissolves into the sky rather than ending at
+  // the canvas edges.
+  float lowerFade = smoothstep(0.12, 0.32, uv.y);
+  float upperFade = 1.0 - smoothstep(0.7, 1.0, uv.y);
+  float sideFade = smoothstep(0.0, 0.12, uv.x) * (1.0 - smoothstep(0.88, 1.0, uv.x));
 
   // Foreground curtain + a dimmer, slower one behind it for depth
   vec4 front = curtain(p, t, 0.0, 1.0);
@@ -123,14 +125,18 @@ void main() {
   float veil = smoothstep(0.3, 0.9, fbm(vec2(p.x * 1.9 + t * 0.02, p.y * 2.2 + 31.0)))
              * smoothstep(0.3, 0.75, uv.y) * 0.18;
 
-  vec3 color = front.rgb + back.rgb * 0.45 + vec3(0.20, 0.80, 0.50) * veil;
-  float bright = front.a + back.a * 0.45 + veil;
+  vec3 color = front.rgb + back.rgb * 0.6 + vec3(0.20, 0.80, 0.50) * veil;
+  float bright = front.a + back.a * 0.6 + veil;
 
-  // Subtle cool ambient so the glow reads as light in a dark sky
-  color += vec3(0.07, 0.12, 0.22) * bright * 0.3;
-
-  float alpha = clamp(bright * 0.62, 0.0, 0.8) * lowerFade * upperFade * sideFade * u_intensity;
-  gl_FragColor = vec4(color, alpha);
+  // The canvas isn't premultiplied, so the colour is the curtain's hue and
+  // the alpha carries its brightness. (Colour scaled by brightness as well
+  // counted it twice: a curtain at 40% brightness showed at ~10%.)
+  vec3 hue = color / max(bright, 1e-3);
+  hue = mix(hue, vec3(0.62, 1.0, 0.78), smoothstep(0.7, 1.3, bright) * 0.35); // bright cores glow whiter
+  // Faint haze stays faint; curtains come up strongly.
+  float alpha = smoothstep(0.015, 0.6, bright) * 0.95;
+  alpha *= lowerFade * upperFade * sideFade * u_intensity;
+  gl_FragColor = vec4(hue, alpha);
 }
 `;
 
