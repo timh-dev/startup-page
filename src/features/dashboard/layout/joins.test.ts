@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeSeams, adjacentSeams, groupOutline, groupsOf, seamBetween, seamPx } from "./joins";
+import { activeSeams, adjacentSeams, groupOutline, groupsOf, roundedRects, seamBetween, seamPx } from "./joins";
 import type { Placement } from "./grid";
 
 const p = (id: string, x: number, y: number, w = 1, h = 1): Placement => ({ id, x, y, w, h });
@@ -20,6 +20,12 @@ describe("seams", () => {
     expect(groupsOf(seams).get("a")?.sort()).toEqual(["a", "b", "c"]);
     expect(groupsOf(seams).has("d")).toBe(false);
   });
+
+  it("carries each join's mode, bridging by default", () => {
+    const layout = new Map([p("a", 0, 0), p("b", 1, 0), p("c", 2, 0)].map((q) => [q.id, q]));
+    const seams = activeSeams(layout, [["a", "b"], ["b", "c", "window"]]);
+    expect(seams.map((s) => s.mode)).toEqual(["bridge", "window"]);
+  });
 });
 
 describe("geometry", () => {
@@ -36,5 +42,11 @@ describe("geometry", () => {
     const d = groupOutline([{ x: 0, y: 0, w: 210, h: 100 }, { x: 0, y: 110, w: 100, h: 100 }, { x: 0, y: 100, w: 100, h: 10 }], 12);
     expect(d.match(/M/g)).toHaveLength(1);
     expect(d.match(/Q/g)).toHaveLength(6); // an L has six corners
+  });
+
+  it("keeps shared-media cards as separate rounded windows", () => {
+    const d = roundedRects([{ x: 0, y: 0, w: 100, h: 100 }, { x: 110, y: 0, w: 100, h: 100 }], 12);
+    expect(d.match(/M/g)).toHaveLength(2);
+    expect(d.match(/Q/g)).toHaveLength(8);
   });
 });

@@ -1759,3 +1759,127 @@ select.debug-input,
 .dashboard-merged[data-editing] {
   pointer-events: none;
 }
+
+/* Shared media with the gaps kept: each card's own rim, not the box's. */
+.dashboard-merged[data-windows]::after {
+  display: none;
+}
+
+.dashboard-merged-rims {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.dashboard-merged-rims path {
+  fill: none;
+  stroke: var(--media-edge);
+  /* Half of it shows (the mask clips the outer half): one hairline. */
+  stroke-width: calc(var(--hairline-width) * 2);
+}
+
+/* A shared-media link: a ring rather than a filled node. */
+.join-node[data-mode="window"] {
+  background: var(--card);
+  border: 2px solid var(--foreground);
+  color: var(--foreground);
+}
+
+/* Two ways to link two videos or two photos, from the node. */
+.join-menu {
+  position: absolute;
+  z-index: 7;
+  display: grid;
+  gap: 2px;
+  min-width: 15rem;
+  margin: 18px 0 0 -7.5rem;
+  padding: 0.3rem;
+  border-radius: 0.9rem;
+  box-shadow: var(--elevation-2);
+  animation: join-node-in var(--duration-fast) var(--ease-out);
+}
+
+.join-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.6rem;
+  font-size: 0.8125rem;
+  text-align: left;
+  color: var(--foreground);
+}
+
+.join-menu button:hover,
+.join-menu button:focus-visible {
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  outline: none;
+}
+
+.join-menu button[aria-checked="true"] {
+  background: color-mix(in oklab, var(--primary) 16%, transparent);
+}
+
+.join-menu small {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.join-menu .join-menu-split {
+  justify-content: center;
+  margin-top: 2px;
+  border-top: var(--hairline-width) solid var(--hairline);
+  border-radius: 0 0 0.6rem 0.6rem;
+  color: var(--destructive, var(--foreground));
+}
+
+/* Little pictures of the two modes: two squares joined, or two apart. */
+.join-menu-icon {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+}
+
+.join-menu-icon::before,
+.join-menu-icon::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 13px;
+  height: 18px;
+  background: linear-gradient(90deg, var(--primary), color-mix(in oklab, var(--primary) 40%, var(--foreground)));
+  background-size: 30px 18px;
+}
+
+.join-menu-icon::before {
+  left: 0;
+  border-radius: 4px 0 0 4px;
+  background-position: 0 0;
+}
+
+.join-menu-icon::after {
+  right: 0;
+  border-radius: 0 4px 4px 0;
+  background-position: -17px 0;
+}
+
+.join-menu-icon[data-kind="bridge"]::before {
+  width: 16px;
+}
+
+.join-menu-icon[data-kind="bridge"]::after {
+  width: 16px;
+}
+
+.join-menu-icon[data-kind="window"]::before,
+.join-menu-icon[data-kind="window"]::after {
+  border-radius: 4px;
+}
+
+/* No label chip while the node's menu is open. */
+.join-node:not([data-label])::after {
+  display: none;
+}

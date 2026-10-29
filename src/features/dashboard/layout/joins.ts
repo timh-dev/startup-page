@@ -8,7 +8,12 @@
 // the dashboard draws them.
 import { pageOf, type Layout, type Placement } from "./grid";
 
-export type Join = [string, string];
+/**
+ * "bridge": one shape, the gap between filled. "window": the cards keep
+ * their own shapes and gaps but show one shared video or photo through them.
+ */
+export type JoinMode = "bridge" | "window";
+export type Join = [string, string] | [string, string, JoinMode];
 
 /** Where two cards touch: a vertical seam (side by side) or a horizontal one (stacked). */
 export interface Seam {
@@ -21,6 +26,7 @@ export interface Seam {
   /** The span along the seam, in cells: [from, to). */
   from: number;
   to: number;
+  mode?: JoinMode;
 }
 
 export const joinKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -60,14 +66,14 @@ export function adjacentSeams(layout: Layout): Seam[] {
 export function activeSeams(layout: Layout, joins: Join[]): Seam[] {
   const seams: Seam[] = [];
   const seen = new Set<string>();
-  for (const [a, b] of joins) {
+  for (const [a, b, mode] of joins) {
     const key = joinKey(a, b);
     const p = layout.get(a);
     const q = layout.get(b);
     if (!p || !q || seen.has(key)) continue;
     const seam = seamBetween(p, q);
     if (seam) {
-      seams.push(seam);
+      seams.push({ ...seam, mode: mode ?? "bridge" });
       seen.add(key);
     }
   }
@@ -128,14 +134,15 @@ export interface SeamPx {
   center: number;
   from: number;
   to: number;
+  mode: JoinMode;
 }
 
 export function seamPx(seam: Seam, m: Metrics): SeamPx {
   const key = joinKey(seam.a, seam.b);
   if (seam.orientation === "v") {
-    return { key, a: seam.a, b: seam.b, orientation: "v", center: seam.line * m.cell - m.gap / 2, from: m.rowTop(seam.from), to: m.rowTop(seam.to - 1) + m.span(1) };
+    return { key, a: seam.a, b: seam.b, orientation: "v", center: seam.line * m.cell - m.gap / 2, from: m.rowTop(seam.from), to: m.rowTop(seam.to - 1) + m.span(1), mode: seam.mode ?? "bridge" };
   }
-  return { key, a: seam.a, b: seam.b, orientation: "h", center: m.rowTop(seam.line) - m.gap / 2, from: seam.from * m.cell, to: seam.from * m.cell + m.span(seam.to - seam.from) };
+  return { key, a: seam.a, b: seam.b, orientation: "h", center: m.rowTop(seam.line) - m.gap / 2, from: seam.from * m.cell, to: seam.from * m.cell + m.span(seam.to - seam.from), mode: seam.mode ?? "bridge" };
 }
 
 const fmt = (n: number) => Math.round(n * 10) / 10;
@@ -217,4 +224,14 @@ export function bridgeRect(s: SeamPx, gap: number): Rect {
   return s.orientation === "v"
     ? { x: s.center - gap / 2, y: s.from, w: gap, h: s.to - s.from }
     : { x: s.from, y: s.center - gap / 2, w: s.to - s.from, h: gap };
+}
+
+/** Separate rounded rectangles as one path (cards that share media but keep their gaps). */
+export function roundedRects(rects: Rect[], radius: number): string {
+  return rects
+    .map(({ x, y, w, h }) => {
+      const r = Math.min(radius, w / 2, h / 2);
+      return `M${fmt(x + r)} ${fmt(y)}H${fmt(x + w - r)}Q${fmt(x + w)} ${fmt(y)} ${fmt(x + w)} ${fmt(y + r)}V${fmt(y + h - r)}Q${fmt(x + w)} ${fmt(y + h)} ${fmt(x + w - r)} ${fmt(y + h)}H${fmt(x + r)}Q${fmt(x)} ${fmt(y + h)} ${fmt(x)} ${fmt(y + h - r)}V${fmt(y + r)}Q${fmt(x)} ${fmt(y)} ${fmt(x + r)} ${fmt(y)}Z`;
+    })
+    .join("");
 }

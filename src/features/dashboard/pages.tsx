@@ -37,8 +37,10 @@ import {
   groupsOf,
   joinKey,
   rectOf,
+  roundedRects,
   seamPx,
   type Join,
+  type JoinMode,
   type Metrics,
   type Rect,
   type SeamPx,
@@ -46,7 +48,7 @@ import {
 import { registerGalleryDrag } from "@/features/dashboard/layout/galleryDrag";
 import { edgeColors, type Side } from "@/features/dashboard/layout/edgeColor";
 
-/** Joined cards of these kinds become one: a single video or photo across the group. */
+/** Linked cards of these kinds become one: a single video or photo across the group. */
 const MERGEABLE = new Set<WidgetType>(["video", "photo"]);
 
 /** Points sampled along each seam: the gap's colour follows each card's edge. */
@@ -190,6 +192,22 @@ export default function Index() {
   // moment so the pointer can cross the gap to a node.
   const [hoverId, setHoverId] = React.useState<string | null>(null);
   const [nodeHover, setNodeHover] = React.useState<{ a: string; b: string } | null>(null);
+  // The node whose link menu is open (by seam key).
+  const [nodeMenu, setNodeMenu] = React.useState<string | null>(null);
+  const nodeMenuRef = React.useRef(nodeMenu);
+  nodeMenuRef.current = nodeMenu;
+  // A click anywhere else closes it (the menu and its node stop their own).
+  React.useEffect(() => {
+    if (!nodeMenu) return undefined;
+    const close = (event: PointerEvent) => {
+      if (!(event.target as HTMLElement)?.closest?.(".join-menu, .join-node")) setNodeMenu(null);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [nodeMenu]);
+  React.useEffect(() => {
+    if (!editing) setNodeMenu(null);
+  }, [editing]);
   const hoverTimer = React.useRef(0);
   const hoverCard = (id: string | null) => {
     window.clearTimeout(hoverTimer.current);
@@ -224,7 +242,7 @@ export default function Index() {
     const px = seams.map((seam) => seamPx(seam, metrics));
     const members = new Map<string, { mask?: string; merged?: boolean }>();
     const outlines: Array<{ key: string; d: string; seams: SeamPx[]; merged: boolean }> = [];
-    const merged: Array<{ key: string; ids: string[]; lead: WidgetInstance; box: Rect; mask: string }> = [];
+    const merged: Array<{ key: string; ids: string[]; lead: WidgetInstance; box: Rect; mask: string; windows?: string }> = [];
     const radius = ui.cardStyle === "soft" ? 1.75 * rem : ui.cardStyle === "sharp" ? 0.625 * rem : 1.125 * rem;
     const done = new Set<string>();
     for (const [id, ids] of groups) {
@@ -232,18 +250,22 @@ export default function Index() {
       ids.forEach((m) => done.add(m));
       const groupSeams = px.filter((s) => ids.includes(s.a));
       const rects = ids.map((m) => rectOf(rendered.get(m)!, metrics));
-      const d = groupOutline([...rects, ...groupSeams.map((s) => bridgeRect(s, gap))], radius);
       const key = ids.slice().sort().join("|");
       // All the same kind of media: the group becomes one video or photo,
       // shown by the first card (in dashboard order) across the whole shape.
       const groupWidgets = widgets.filter((w) => ids.includes(w.id));
       const kind = groupWidgets[0]?.type;
-      if (kind && MERGEABLE.has(kind) && groupWidgets.every((w) => w.type === kind)) {
+      const mergeable = !!kind && MERGEABLE.has(kind) && groupWidgets.every((w) => w.type === kind);
+      // Shared media, gaps kept: each card its own window onto the one video or photo.
+      const windows = mergeable && groupSeams.every((s) => s.mode === "window");
+      const d = windows ? roundedRects(rects, radius) : groupOutline([...rects, ...groupSeams.map((s) => bridgeRect(s, gap))], radius);
+      if (mergeable) {
         const x0 = Math.min(...rects.map((r) => r.x));
         const y0 = Math.min(...rects.map((r) => r.y));
         const box = { x: x0, y: y0, w: Math.max(...rects.map((r) => r.x + r.w)) - x0, h: Math.max(...rects.map((r) => r.y + r.h)) - y0 };
-        merged.push({ key, ids, lead: groupWidgets[0], box, mask: svgMask(d, box) });
-        outlines.push({ key, d, seams: groupSeams, merged: true });
+        const local = windows ? roundedRects(rects.map((r) => ({ ...r, x: r.x - x0, y: r.y - y0 })), radius) : undefined;
+        merged.push({ key, ids, lead: groupWidgets[0], box, mask: svgMask(d, box), windows: local });
+        outlines.push({ key, d, seams: windows ? [] : groupSeams, merged: true });
         for (const m of ids) members.set(m, { merged: true });
         continue;
       }
@@ -263,7 +285,8 @@ export default function Index() {
     }
     // Only seams between different kinds get the sampled gradient.
     const blended = px.filter((s) => !members.get(s.a)?.merged);
-    return { seams: px, blended, members, outlines, merged, keys: new Set(seams.map((s) => joinKey(s.a, s.b))), radius };
+    const modes = new Map(px.map((s) => [s.key, s.mode]));
+    return { seams: px, blended, members, outlines, merged, modes, radius };
   }, [flow, rendered, joins, widgets, metrics, gap, fade, rem, ui.cardStyle]);
 
   // Each joined card's colours along its joined edges (from its photo,
@@ -335,12 +358,13 @@ export default function Index() {
     if (previous) void persistSettings((prev) => ({ ...prev, widgets: previous }));
   }, [persistSettings, popHistory]);
 
-  const toggleJoin = (a: string, b: string) => {
+  /** Link two cards ("bridge": one shape; "window": shared media, gaps kept), or split them (null). */
+  const setJoin = (a: string, b: string, mode: JoinMode | null) => {
     const key = joinKey(a, b);
     void persistSettings((prev) => {
       const current: Join[] = Array.isArray(prev.layout?.joins) ? prev.layout.joins : [];
-      const exists = current.some(([x, y]) => joinKey(x, y) === key);
-      const next = exists ? current.filter(([x, y]) => joinKey(x, y) !== key) : [...current, [a, b] as Join];
+      const rest = current.filter(([x, y]) => joinKey(x, y) !== key);
+      const next: Join[] = mode === null ? rest : [...rest, mode === "bridge" ? [a, b] : [a, b, mode]];
       // Drop joins whose cards are gone.
       const ids = new Set((prev.widgets as WidgetInstance[]).map((w) => w.id));
       return { ...prev, layout: { ...(prev.layout || {}), joins: next.filter(([x, y]) => ids.has(x) && ids.has(y)) } };
@@ -607,7 +631,8 @@ export default function Index() {
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        if (useSidePanelStore.getState().panel) closePanel();
+        if (nodeMenuRef.current) setNodeMenu(null);
+        else if (useSidePanelStore.getState().panel) closePanel();
         else setEditing(false);
         select(null);
         return;
@@ -732,7 +757,7 @@ export default function Index() {
   const nodes =
     editing && !flow && !draggingIds.length && !ghost
       ? adjacentSeams(shown)
-          .filter((seam) => joined.keys.has(joinKey(seam.a, seam.b)) || seam.a === hoverId || seam.b === hoverId)
+          .filter((seam) => joined.modes.has(joinKey(seam.a, seam.b)) || joinKey(seam.a, seam.b) === nodeMenu || seam.a === hoverId || seam.b === hoverId)
           .map((seam) => seamPx(seam, metrics))
       : [];
 
@@ -869,6 +894,7 @@ export default function Index() {
           key={group.key}
           className={`dashboard-merged ${cardClassFor(group.lead.type)}`}
           data-merged-ids={group.ids.join(" ")}
+          data-windows={group.windows ? "true" : undefined}
           data-editing={editing || undefined}
           style={{
             transform: `translate(${group.box.x}px, ${group.box.y}px)`,
@@ -879,40 +905,84 @@ export default function Index() {
           }}
         >
           <MergedContent instance={group.lead} size={`${group.box.w}x${group.box.h}`} />
+          {/* Each window's own rim (the box's rim would only trace its outer edges). */}
+          {group.windows && (
+            <svg className="dashboard-merged-rims" width={group.box.w} height={group.box.h} aria-hidden="true">
+              <path d={group.windows} />
+            </svg>
+          )}
         </div>
       ))}
 
       {nodes.map((s) => {
-        const isJoined = joined.keys.has(s.key);
+        const mode = joined.modes.get(s.key);
         const x = s.orientation === "v" ? s.center : (s.from + s.to) / 2;
         const y = s.orientation === "v" ? (s.from + s.to) / 2 : s.center;
-        const names = `${getWidgetType(widgets.find((w) => w.id === s.a)?.type ?? "clock").label} and ${getWidgetType(widgets.find((w) => w.id === s.b)?.type ?? "clock").label}`;
+        const typeA = widgets.find((w) => w.id === s.a)?.type;
+        const typeB = widgets.find((w) => w.id === s.b)?.type;
+        const names = `${getWidgetType(typeA ?? "clock").label} and ${getWidgetType(typeB ?? "clock").label}`;
+        // Two videos or two photos can also share one, keeping their gap.
+        const canShare = !!typeA && typeA === typeB && MERGEABLE.has(typeA);
+        const media = typeA === "video" ? "video" : "photo";
+        const menuOpen = nodeMenu === s.key;
+        const choose = (next: JoinMode | null) => {
+          setJoin(s.a, s.b, next);
+          setNodeMenu(null);
+          setNodeHover(null);
+        };
+        const label = !mode ? "Link" : !canShare ? "Split" : mode === "window" ? "Shared" : "Joined";
         return (
-          <button
-            key={s.key}
-            type="button"
-            className="join-node"
-            data-joined={isJoined || undefined}
-            data-label={isJoined ? "Split" : "Join"}
-            style={{ left: x, top: y }}
-            onPointerEnter={() => {
-              hoverCard(hoverId);
-              setNodeHover({ a: s.a, b: s.b });
-            }}
-            onPointerLeave={() => {
-              setNodeHover(null);
-              hoverCard(null);
-            }}
-            onClick={() => {
-              toggleJoin(s.a, s.b);
-              setNodeHover(null);
-            }}
-            title={isJoined ? `Split ${names}` : `Join ${names} into one shape`}
-            aria-label={isJoined ? `Split ${names}` : `Join ${names}`}
-            aria-pressed={isJoined}
-          >
-            <HiLink className="size-3.5" />
-          </button>
+          <React.Fragment key={s.key}>
+            <button
+              type="button"
+              className="join-node"
+              data-joined={mode ? "true" : undefined}
+              data-mode={mode}
+              data-label={menuOpen ? undefined : label}
+              style={{ left: x, top: y }}
+              onPointerEnter={() => {
+                hoverCard(hoverId);
+                setNodeHover({ a: s.a, b: s.b });
+              }}
+              onPointerLeave={() => {
+                setNodeHover(null);
+                hoverCard(null);
+              }}
+              onClick={() => {
+                if (canShare) setNodeMenu(menuOpen ? null : s.key);
+                else choose(mode ? null : "bridge");
+              }}
+              title={canShare ? `Link ${names}` : mode ? `Split ${names}` : `Join ${names} into one shape`}
+              aria-label={canShare ? `Link ${names}` : mode ? `Split ${names}` : `Join ${names}`}
+              aria-pressed={!!mode}
+              aria-expanded={canShare ? menuOpen : undefined}
+            >
+              <HiLink className="size-3.5" />
+            </button>
+            {menuOpen && (
+              <div className="join-menu surface-glass" role="menu" aria-label={`Link ${names}`} style={{ left: x, top: y }}>
+                <button type="button" role="menuitemradio" aria-checked={mode === "bridge"} onClick={() => choose("bridge")}>
+                  <span className="join-menu-icon" data-kind="bridge" aria-hidden="true" />
+                  <span>
+                    One {media}, one shape
+                    <small>The gap fills in</small>
+                  </span>
+                </button>
+                <button type="button" role="menuitemradio" aria-checked={mode === "window"} onClick={() => choose("window")}>
+                  <span className="join-menu-icon" data-kind="window" aria-hidden="true" />
+                  <span>
+                    One {media}, keep the gap
+                    <small>Each card a window onto it</small>
+                  </span>
+                </button>
+                {mode && (
+                  <button type="button" role="menuitem" className="join-menu-split" onClick={() => choose(null)}>
+                    Split
+                  </button>
+                )}
+              </div>
+            )}
+          </React.Fragment>
         );
       })}
     </div>
