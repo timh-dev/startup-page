@@ -153,14 +153,12 @@ function updateAndRenderShootingStars(ctx: CanvasRenderingContext2D, width: numb
 }
 
 // Render stars with realistic brightness, subtle twinkle, and polar rotation
-// In space (the physical sky's view from orbit) stars stay out by day,
-// dimmed a little by the sun's glare; seen from the ground they fade out.
-export function renderStars(ctx: CanvasRenderingContext2D, width: number, height: number, stars: Star[], time: number, lst: number, solar: SolarContext, elev?: number, space = false) {
+export function renderStars(ctx: CanvasRenderingContext2D, width: number, height: number, stars: Star[], time: number, lst: number, solar: SolarContext, elev?: number) {
   if (elev === undefined) elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
 
   let starOpacity = 1;
   if (elev > -6) {
-    starOpacity = Math.max(space ? 0.55 : 0, 1 - (elev + 6) / 11);
+    starOpacity = Math.max(0, 1 - (elev + 6) / 11);
   }
 
   const dt = 1 / 60;

@@ -1,19 +1,17 @@
-// Physically based atmosphere for the solar chart: single scattering
+// Physically based sky for the solar chart: single-scattering atmosphere
 // (Rayleigh + Mie + ozone) raymarched per pixel in WebGL, after Maxime
 // Heckel's "On Rendering the Sky, Sunsets, and Planets" and Sébastien
 // Hillaire's model. Earth constants are the standard ones from Hillaire
 // (2020) and Bruneton (2017).
 //
-// The view is from orbit: the chart's horizon line is the planet's limb,
-// space is black above it, and the atmosphere is the thin glowing band
-// along the limb. By day the band is blue; at sunrise and sunset it burns
-// orange and red into violet; at night it fades out, the lit upper
-// atmosphere lingering through twilight. Seen from orbit the atmosphere is
-// only a couple of degrees thick, so the vertical scale is stretched to
-// make the band readable.
+// The view is from the ground, facing the sun: the chart's horizon line is
+// 0° elevation, height is elevation, and width is azimuth around the sun.
+// Sunset reddening, the Mie haze around the sun, twilight after sunset
+// (sun below the horizon still lighting the upper atmosphere) and the
+// purple cast from ozone all fall out of the physics.
 //
-// The atmosphere only changes when the sun moves, so it is rendered on
-// demand (when the time, hover position or size changes), not every frame.
+// The sky only changes when the sun moves, so it is rendered on demand
+// (when the time, hover position or size changes), not every frame.
 
 const VERTEX = `
 attribute vec2 a_position;
@@ -23,22 +21,21 @@ void main() { gl_Position = vec4(a_position, 0.0, 1.0); }
 const FRAGMENT = `
 precision highp float;
 
-uniform vec2 u_resolution;    // canvas pixels
-uniform float u_horizon;      // the limb, canvas pixels from the top
-uniform vec2 u_sunPx;         // where the sun is drawn, canvas pixels
-uniform float u_radPerPxX;    // view angle per canvas pixel, across
-uniform float u_radPerPxY;    // view angle per canvas pixel, up (stretched)
-uniform float u_sunElevation; // the sun's real elevation, radians
+uniform vec2 u_resolution;   // canvas pixels
+uniform float u_horizon;     // horizon, canvas pixels from the top
+uniform float u_sunX;        // sun, canvas pixels from the left
+uniform float u_radPerPx;    // view angle per canvas pixel
+uniform vec3 u_sunDir;       // unit vector; +y up, +z toward the sun's azimuth
 uniform float u_exposure;
-uniform float u_aerosol;      // Mie density scale: hazier evenings, clearer mornings
-uniform float u_ozone;        // ozone scale: deeper purples at dusk
+uniform float u_aerosol;     // Mie density scale: hazier evenings, clearer mornings
+uniform float u_ozone;       // ozone scale: deeper purples at dusk
 
 const float PI = 3.14159265;
-const float R_GROUND = 6360.0;     // km
-const float R_TOP = 6460.0;        // km (Karman line)
-const float CAMERA_HEIGHT = 400.0; // km, about the ISS
+const float R_GROUND = 6360.0;  // km
+const float R_TOP = 6460.0;     // km (Karman line)
+const float CAMERA_HEIGHT = 0.3;
 
-const vec3 RAYLEIGH_BETA = vec3(5.802, 13.558, 33.1) * 1e-3; // per km
+const vec3 RAYLEIGH_BETA = vec3(5.802, 13.558, 33.1) * 1e-3;  // per km
 const float RAYLEIGH_H = 8.0;
 const vec3 MIE_SCATTER = vec3(3.996e-3);
 const vec3 MIE_EXTINCT = vec3(4.40e-3);
@@ -49,17 +46,23 @@ const float OZONE_CENTER = 25.0;
 const float OZONE_HALF_WIDTH = 15.0;
 const float SUN_INTENSITY = 20.0;
 
-const int VIEW_STEPS = 40;
+const int VIEW_STEPS = 24;
 const int LIGHT_STEPS = 6;
 
-// Where the ray enters and leaves a sphere (x < y); y < 0 when it misses.
-vec2 sphereHits(vec3 origin, vec3 dir, float radius) {
+// Distance along the ray to the sphere's far side, or -1 when missed.
+float sphereExit(vec3 origin, vec3 dir, float radius) {
   float b = dot(origin, dir);
   float c = dot(origin, origin) - radius * radius;
   float d = b * b - c;
-  if (d < 0.0) return vec2(0.0, -1.0);
-  float q = sqrt(d);
-  return vec2(-b - q, -b + q);
+  if (d < 0.0) return -1.0;
+  return -b + sqrt(d);
+}
+
+// True when the ray hits the ground before leaving the atmosphere.
+bool hitsGround(vec3 origin, vec3 dir) {
+  float b = dot(origin, dir);
+  float c = dot(origin, origin) - R_GROUND * R_GROUND;
+  return b < 0.0 && b * b - c > 0.0;
 }
 
 vec3 densities(float height) {
@@ -86,10 +89,9 @@ float miePhase(float mu) {
 }
 
 // Transmittance from a point toward the sun; zero in the planet's shadow.
-vec3 sunTransmittance(vec3 point, vec3 sunDir) {
-  vec2 ground = sphereHits(point, sunDir, R_GROUND);
-  if (ground.y > 0.0 && ground.x > 0.0) return vec3(0.0);
-  float rayLength = sphereHits(point, sunDir, R_TOP).y;
+vec3 sunTransmittance(vec3 point) {
+  if (hitsGround(point, u_sunDir)) return vec3(0.0);
+  float rayLength = sphereExit(point, u_sunDir, R_TOP);
   vec3 depth = vec3(0.0);
   float previous = 0.0;
   for (int i = 1; i <= LIGHT_STEPS; i++) {
@@ -97,41 +99,37 @@ vec3 sunTransmittance(vec3 point, vec3 sunDir) {
     float u = float(i) / float(LIGHT_STEPS);
     float t = rayLength * u * u;
     float dt = t - previous;
-    vec3 pos = point + sunDir * (t - dt * 0.5);
+    vec3 pos = point + u_sunDir * (t - dt * 0.5);
     depth += extinction(densities(max(0.0, sqrt(dot(pos, pos)) - R_GROUND))) * dt;
     previous = t;
   }
   return exp(-depth);
 }
 
-// Light scattered toward the camera along a ray through the atmosphere.
-// Lighting uses the sun's real direction; the phase functions use where
-// the sun is drawn, so the glow centres on the disc.
-vec3 atmosphere(vec3 origin, vec3 dir, vec3 sunDir, vec3 sunView) {
-  vec2 hits = sphereHits(origin, dir, R_TOP);
-  if (hits.y < 0.0) return vec3(0.0);
-  float start = max(hits.x, 0.0);
-  float end = hits.y;
-  vec2 ground = sphereHits(origin, dir, R_GROUND);
-  if (ground.y > 0.0) end = min(end, ground.x);
-
-  float mu = dot(dir, sunView);
+vec3 sky(vec3 dir) {
+  vec3 origin = vec3(0.0, R_GROUND + CAMERA_HEIGHT, 0.0);
+  float rayLength = sphereExit(origin, dir, R_TOP);
+  float mu = dot(dir, u_sunDir);
   float phaseR = rayleighPhase(mu);
   float phaseM = miePhase(mu);
-  float dt = (end - start) / float(VIEW_STEPS);
 
   vec3 radiance = vec3(0.0);
   vec3 transmittance = vec3(1.0);
-  for (int i = 0; i < VIEW_STEPS; i++) {
-    vec3 pos = origin + dir * (start + (float(i) + 0.5) * dt);
+  float previous = 0.0;
+  for (int i = 1; i <= VIEW_STEPS; i++) {
+    float u = float(i) / float(VIEW_STEPS);
+    float t = rayLength * u * u;
+    float dt = t - previous;
+    vec3 pos = origin + dir * (t - dt * 0.5);
     vec3 density = densities(max(0.0, sqrt(dot(pos, pos)) - R_GROUND));
-    vec3 ext = max(extinction(density), vec3(1e-7));
-    vec3 stepTransmittance = exp(-ext * dt);
+    vec3 stepTransmittance = exp(-extinction(density) * dt);
     vec3 scattering = RAYLEIGH_BETA * density.x * phaseR + MIE_SCATTER * density.y * phaseM;
     // Energy-conserving integration over the step (Hillaire 2015).
-    vec3 inScatter = scattering * sunTransmittance(pos, sunDir);
+    vec3 inScatter = scattering * sunTransmittance(pos);
+    vec3 ext = max(extinction(density), vec3(1e-7));
     radiance += transmittance * (inScatter - inScatter * stepTransmittance) / ext;
     transmittance *= stepTransmittance;
+    previous = t;
   }
   return radiance * SUN_INTENSITY;
 }
@@ -140,32 +138,22 @@ vec3 aces(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }
 
-// View direction for a canvas pixel: the limb on the horizon line, and the
-// chart's x centred on the sun's azimuth.
-vec3 viewDir(vec2 px, float dip) {
-  float elevation = (u_horizon - px.y) * u_radPerPxY - dip;
-  float azimuth = (px.x - u_sunPx.x) * u_radPerPxX;
-  return vec3(cos(elevation) * sin(azimuth), sin(elevation), cos(elevation) * cos(azimuth));
-}
-
 void main() {
   // Canvas coordinates with y down, matching the 2D chart.
   vec2 px = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);
-  vec3 origin = vec3(0.0, R_GROUND + CAMERA_HEIGHT, 0.0);
-  // The limb sits this far below the camera's horizontal.
-  float dip = acos(R_GROUND / (R_GROUND + CAMERA_HEIGHT));
+  float elevation = (u_horizon - px.y) * u_radPerPx;
+  float azimuth = (px.x - u_sunX) * u_radPerPx;
 
-  // The sun's real elevation, measured at the point on the limb toward the
-  // sun, so a noon sun lights the band like noon.
-  vec3 limb = vec3(0.0, -sin(dip), cos(dip));
-  vec3 up = normalize(origin + limb * sqrt(dot(origin, origin) - R_GROUND * R_GROUND));
-  vec3 sunDir = normalize(cos(u_sunElevation) * limb + sin(u_sunElevation) * up);
-  vec3 sunView = viewDir(u_sunPx, dip);
-
-  // Space above, the planet's night side below: both near black.
-  vec3 color = vec3(0.0004, 0.0005, 0.0012);
-  if (px.y <= u_horizon) {
-    color += aces(atmosphere(origin, viewDir(px, dip), sunDir, sunView) * u_exposure);
+  // A faint airglow so the night sky never reads as a flat void (linear
+  // light, so these small values end up as a deep navy after gamma).
+  vec3 airglow = vec3(0.0010, 0.0013, 0.0032);
+  vec3 color;
+  if (elevation < 0.0) {
+    // The ground below the horizon: near black.
+    color = vec3(0.0006, 0.0007, 0.0014);
+  } else {
+    vec3 dir = vec3(cos(elevation) * sin(azimuth), sin(elevation), cos(elevation) * cos(azimuth));
+    color = aces(sky(dir) * u_exposure) + airglow;
   }
 
   color = pow(color, vec3(1.0 / 2.2));
@@ -184,8 +172,7 @@ export interface SkyView {
   scale: number;
   horizonY: number;
   sunX: number;
-  sunY: number;
-  /** Degrees of view per CSS pixel across the chart. */
+  /** Degrees of view per CSS pixel. */
   degPerPx: number;
   /** Sun elevation in degrees (negative below the horizon). */
   sunElevation: number;
@@ -197,11 +184,6 @@ export interface PhysicalSky {
   render(view: SkyView): void;
   dispose(): void;
 }
-
-// Vertical stretch: the atmosphere is ~2.5° thick seen from orbit, so one
-// degree up spans this many CSS pixels, putting the band's glow across the
-// lower part of the chart.
-const PX_PER_DEGREE_UP = 34;
 
 function compile(gl: WebGLRenderingContext, type: number, source: string) {
   const shader = gl.createShader(type)!;
@@ -218,15 +200,11 @@ function compile(gl: WebGLRenderingContext, type: number, source: string) {
 /**
  * Exposure rises as the sun sets, like an eye adjusting to twilight. Single
  * scattering also underestimates twilight (it leaves out light scattered
- * more than once), which the extra exposure makes up for. By day it stays
- * low: from orbit the limb is seen through a long path of sunlit air, and
- * more exposure washes the band out to white.
+ * more than once), which the extra exposure makes up for.
  */
 function exposureFor(elevation: number) {
-  const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-  const day = clamp01((elevation - 3) / 12); // 0 at +3°, 1 at +15°
-  const twilight = clamp01((3 - elevation) / 13); // 0 at +3°, 1 at -10°
-  return 0.85 - day * 0.6 + twilight * twilight * 40;
+  const t = Math.max(0, Math.min(1, (3 - elevation) / 13)); // 0 at +3°, 1 at -10°
+  return 0.85 + t * t * 40;
 }
 
 /** Returns null when WebGL isn't available; the 2D sky is used instead. */
@@ -241,8 +219,7 @@ export function createPhysicalSky(canvas: HTMLCanvasElement): PhysicalSky | null
     gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT));
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
-  } catch (error) {
-    console.warn("[solar chart] physical sky unavailable", error);
+  } catch {
     return null;
   }
 
@@ -254,10 +231,9 @@ export function createPhysicalSky(canvas: HTMLCanvasElement): PhysicalSky | null
   const u = {
     resolution: uniform("u_resolution"),
     horizon: uniform("u_horizon"),
-    sunPx: uniform("u_sunPx"),
-    radPerPxX: uniform("u_radPerPxX"),
-    radPerPxY: uniform("u_radPerPxY"),
-    sunElevation: uniform("u_sunElevation"),
+    sunX: uniform("u_sunX"),
+    radPerPx: uniform("u_radPerPx"),
+    sunDir: uniform("u_sunDir"),
     exposure: uniform("u_exposure"),
     aerosol: uniform("u_aerosol"),
     ozone: uniform("u_ozone"),
@@ -271,7 +247,7 @@ export function createPhysicalSky(canvas: HTMLCanvasElement): PhysicalSky | null
         canvas.width = width;
         canvas.height = height;
       }
-      const toRad = Math.PI / 180;
+      const elevation = (view.sunElevation * Math.PI) / 180;
       gl.viewport(0, 0, width, height);
       gl.useProgram(program);
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -279,10 +255,9 @@ export function createPhysicalSky(canvas: HTMLCanvasElement): PhysicalSky | null
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform2f(u.resolution, width, height);
       gl.uniform1f(u.horizon, view.horizonY * view.scale);
-      gl.uniform2f(u.sunPx, view.sunX * view.scale, view.sunY * view.scale);
-      gl.uniform1f(u.radPerPxX, (view.degPerPx * toRad) / view.scale);
-      gl.uniform1f(u.radPerPxY, toRad / PX_PER_DEGREE_UP / view.scale);
-      gl.uniform1f(u.sunElevation, view.sunElevation * toRad);
+      gl.uniform1f(u.sunX, view.sunX * view.scale);
+      gl.uniform1f(u.radPerPx, (view.degPerPx * Math.PI) / 180 / view.scale);
+      gl.uniform3f(u.sunDir, 0, Math.sin(elevation), Math.cos(elevation));
       gl.uniform1f(u.exposure, exposureFor(view.sunElevation));
       // Evenings carry more dust and haze than mornings, which is why
       // sunsets run redder and more vivid; mornings stay clean and golden.

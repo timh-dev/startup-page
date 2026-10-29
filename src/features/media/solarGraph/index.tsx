@@ -184,7 +184,7 @@ export default function SolarGraph() {
       }
 
       // 2. Stars
-      renderStars(ctx, w, h, state.stars, state.animationTime, effectiveLst, solar, cachedElev, !!physicalSky);
+      renderStars(ctx, w, h, state.stars, state.animationTime, effectiveLst, solar, cachedElev);
 
       // 3. Atmosphere along the horizon (behind the curve); the physical
       // sky already has it.
@@ -202,19 +202,22 @@ export default function SolarGraph() {
       }
     }
 
-    // The view from orbit, facing the sun: the horizon line is the limb. The
-    // chart's width spans the same angle as horizon-to-peak does in sun
-    // elevation today, and the atmosphere is lit by the sun's real elevation.
+    // The sky looks toward the sun: the chart's horizon is 0° and the noon
+    // peak is today's highest elevation, with the same angular scale across.
+    // Above the horizon the sun's direction comes from where it is drawn, so
+    // the glow centres on the drawn disc; below, its real depth sets the
+    // twilight.
     function renderPhysicalSky(sky: PhysicalSky, w: number, h: number, lst: number, solar: SolarContext, horizonY: number, elevation: number) {
       const todayMax = Math.max(...solar.curveElevations);
       const peakY = h * PEAK_FRAC;
       const degPerPx = todayMax > 1 ? Math.min(0.5, Math.max(0.05, todayMax / Math.max(1, horizonY - peakY))) : 0.15;
       const { x: sunX, y: sunY } = solarToCanvas(lst, w, h, solar);
+      const sunElevation = sunY < horizonY ? (horizonY - sunY) * degPerPx : elevation;
       const evening = hourToDayFraction(lst, solar) > 0.5;
-      const key = `${w}x${h}|${sunX.toFixed(1)}|${sunY.toFixed(1)}|${elevation.toFixed(2)}|${degPerPx.toFixed(4)}|${evening}`;
+      const key = `${w}x${h}|${sunX.toFixed(1)}|${sunElevation.toFixed(2)}|${degPerPx.toFixed(4)}|${evening}`;
       if (key === skyKey) return;
       skyKey = key;
-      sky.render({ width: w, height: h, scale: 1, horizonY, sunX, sunY, degPerPx, sunElevation: elevation, evening });
+      sky.render({ width: w, height: h, scale: 1, horizonY, sunX, degPerPx, sunElevation, evening });
     }
 
     // Mouse event handlers for hover interaction
