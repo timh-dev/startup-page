@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { HiOutlineBugAnt, HiXMark } from "react-icons/hi2";
 
 import { DEBUG_PLACES, debugNow, fromWallClock, isDebugging, useDebugStore, wallClock } from "@/lib/debug";
+import { SPEEDS, startReplay, useMotionStore } from "@/lib/motion";
+
+const speedLabel = (speed: number) => (speed === 0 ? "Paused" : speed === 0.25 ? "¼×" : speed === 0.5 ? "½×" : `${speed}×`);
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -16,7 +19,9 @@ export default function DebugPanel() {
   const [, setTick] = useState(0);
   const [lat, setLat] = useState("");
   const [lon, setLon] = useState("");
-  const active = isDebugging({ timeOffsetMs, location });
+  const speed = useMotionStore((state) => state.speed);
+  const setSpeed = useMotionStore((state) => state.setSpeed);
+  const active = isDebugging({ timeOffsetMs, location }) || speed !== 1;
 
   // Keep the shown time moving.
   useEffect(() => {
@@ -43,6 +48,7 @@ export default function DebugPanel() {
   const minutes = wall.hours * 60 + wall.minutes;
   const dateValue = `${wall.year}-${pad(wall.month)}-${pad(wall.day)}`;
   const summary = [
+    speed !== 1 ? `Animations ${speedLabel(speed)}` : null,
     location?.label,
     Math.abs(timeOffsetMs) > 1000
       ? now.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone })
@@ -62,7 +68,16 @@ export default function DebugPanel() {
           <HiOutlineBugAnt className="size-3.5" />
           <span>Debugging · {summary}</span>
         </button>
-        <button type="button" className="debug-pill-reset" onClick={reset} aria-label="Stop debugging" title="Back to the real time and place">
+        <button
+          type="button"
+          className="debug-pill-reset"
+          onClick={() => {
+            reset();
+            setSpeed(1);
+          }}
+          aria-label="Stop debugging"
+          title="Back to the real time, place and speed"
+        >
           <HiXMark className="size-3.5" />
         </button>
       </div>
@@ -160,9 +175,34 @@ export default function DebugPanel() {
         </form>
       </div>
 
+      <div className="debug-section">
+        <div className="debug-section-head">
+          <span className="eyebrow">Animation</span>
+          <span className="debug-readout">{speedLabel(speed)}</span>
+        </div>
+        <div className="debug-row debug-speeds">
+          {SPEEDS.map((value) => (
+            <button key={value} type="button" className="debug-button" aria-pressed={speed === value} data-active={speed === value || undefined} onClick={() => setSpeed(value)}>
+              {value === 0 ? "❚❚" : speedLabel(value)}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="debug-button" onClick={startReplay}>
+          Replay the day (midnight → now)
+        </button>
+      </div>
+
       <footer className="debug-panel-footer">
         <span>This device only · Alt+Shift+D</span>
-        <button type="button" className="debug-button" onClick={reset} disabled={!active}>
+        <button
+          type="button"
+          className="debug-button"
+          onClick={() => {
+            reset();
+            setSpeed(1);
+          }}
+          disabled={!active}
+        >
           Reset all
         </button>
       </footer>

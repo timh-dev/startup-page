@@ -11,7 +11,8 @@ import { renderHorizonGlow } from './renderHorizonGlow';
 import { renderMarkers } from './renderMarkers';
 import { createAdaptiveResolution } from '@/lib/adaptive-resolution';
 import { ambientFrameMs } from '@/lib/power';
-import { debugLocation, useDebugStore } from '@/lib/debug';
+import { debugLocation, debugTimeZone, useDebugStore, wallClock } from '@/lib/debug';
+import { replayNow, useMotionStore } from '@/lib/motion';
 
 const TARGET_FRAME_MS = 1000 / 30; // idle at 30 fps; hover upgrades to 60
 
@@ -20,6 +21,7 @@ interface SolarGraphState {
   stars: Star[] | null;
   solar: SolarContext | null;
   animationTime: number;
+  replaying: boolean;
   animFrameId: number | null;
   lastTimestamp: number;
   hovering: boolean;
@@ -38,6 +40,7 @@ export default function SolarGraph() {
     stars: null,
     solar: null,
     animationTime: 0,
+    replaying: false,
     animFrameId: null,
     lastTimestamp: 0,
     hovering: false,
@@ -120,9 +123,17 @@ export default function SolarGraph() {
         if (resized) resize();
         const elapsed = timestamp - state.lastTimestamp;
         const targetMs = state.hovering ? 1000 / 60 : ambientFrameMs(TARGET_FRAME_MS);
-        if (!resized && elapsed < targetMs) return;
+        // The day replay (shared with the globe and weather sky) runs at 60 fps.
+        const replayed = replayNow();
+        if (replayed) {
+          const wall = wallClock(replayed, debugTimeZone());
+          state.lst = wall.hours + wall.minutes / 60 + wall.seconds / 3600;
+        }
+        else if (state.replaying) state.lst = getCurrentLst();
+        state.replaying = !!replayed;
+        if (!resized && !replayed && elapsed < targetMs) return;
         if (!canvas.clientWidth) return; // ancestor has display:none — skip draw
-        const dt = elapsed / 1000;
+        const dt = (elapsed / 1000) * useMotionStore.getState().speed;
         state.lastTimestamp = timestamp;
         state.animationTime += dt;
         draw(ctx, canvas, state);

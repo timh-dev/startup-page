@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { getFlashEvent, getFlashEnvelope, makeRng } from "@/features/weather/lightning";
 import type { PrecipitationStyle, WeatherVisualProfile } from "@/features/weather/types/weather";
 import { prefersReducedMotion } from "@/lib/power";
+import { motionTime, useMotionStore } from "@/lib/motion";
 
 const MAX_DPR = 2;
 
@@ -47,9 +48,11 @@ function useAnimatedCanvas(
         lastNow = now;
         return;
       }
-      const dt = Math.min((now - lastNow) / 1000, 0.05);
+      const speed = useMotionStore.getState().speed;
+      const dt = Math.min((now - lastNow) / 1000, 0.05) * speed;
       lastNow = now;
-      drawRef.current(ctx, canvas.width, canvas.height, dt, now / 1000);
+      if (speed === 0) return; // paused: leave the last frame
+      drawRef.current(ctx, canvas.width, canvas.height, dt, motionTime());
     }
 
     animationFrame = requestAnimationFrame(frame);

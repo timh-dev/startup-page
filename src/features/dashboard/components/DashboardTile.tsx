@@ -3,17 +3,16 @@ import { HiXMark } from "react-icons/hi2";
 
 import type { WidgetInstance } from "@/lib/dashboard-dimensions";
 import { getWidgetType } from "@/features/dashboard/widgetRegistry";
-import type { Placement } from "@/features/dashboard/layout/grid";
+import type { Rect } from "@/features/dashboard/layout/joins";
 
 interface DashboardTileProps {
   instance: WidgetInstance;
   /** Position in the list, for the load-in stagger. */
   index: number;
-  placement: Placement;
-  /** Tile size plus gap, in px. */
-  cell: number;
-  tile: number;
-  gap: number;
+  /** Where the card's box sits on the grid, in px (grown across seams when joined). */
+  rect: Rect;
+  /** For a joined card: its group's outline (the seam edge is a clip-path, animated). */
+  mask?: string;
   editing: boolean;
   selected: boolean;
   dragging: boolean;
@@ -44,10 +43,8 @@ const TileContent = React.memo(
 export default function DashboardTile({
   instance,
   index,
-  placement,
-  cell,
-  tile,
-  gap,
+  rect,
+  mask,
   editing,
   selected,
   dragging,
@@ -59,21 +56,28 @@ export default function DashboardTile({
   onRemove,
 }: DashboardTileProps) {
   const label = getWidgetType(instance.type).label;
-  const width = placement.w * tile + (placement.w - 1) * gap;
-  const height = placement.h * tile + (placement.h - 1) * gap;
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Splitting a card off its group: drop the animated seam clip.
+  React.useEffect(() => {
+    if (!mask && ref.current) ref.current.style.clipPath = "";
+  }, [mask]);
 
   return (
     <div
+      ref={ref}
       data-tile-id={instance.id}
-      className={`dashboard-tile tile-enter ${radiusClass}`}
+      className={`dashboard-tile tile-enter ${mask ? "" : radiusClass}`}
       data-editing={editing || undefined}
       data-selected={selected || undefined}
       data-dragging={dragging || undefined}
+      data-joined={mask ? "true" : undefined}
       style={
         {
-          transform: `translate(${placement.x * cell}px, ${placement.y * cell}px)`,
-          width,
-          height,
+          transform: `translate(${rect.x}px, ${rect.y}px)`,
+          width: rect.w,
+          height: rect.h,
+          maskImage: mask,
+          WebkitMaskImage: mask,
           "--tile-index": index,
           "--wiggle-delay": `${(index * 137) % 400}ms`,
         } as React.CSSProperties
@@ -87,25 +91,21 @@ export default function DashboardTile({
         <TileContent instance={instance} cardClass={cardClass} />
       </div>
 
-      {editing && (
-        <>
-          <button
-            type="button"
-            className="tile-remove"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRemove();
-            }}
-            aria-label={`Remove ${label}`}
-            title="Remove"
-          >
-            <HiXMark className="size-3" />
-          </button>
-          {canResize && (
-            <div className="tile-resize" onPointerDown={onResizeStart} role="presentation" title="Drag to resize" />
-          )}
-        </>
+      {editing && !mask && (
+        <button
+          type="button"
+          className="tile-remove"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
+          aria-label={`Remove ${label}`}
+          title="Remove"
+        >
+          <HiXMark className="size-3" />
+        </button>
       )}
+      {editing && canResize && !mask && <div className="tile-resize" onPointerDown={onResizeStart} role="presentation" title="Drag to resize" />}
     </div>
   );
 }

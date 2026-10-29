@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { ambientFrameMs } from "@/lib/power";
+import { motionTime } from "@/lib/motion";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -196,7 +197,6 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
 
-    const startedAt = performance.now();
 
     let glReady = false;
     let position = -1;
@@ -257,7 +257,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform2f(resolution, canvas.width, canvas.height);
-      gl.uniform1f(time, (now - startedAt) / 1000);
+      gl.uniform1f(time, motionTime());
       gl.uniform1f(intensityUniform, Math.max(0, Math.min(intensityRef.current, 1)));
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }

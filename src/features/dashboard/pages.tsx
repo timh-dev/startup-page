@@ -1,4 +1,5 @@
 import React from "react";
+import { HiLink } from "react-icons/hi2";
 
 import { useSettingsStore } from "@/features/settings/stores";
 import { useLayoutEditStore } from "@/features/dashboard/stores/layoutEditStore";
@@ -9,20 +10,41 @@ import { TILE_SIZE_OPTIONS, type TileSize, type WidgetInstance, type WidgetType 
 import DashboardTile from "@/features/dashboard/components/DashboardTile";
 import EditBar from "@/features/dashboard/components/EditBar";
 import { useRootFontSize } from "@/lib/use-root-font-size";
+import { motionTime } from "@/lib/motion";
 import {
   DEFAULT_COLUMNS,
   MAX_COLUMNS,
   MIN_COLUMNS,
+  PAGE_ROWS,
   applyLayout,
   cellsFor,
   firstFreeSpot,
   nearestSize,
+  pageCount,
+  pageOf,
+  placeGroup,
   placeTile,
   resolveLayout,
   rowCount,
   type Layout,
   type Placement,
 } from "@/features/dashboard/layout/grid";
+import {
+  activeSeams,
+  adjacentSeams,
+  bridgeRect,
+  groupOutline,
+  groupsOf,
+  joinKey,
+  memberRegion,
+  rectOf,
+  seamLine,
+  seamPx,
+  type Join,
+  type Metrics,
+  type Rect,
+  type SeamPx,
+} from "@/features/dashboard/layout/joins";
 import { registerGalleryDrag } from "@/features/dashboard/layout/galleryDrag";
 
 /** Width of the side panel plus its margin, in rem; the grid makes room for it. */
@@ -46,24 +68,30 @@ function newInstance(type: WidgetType): WidgetInstance {
 }
 
 type Drag =
-  | { kind: "move"; id: string; size: { w: number; h: number }; offset: { x: number; y: number }; start: { x: number; y: number }; moved: boolean; el: HTMLElement; base: Layout; key: string }
+  | { kind: "move"; id: string; members: Placement[]; g0: { x: number; y: number }; start: { x: number; y: number }; moved: boolean; base: Layout; key: string }
   | { kind: "resize"; id: string; origin: Placement; allowed: TileSize[]; size: TileSize; base: Layout; key: string }
   | { kind: "new"; instance: WidgetInstance; size: { w: number; h: number }; start: { x: number; y: number }; moved: boolean; base: Layout; key: string; over: boolean };
 
-const removeTarget = (event: React.PointerEvent | PointerEvent) =>
+const isControl = (event: React.PointerEvent | PointerEvent) =>
   (event.target as HTMLElement | null)?.closest?.("button, a, input, select, textarea, .tile-resize");
 
+const svgMask = (d: string, box: Rect) =>
+  `url("data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='${box.x} ${box.y} ${box.w} ${box.h}' width='${box.w}' height='${box.h}' preserveAspectRatio='none'><path d='${d}' fill='black'/></svg>`,
+  )}")`;
+
 /**
- * The dashboard: cards placed freely on a grid that scales to the window.
- * In edit mode, drag a card anywhere (the cards it lands on move to the
- * nearest free spots, live), drag its corner to resize, ✕ to remove, click
- * to open its inspector. On narrow screens the grid falls back to a flowing
- * order in fewer columns.
+ * The dashboard: cards placed freely on pages of 4 rows that snap as you
+ * scroll. In edit mode, drag a card (or a joined group) anywhere, drag a
+ * corner to resize, click the node between two touching cards to join them
+ * into one shape, ✕ to remove, click to open the inspector. On narrow
+ * screens it falls back to one flowing column of fewer columns.
  */
 export default function Index() {
   const settings = useSettingsStore((state) => state.settings);
   const persistSettings = useSettingsStore((state) => state.persistSettings);
   const { editing, selectedId, select, pushHistory, popHistory, setEditing, setInsertAt } = useLayoutEditStore();
+  const insertAt = useLayoutEditStore((state) => state.insertAt);
   const panel = useSidePanelStore((state) => state.panel);
   const openPanel = useSidePanelStore((state) => state.open);
   const closePanel = useSidePanelStore((state) => state.close);
@@ -76,19 +104,19 @@ export default function Index() {
   const minTile = Math.round(maxTile * 0.75);
   const columns = Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, Number(settings.layout?.columns) || DEFAULT_COLUMNS));
   const widgets: WidgetInstance[] = React.useMemo(() => (Array.isArray(settings.widgets) ? settings.widgets : []), [settings.widgets]);
+  const joins: Join[] = React.useMemo(() => (Array.isArray(settings.layout?.joins) ? settings.layout.joins : []), [settings.layout?.joins]);
   const base = React.useMemo(() => resolveLayout(widgets, columns), [widgets, columns]);
 
-  // Fit the grid to the space left beside the side panel.
+  // Fit a page (4 rows) to the space left beside the side panel.
   const panelOffset = panel ? SIDE_PANEL_REM * rem : 0;
   const pad = { top: 5 * rem, bottom: 1.5 * rem, side: 2 * rem };
   const availW = viewport.width - pad.side * 2 - panelOffset;
   const availH = viewport.height - pad.top - pad.bottom;
   const fill = 0.81;
-  const rows = Math.max(1, rowCount(base));
   const widthFit = ((availW - (columns - 1) * gap) / columns) * fill;
-  const heightFit = ((availH - (rows - 1) * gap) / rows) * fill;
+  const heightFit = ((availH - (PAGE_ROWS - 1) * gap) / PAGE_ROWS) * fill;
   // With the panel open the grid may shrink further before giving up on
-  // free placement, so opening an inspector never reflows the dashboard.
+  // pages, so opening an inspector never reflows the dashboard.
   const flow = widthFit < (panel ? minTile * 0.55 : minTile);
   let tile: number;
   let layout: Layout;
@@ -101,17 +129,25 @@ export default function Index() {
       const pb = base.get(b.id)!;
       return pa.y - pb.y || pa.x - pb.x;
     });
-    layout = resolveLayout(ordered.map(({ pos: _pos, ...rest }) => rest), gridColumns);
+    layout = resolveLayout(
+      ordered.map(({ pos: _pos, ...rest }) => rest),
+      gridColumns,
+      Infinity,
+    );
   } else {
-    tile = Math.max(Math.min(widthFit, heightFit, maxTile), Math.min(widthFit, minTile));
+    tile = Math.min(widthFit, heightFit, maxTile);
     layout = base;
   }
   tile = Math.floor(tile);
   const cell = tile + gap;
-  // Centre the cards themselves; the extra drop row in edit mode hangs below
-  // instead of shifting everything up.
-  const contentHeight = Math.max(1, rowCount(layout)) * cell - gap;
-  const topOffset = Math.max(pad.top, (viewport.height - contentHeight) / 2);
+  const span = (n: number) => n * tile + (n - 1) * gap;
+  const pageH = viewport.height;
+  // Each page centres its four rows in the window.
+  const pageTop = Math.max(pad.top, (pageH - span(PAGE_ROWS)) / 2);
+  const rowTop = React.useCallback(
+    (row: number) => (flow ? row * cell : pageOf(row) * pageH + pageTop + (row % PAGE_ROWS) * cell),
+    [flow, cell, pageH, pageTop],
+  );
 
   const [preview, setPreviewState] = React.useState<Layout | null>(null);
   // Mirrored in a ref so the drop handler reads the latest preview.
@@ -120,13 +156,86 @@ export default function Index() {
     previewRef.current = next;
     setPreviewState(next);
   };
-  const [draggingId, setDraggingId] = React.useState<string | null>(null);
+  const [draggingIds, setDraggingIds] = React.useState<string[]>([]);
   const [ghost, setGhost] = React.useState<{ instance: WidgetInstance; size: { w: number; h: number } } | null>(null);
+  const [page, setPage] = React.useState(0);
   const ghostRef = React.useRef<HTMLDivElement>(null);
   const gridRef = React.useRef<HTMLDivElement>(null);
+  const scrollerRef = React.useRef<HTMLDivElement>(null);
+  const seamLayerRef = React.useRef<SVGSVGElement>(null);
   const dragRef = React.useRef<Drag | null>(null);
   const shown = preview ?? layout;
-  const shownRows = Math.max(1, rowCount(shown)) + (editing && !flow ? 1 : 0);
+  // A dragged group stays anchored at its start (the pointer offset rides on
+  // top); everything else shows the preview.
+  const rendered: Layout = React.useMemo(() => {
+    if (!draggingIds.length) return shown;
+    const next = new Map(shown);
+    for (const id of draggingIds) next.set(id, base.get(id)!);
+    return next;
+  }, [shown, draggingIds, base]);
+
+  const pages = flow ? 1 : pageCount(shown) + (editing ? 1 : 0);
+  const shownRows = flow ? Math.max(1, rowCount(shown)) : pages * PAGE_ROWS;
+
+  // ---- joined cards: groups, outlines, seams ----
+  const metrics: Metrics = React.useMemo(() => ({ cell, gap, span: (n: number) => n * tile + (n - 1) * gap, rowTop }), [cell, gap, tile, rowTop]);
+  const amplitude = Math.round(gap * 0.5 + 6);
+  const reach = gap / 2 + amplitude * 1.35;
+  const joined = React.useMemo(() => {
+    const seams = flow ? [] : activeSeams(rendered, joins);
+    const groups = groupsOf(seams);
+    const px = seams.map((seam) => seamPx(seam, metrics));
+    const members = new Map<string, { rect: Rect; box: Rect; seams: SeamPx[]; mask: string }>();
+    const outlines: Array<{ key: string; d: string }> = [];
+    const radius = ui.cardStyle === "soft" ? 1.75 * rem : ui.cardStyle === "sharp" ? 0.625 * rem : 1.125 * rem;
+    const done = new Set<string>();
+    for (const [id, ids] of groups) {
+      if (done.has(id)) continue;
+      ids.forEach((m) => done.add(m));
+      const groupSeams = px.filter((s) => ids.includes(s.a));
+      const rects = ids.map((m) => rectOf(rendered.get(m)!, metrics));
+      const d = groupOutline([...rects, ...groupSeams.map((s) => bridgeRect(s, gap))], radius);
+      outlines.push({ key: ids.slice().sort().join("|"), d });
+      for (const m of ids) {
+        const rect = rectOf(rendered.get(m)!, metrics);
+        const own = groupSeams.filter((s) => s.a === m || s.b === m);
+        const grow = (side: "l" | "t" | "r" | "b") =>
+          own.some((s) => (s.orientation === "v" ? (side === "r" ? s.a === m : side === "l" && s.b === m) : side === "b" ? s.a === m : side === "t" && s.b === m)) ? reach : 0;
+        const box = { x: rect.x - grow("l"), y: rect.y - grow("t"), w: rect.w + grow("l") + grow("r"), h: rect.h + grow("t") + grow("b") };
+        members.set(m, { rect, box, seams: own, mask: svgMask(d, box) });
+      }
+    }
+    return { seams: px, members, outlines, keys: new Set(seams.map((s) => joinKey(s.a, s.b))) };
+  }, [flow, rendered, joins, metrics, gap, reach, rem, ui.cardStyle]);
+
+  // The seams move like oil and water: each joined card is clipped to its
+  // region with a wavy edge, redrawn every frame on the shared clock.
+  React.useEffect(() => {
+    if (!joined.members.size) return undefined;
+    let frame = 0;
+    let lastT = -1;
+    const tick = () => {
+      frame = requestAnimationFrame(tick);
+      const t = motionTime();
+      if (t === lastT) return; // paused
+      lastT = t;
+      const grid = gridRef.current;
+      if (!grid) return;
+      for (const [id, member] of joined.members) {
+        const el = grid.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(id)}"]`);
+        if (el) el.style.clipPath = `path("${memberRegion(id, member.rect, member.box, member.seams, t, amplitude)}")`;
+      }
+      const layer = seamLayerRef.current;
+      if (layer) {
+        for (const s of joined.seams) {
+          const d = seamLine(s, t, amplitude);
+          layer.querySelectorAll<SVGPathElement>(`[data-seam="${CSS.escape(s.key)}"]`).forEach((path) => path.setAttribute("d", d));
+        }
+      }
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [joined, amplitude]);
 
   const radiusClass = ui.cardStyle === "soft" ? "rounded-[1.75rem]" : ui.cardStyle === "sharp" ? "rounded-[0.625rem]" : "rounded-[1.125rem]";
   // Two materials (src/assets/styles/design-system.css): an opaque card for
@@ -166,6 +275,18 @@ export default function Index() {
     if (previous) void persistSettings((prev) => ({ ...prev, widgets: previous }));
   }, [persistSettings, popHistory]);
 
+  const toggleJoin = (a: string, b: string) => {
+    const key = joinKey(a, b);
+    void persistSettings((prev) => {
+      const current: Join[] = Array.isArray(prev.layout?.joins) ? prev.layout.joins : [];
+      const exists = current.some(([x, y]) => joinKey(x, y) === key);
+      const next = exists ? current.filter(([x, y]) => joinKey(x, y) !== key) : [...current, [a, b] as Join];
+      // Drop joins whose cards are gone.
+      const ids = new Set((prev.widgets as WidgetInstance[]).map((w) => w.id));
+      return { ...prev, layout: { ...(prev.layout || {}), joins: next.filter(([x, y]) => ids.has(x) && ids.has(y)) } };
+    });
+  };
+
   const removeWidget = React.useCallback(
     (id: string) => {
       commit(widgets.filter((widget) => widget.id !== id));
@@ -187,7 +308,16 @@ export default function Index() {
 
   const toGrid = (clientX: number, clientY: number) => {
     const rect = gridRef.current!.getBoundingClientRect();
-    return { x: clientX - rect.left, y: clientY - rect.top, inside: clientX >= rect.left - cell / 2 && clientX <= rect.right + cell / 2 && clientY >= rect.top - cell / 2 && clientY <= rect.bottom + cell };
+    return { x: clientX - rect.left, y: clientY - rect.top, inside: clientX >= rect.left - cell / 2 && clientX <= rect.right + cell / 2 && clientY >= 0 && clientY <= viewport.height };
+  };
+
+  /** The cell whose top-left is nearest a point (in grid px), for a card h rows tall. */
+  const cellAt = (left: number, top: number, h: number) => {
+    const x = Math.round(left / cell);
+    if (flow) return { x, y: Math.max(0, Math.round(top / cell)) };
+    const p = Math.max(0, Math.floor((top + span(h) / 2) / pageH));
+    const within = Math.round((top - p * pageH - pageTop) / cell);
+    return { x, y: p * PAGE_ROWS + Math.max(0, Math.min(PAGE_ROWS - h, within)) };
   };
 
   // Adds a card: at a dropped spot, the clicked empty cell, or the first free one.
@@ -196,8 +326,8 @@ export default function Index() {
       const cells = cellsFor(instance.size);
       let next = at;
       if (!next) {
-        const insertAt = useLayoutEditStore.getState().insertAt;
-        next = insertAt ? placeTile(base, instance.id, insertAt, cells, columns) : placeTile(base, instance.id, firstFreeSpot(base, cells, columns), cells, columns);
+        const cellPick = useLayoutEditStore.getState().insertAt;
+        next = placeTile(base, instance.id, cellPick ?? firstFreeSpot(base, cells, columns), cells, columns);
       }
       commit(applyLayout([...widgets, instance], next));
       setInsertAt(null);
@@ -206,34 +336,57 @@ export default function Index() {
     [base, columns, commit, openInspector, setInsertAt, widgets],
   );
 
-  // ---- pointer drags: move, resize, and new cards from the gallery ----
+  // ---- pointer drags: move (a card or its group), resize, new cards ----
   const endDrag = React.useRef<() => void>(() => {});
+  const lastPointer = React.useRef<{ clientX: number; clientY: number } | null>(null);
+  const lastAutoScroll = React.useRef(0);
+
+  const elementsOf = (ids: string[]) =>
+    ids.map((id) => gridRef.current?.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(id)}"]`)).filter(Boolean) as HTMLElement[];
+
+  // Dragging near the top or bottom of the window turns the page.
+  const autoScroll = (clientY: number) => {
+    const scroller = scrollerRef.current;
+    if (flow || !scroller || performance.now() - lastAutoScroll.current < 700) return;
+    const edge = 56;
+    if (clientY > viewport.height - edge && scroller.scrollTop + pageH < scroller.scrollHeight - 2) {
+      lastAutoScroll.current = performance.now();
+      scroller.scrollBy({ top: pageH, behavior: "smooth" });
+    } else if (clientY < edge + 20 && scroller.scrollTop > 2) {
+      lastAutoScroll.current = performance.now();
+      scroller.scrollBy({ top: -pageH, behavior: "smooth" });
+    }
+  };
 
   const onMove = React.useCallback(
-    (event: PointerEvent) => {
+    (event: { clientX: number; clientY: number }) => {
       const drag = dragRef.current;
       if (!drag || !gridRef.current) return;
+      lastPointer.current = { clientX: event.clientX, clientY: event.clientY };
       if (drag.kind === "move") {
         if (!drag.moved && Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y) < 5) return;
         if (!drag.moved) {
           drag.moved = true;
-          setDraggingId(drag.id);
+          setDraggingIds(drag.members.map((m) => m.id));
         }
+        autoScroll(event.clientY);
         const g = toGrid(event.clientX, event.clientY);
-        const left = g.x - drag.offset.x;
-        const top = g.y - drag.offset.y;
-        const from = drag.base.get(drag.id)!;
-        drag.el.style.translate = `${left - from.x * cell}px ${top - from.y * cell}px`;
-        const target = { x: Math.round(left / cell), y: Math.max(0, Math.round(top / cell)) };
+        const dx = g.x - drag.g0.x;
+        const dy = g.y - drag.g0.y;
+        for (const el of elementsOf(drag.members.map((m) => m.id))) el.style.translate = `${dx}px ${dy}px`;
+        const grabbed = drag.members.find((m) => m.id === drag.id)!;
+        const target = cellAt(grabbed.x * cell + dx, rowTop(grabbed.y) + dy, grabbed.h);
         const key = `${target.x},${target.y}`;
         if (key !== drag.key) {
           drag.key = key;
-          setPreview(placeTile(drag.base, drag.id, target, drag.size, columns));
+          const shiftX = target.x - grabbed.x;
+          const shiftY = target.y - grabbed.y;
+          setPreview(placeGroup(drag.base, drag.members.map((m) => ({ ...m, x: m.x + shiftX, y: m.y + shiftY })), columns));
         }
       } else if (drag.kind === "resize") {
         const g = toGrid(event.clientX, event.clientY);
         const w = Math.max(1, Math.min(3, Math.round((g.x - drag.origin.x * cell) / cell)));
-        const h = Math.max(1, Math.min(2, Math.round((g.y - drag.origin.y * cell) / cell)));
+        const h = Math.max(1, Math.min(2, Math.round((g.y - rowTop(drag.origin.y)) / cell)));
         const size = nearestSize(w, h, drag.allowed);
         if (size !== drag.key) {
           drag.key = size;
@@ -243,12 +396,13 @@ export default function Index() {
       } else {
         if (!drag.moved && Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y) < 5) return;
         drag.moved = true;
-        const w = drag.size.w * tile + (drag.size.w - 1) * gap;
-        const h = drag.size.h * tile + (drag.size.h - 1) * gap;
+        autoScroll(event.clientY);
+        const w = span(drag.size.w);
+        const h = span(drag.size.h);
         if (ghostRef.current) ghostRef.current.style.transform = `translate(${event.clientX - w / 2}px, ${event.clientY - h / 2}px)`;
         const g = toGrid(event.clientX, event.clientY);
         drag.over = g.inside;
-        const target = { x: Math.round((g.x - w / 2) / cell), y: Math.max(0, Math.round((g.y - h / 2) / cell)) };
+        const target = cellAt(g.x - w / 2, g.y - h / 2, drag.size.h);
         const key = g.inside ? `${target.x},${target.y}` : "out";
         if (key !== drag.key) {
           drag.key = key;
@@ -257,8 +411,13 @@ export default function Index() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cell, columns, gap, tile],
+    [cell, columns, gap, tile, flow, pageH, pageTop, rowTop, viewport.height],
   );
+
+  // A page turn mid-drag moves the grid under a still pointer.
+  const onScrollDuringDrag = React.useCallback(() => {
+    if (dragRef.current && lastPointer.current) onMove(lastPointer.current);
+  }, [onMove]);
 
   const onUp = React.useCallback(() => {
     const drag = dragRef.current;
@@ -266,10 +425,11 @@ export default function Index() {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", endDrag.current);
     window.removeEventListener("pointercancel", endDrag.current);
+    scrollerRef.current?.removeEventListener("scroll", onScrollDuringDrag);
     const current = previewRef.current;
     setPreview(null);
     if (drag?.kind === "move") {
-      drag.el.style.translate = "";
+      for (const el of elementsOf(drag.members.map((m) => m.id))) el.style.translate = "";
       if (drag.moved && current) commit(applyLayout(widgets, current));
       else if (!drag.moved) openInspector(drag.id);
     } else if (drag?.kind === "resize") {
@@ -280,35 +440,38 @@ export default function Index() {
       if (drag.over && current) addWidget(drag.instance, current);
       else if (!drag.moved) addWidget(drag.instance, null);
     }
-    setDraggingId(null);
+    setDraggingIds([]);
     setGhost(null);
-  }, [addWidget, commit, onMove, openInspector, widgets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addWidget, commit, onMove, onScrollDuringDrag, openInspector, widgets]);
   endDrag.current = onUp;
 
   const listen = () => {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", endDrag.current);
     window.addEventListener("pointercancel", endDrag.current);
+    scrollerRef.current?.addEventListener("scroll", onScrollDuringDrag);
   };
 
+  const groupOf = (id: string) => groupsOf(activeSeams(base, joins)).get(id) ?? [id];
+
   const startMove = (id: string, event: React.PointerEvent<HTMLElement>) => {
-    if (!editing || flow || event.button !== 0 || removeTarget(event)) {
-      if (editing && flow && !removeTarget(event)) openInspector(id);
+    if (!editing || event.button !== 0 || isControl(event)) return;
+    if (flow) {
+      openInspector(id);
       return;
     }
     event.preventDefault();
-    const from = base.get(id)!;
     const g = toGrid(event.clientX, event.clientY);
     dragRef.current = {
       kind: "move",
       id,
-      size: { w: from.w, h: from.h },
-      offset: { x: g.x - from.x * cell, y: g.y - from.y * cell },
+      members: groupOf(id).map((m) => base.get(m)!),
+      g0: { x: g.x, y: g.y },
       start: { x: event.clientX, y: event.clientY },
       moved: false,
-      el: event.currentTarget,
       base,
-      key: `${from.x},${from.y}`,
+      key: "",
     };
     listen();
   };
@@ -331,7 +494,7 @@ export default function Index() {
     listen();
   };
 
-  // The gallery (in the side panel) starts drags of new cards through here.
+  // The gallery (in the side panel) adds cards through here.
   React.useEffect(
     () =>
       registerGalleryDrag({
@@ -348,8 +511,8 @@ export default function Index() {
     [base, onMove, addWidget],
   );
 
-  // Keyboard: arrows move the selected card, Delete removes it, ⌘Z undoes,
-  // Esc closes the inspector, then leaves edit mode. E toggles edit mode.
+  // Keyboard: arrows move the selected card (with its group), Delete removes
+  // it, ⌘Z undoes, Esc closes the panel then leaves edit mode, E toggles it.
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -390,13 +553,47 @@ export default function Index() {
       const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key as "ArrowLeft"];
       if (step) {
         event.preventDefault();
-        const from = base.get(id)!;
-        commit(applyLayout(widgets, placeTile(base, id, { x: from.x + step[0], y: from.y + step[1] }, from, columns)));
+        const members = groupOf(id).map((m) => base.get(m)!);
+        commit(applyLayout(widgets, placeGroup(base, members.map((m) => ({ ...m, x: m.x + step[0], y: m.y + step[1] })), columns)));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [base, closePanel, columns, commit, flow, removeWidget, select, setEditing, undo, widgets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, joins, closePanel, columns, commit, flow, removeWidget, select, setEditing, undo, widgets]);
+
+  // One scroll gesture turns exactly one page (snapping alone would pull a
+  // short trackpad swipe back). Cards that scroll themselves keep the wheel.
+  React.useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || flow) return undefined;
+    let acc = 0;
+    let lockedUntil = 0;
+    const scrollsItself = (el: HTMLElement | null, dy: number) => {
+      for (let node = el; node && node !== scroller; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (!/(auto|scroll)/.test(style.overflowY) || node.scrollHeight <= node.clientHeight + 1) continue;
+        if (dy > 0 ? node.scrollTop + node.clientHeight < node.scrollHeight - 1 : node.scrollTop > 0) return true;
+      }
+      return false;
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) < Math.abs(event.deltaX) || event.ctrlKey) return;
+      if (scrollsItself(event.target as HTMLElement, event.deltaY)) return;
+      event.preventDefault();
+      const now = performance.now();
+      if (now < lockedUntil) return;
+      acc += event.deltaY;
+      if (Math.abs(acc) < 30) return;
+      const current = Math.round(scroller.scrollTop / pageH);
+      const target = Math.max(0, Math.min(Math.round(scroller.scrollHeight / pageH) - 1, current + Math.sign(acc)));
+      acc = 0;
+      lockedUntil = now + 650;
+      if (target !== current) scroller.scrollTo({ top: target * pageH, behavior: "smooth" });
+    };
+    scroller.addEventListener("wheel", onWheel, { passive: false });
+    return () => scroller.removeEventListener("wheel", onWheel);
+  }, [flow, pageH]);
 
   // Leaving edit mode closes a card's inspector or the gallery.
   React.useEffect(() => {
@@ -410,102 +607,172 @@ export default function Index() {
     for (const p of shown.values()) for (let x = p.x; x < p.x + p.w; x++) for (let y = p.y; y < p.y + p.h; y++) taken.add(`${x},${y}`);
     for (let y = 0; y < shownRows; y++) for (let x = 0; x < gridColumns; x++) if (!taken.has(`${x},${y}`)) emptyCells.push({ x, y });
   }
-  const dropTarget = draggingId ? preview?.get(draggingId) : ghost ? preview?.get(ghost.instance.id) : null;
-  const span = (n: number) => n * tile + (n - 1) * gap;
-  const insertAt = useLayoutEditStore((state) => state.insertAt);
+  const dropTargets = (draggingIds.length ? draggingIds : ghost ? [ghost.instance.id] : []).map((id) => preview?.get(id)).filter(Boolean) as Placement[];
+  // Nodes between touching cards, to join or split them.
+  const nodes = editing && !flow && !draggingIds.length && !ghost ? adjacentSeams(shown).map((seam) => seamPx(seam, metrics)) : [];
+
+  const gridWidth = span(gridColumns);
+  const gridHeight = flow ? span(shownRows) : pages * pageH;
+  const deselect = (event: React.PointerEvent) => {
+    if (editing && event.target === event.currentTarget) {
+      select(null);
+      if (panel?.kind === "widget") closePanel();
+    }
+  };
+
+  const grid = (
+    <div
+      ref={gridRef}
+      className="dashboard-grid relative"
+      data-editing={editing || undefined}
+      style={{ width: gridWidth, height: gridHeight }}
+      onPointerDown={deselect}
+    >
+      {emptyCells.map(({ x, y }) => (
+        <button
+          key={`${x},${y}`}
+          type="button"
+          className={`grid-empty-cell ${radiusClass}`}
+          data-active={insertAt?.x === x && insertAt?.y === y ? "true" : undefined}
+          style={{ transform: `translate(${x * cell}px, ${rowTop(y)}px)`, width: tile, height: tile }}
+          onClick={() => {
+            setInsertAt({ x, y });
+            select(null);
+            openPanel({ kind: "gallery" });
+          }}
+          aria-label={`Add a widget here (page ${pageOf(y) + 1}, column ${x + 1}, row ${(y % PAGE_ROWS) + 1})`}
+        />
+      ))}
+
+      {dropTargets.map((target) => (
+        <div
+          key={target.id}
+          className={`grid-drop-target ${radiusClass}`}
+          style={{ transform: `translate(${target.x * cell}px, ${rowTop(target.y)}px)`, width: span(target.w), height: span(target.h) }}
+        />
+      ))}
+
+      {/* Joined groups: one shadowed silhouette under the cards. */}
+      <svg className="join-shadow-layer" width={gridWidth} height={gridHeight} aria-hidden="true">
+        {joined.outlines.map((outline) => (
+          <path key={outline.key} d={outline.d} />
+        ))}
+      </svg>
+
+      {widgets.map((instance, index) => {
+        const placement = rendered.get(instance.id) ?? layout.get(instance.id)!;
+        const member = joined.members.get(instance.id);
+        const rect = member?.box ?? { x: placement.x * cell, y: rowTop(placement.y), w: span(placement.w), h: span(placement.h) };
+        return (
+          <DashboardTile
+            key={instance.id}
+            index={index}
+            instance={instance}
+            rect={rect}
+            mask={member?.mask}
+            editing={editing}
+            selected={selectedId === instance.id}
+            dragging={draggingIds.includes(instance.id)}
+            canResize={editing && !flow}
+            radiusClass={radiusClass}
+            cardClass={cardClassFor(instance.type)}
+            onPointerDown={(event) => startMove(instance.id, event)}
+            onResizeStart={(event) => startResize(instance.id, event)}
+            onRemove={() => removeWidget(instance.id)}
+          />
+        );
+      })}
+
+      {/* The meniscus along each seam: where two liquids meet. */}
+      <svg ref={seamLayerRef} className="seam-layer" width={gridWidth} height={gridHeight} aria-hidden="true">
+        {joined.seams
+          .filter((s) => !draggingIds.includes(s.a))
+          .map((s) => (
+            <g key={s.key}>
+              <path data-seam={s.key} className="seam-shade" />
+              <path data-seam={s.key} className="seam-shine" />
+            </g>
+          ))}
+      </svg>
+
+      {nodes.map((s) => {
+        const isJoined = joined.keys.has(s.key);
+        const x = s.orientation === "v" ? s.center : (s.from + s.to) / 2;
+        const y = s.orientation === "v" ? (s.from + s.to) / 2 : s.center;
+        return (
+          <button
+            key={s.key}
+            type="button"
+            className="join-node"
+            data-joined={isJoined || undefined}
+            style={{ transform: `translate(${x}px, ${y}px) translate(-50%, -50%)` }}
+            onClick={() => toggleJoin(s.a, s.b)}
+            title={isJoined ? "Split these cards" : "Join these cards into one shape"}
+            aria-label={isJoined ? "Split these cards" : "Join these cards"}
+            aria-pressed={isJoined}
+          >
+            {isJoined && <HiLink className="size-3" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const editBar = editing && <EditBar flow={flow} onUndo={undo} />;
+  const ghostCard = ghost && (
+    <div ref={ghostRef} className={`grid-ghost surface-tile ${radiusClass}`} style={{ width: span(ghost.size.w), height: span(ghost.size.h) }} aria-hidden="true">
+      {React.createElement(getWidgetType(ghost.instance.type).icon, { className: "size-5" })}
+      <span>{getWidgetType(ghost.instance.type).label}</span>
+    </div>
+  );
+
+  if (flow) {
+    return (
+      <div
+        className="flex min-h-screen items-start justify-center"
+        style={{ paddingTop: pad.top, paddingBottom: editing ? 5 * rem : pad.bottom, paddingLeft: pad.side, paddingRight: pad.side + panelOffset }}
+        onPointerDown={deselect}
+      >
+        {editBar}
+        {grid}
+        {ghostCard}
+      </div>
+    );
+  }
 
   return (
-    <div
-      className="flex min-h-screen items-start justify-center"
-      style={{
-        paddingTop: topOffset,
-        paddingBottom: editing ? 5 * rem : pad.bottom,
-        paddingLeft: pad.side,
-        paddingRight: pad.side + panelOffset,
-        transition: "padding var(--duration-base) var(--ease-out)",
-      }}
-      onPointerDown={(event) => {
-        if (editing && event.target === event.currentTarget) {
-          select(null);
-          if (panel?.kind === "widget") closePanel();
-        }
-      }}
-    >
-      {editing && <EditBar flow={flow} onUndo={undo} />}
-
+    <>
+      {editBar}
       <div
-        ref={gridRef}
-        className="dashboard-grid relative"
-        data-editing={editing || undefined}
-        style={{ width: span(gridColumns), height: span(shownRows), transition: "height var(--duration-base) var(--ease-out)" }}
-        onPointerDown={(event) => {
-          if (editing && event.target === event.currentTarget) {
-            select(null);
-            if (panel?.kind === "widget") closePanel();
-          }
-        }}
+        ref={scrollerRef}
+        className="dashboard-scroller"
+        onScroll={(event) => setPage(Math.round(event.currentTarget.scrollTop / pageH))}
+        onPointerDown={deselect}
       >
-        {emptyCells.map(({ x, y }) => (
-          <button
-            key={`${x},${y}`}
-            type="button"
-            className={`grid-empty-cell ${radiusClass}`}
-            data-active={insertAt?.x === x && insertAt?.y === y ? "true" : undefined}
-            style={{ transform: `translate(${x * cell}px, ${y * cell}px)`, width: tile, height: tile }}
-            onClick={() => {
-              setInsertAt({ x, y });
-              select(null);
-              openPanel({ kind: "gallery" });
-            }}
-            aria-label={`Add a widget here (column ${x + 1}, row ${y + 1})`}
-          />
-        ))}
-
-        {dropTarget && (
-          <div
-            className={`grid-drop-target ${radiusClass}`}
-            style={{ transform: `translate(${dropTarget.x * cell}px, ${dropTarget.y * cell}px)`, width: span(dropTarget.w), height: span(dropTarget.h) }}
-          />
-        )}
-
-        {widgets.map((instance, index) => {
-          // The card being dragged stays anchored at its start; the pointer
-          // offset rides on top (see onMove).
-          const placement = (instance.id === draggingId ? base.get(instance.id) : shown.get(instance.id)) ?? layout.get(instance.id)!;
-          return (
-            <DashboardTile
-              key={instance.id}
-              index={index}
-              instance={instance}
-              placement={placement}
-              cell={cell}
-              tile={tile}
-              gap={gap}
-              editing={editing}
-              selected={selectedId === instance.id}
-              dragging={draggingId === instance.id}
-              canResize={editing && !flow}
-              radiusClass={radiusClass}
-              cardClass={cardClassFor(instance.type)}
-              onPointerDown={(event) => startMove(instance.id, event)}
-              onResizeStart={(event) => startResize(instance.id, event)}
-              onRemove={() => removeWidget(instance.id)}
-            />
-          );
-        })}
-      </div>
-
-      {ghost && (
-        <div
-          ref={ghostRef}
-          className={`grid-ghost surface-tile ${radiusClass}`}
-          style={{ width: span(ghost.size.w), height: span(ghost.size.h) }}
-          aria-hidden="true"
-        >
-          {React.createElement(getWidgetType(ghost.instance.type).icon, { className: "size-5" })}
-          <span>{getWidgetType(ghost.instance.type).label}</span>
+        <div className="dashboard-pages" style={{ height: gridHeight }} onPointerDown={deselect}>
+          {Array.from({ length: pages }, (_, p) => (
+            <div key={p} className="dashboard-page-snap" style={{ top: p * pageH, height: pageH }} />
+          ))}
+          <div style={{ position: "absolute", top: 0, left: Math.max(pad.side, (viewport.width - panelOffset - gridWidth) / 2), transition: "left var(--duration-base) var(--ease-out)" }}>
+            {grid}
+          </div>
         </div>
+      </div>
+      {pages > 1 && (
+        <nav className="page-dots" aria-label="Dashboard pages" style={{ right: panelOffset + 0.9 * rem }}>
+          {Array.from({ length: pages }, (_, p) => (
+            <button
+              key={p}
+              type="button"
+              className="page-dot"
+              aria-current={page === p ? "page" : undefined}
+              aria-label={`Page ${p + 1}`}
+              onClick={() => scrollerRef.current?.scrollTo({ top: p * pageH, behavior: "smooth" })}
+            />
+          ))}
+        </nav>
       )}
-    </div>
+      {ghostCard}
+    </>
   );
 }

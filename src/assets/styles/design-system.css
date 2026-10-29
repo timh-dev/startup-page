@@ -1474,6 +1474,16 @@
   opacity: 0.4;
 }
 
+.debug-button[data-active] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.debug-speeds > .debug-button {
+  flex: 1 1 0;
+  padding: 0;
+}
+
 select.debug-input,
 .debug-section > .debug-input {
   width: 100%;
@@ -1531,4 +1541,143 @@ select.debug-input,
 .debug-pill-open:hover,
 .debug-pill-reset:hover {
   background: color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+
+/* --- Pages: 4 rows each, snapping as you scroll ------------------------------ */
+
+.dashboard-scroller {
+  position: fixed;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.dashboard-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-pages {
+  position: relative;
+}
+
+.dashboard-page-snap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  scroll-snap-align: start;
+  pointer-events: none;
+}
+
+.page-dots {
+  position: fixed;
+  top: 50%;
+  z-index: 30;
+  display: grid;
+  gap: 0.5rem;
+  translate: 0 -50%;
+  transition: right var(--duration-base) var(--ease-out);
+}
+
+.page-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--foreground) 22%, transparent);
+  transition: height var(--duration-base) var(--ease-out), background-color var(--duration-base) var(--ease-out);
+}
+
+.page-dot:hover {
+  background: color-mix(in oklab, var(--foreground) 45%, transparent);
+}
+
+.page-dot[aria-current="page"] {
+  height: 1.1rem;
+  background: var(--foreground);
+}
+
+/* --- Joined cards: one shape, oil-and-water seams --------------------------- */
+
+/* Inside a group, the cards' own corners and shadows give way to the group's. */
+.dashboard-tile[data-joined] .dashboard-tile-content > *,
+.dashboard-tile[data-joined] .dashboard-tile-content > * > * {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.dashboard-tile[data-joined] {
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+}
+
+.join-shadow-layer,
+.seam-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.join-shadow-layer path {
+  fill: var(--card);
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.08)) drop-shadow(0 10px 24px rgb(0 0 0 / 0.1));
+}
+
+.seam-layer {
+  z-index: 3;
+}
+
+/* The meniscus: a soft shadowed crease with a thin bright edge, like the
+   line where two liquids that won't mix meet. */
+.seam-shade {
+  fill: none;
+  stroke: rgb(0 0 0 / 0.16);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: blur(2.5px);
+}
+
+.seam-shine {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.55);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  mix-blend-mode: soft-light;
+}
+
+/* The node between two touching cards (edit mode): click to join or split. */
+.join-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 9999px;
+  border: 2px solid var(--foreground);
+  background: var(--background);
+  color: var(--background);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  opacity: 0.7;
+  transition: opacity var(--duration-fast) var(--ease-out), scale var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.join-node:hover {
+  opacity: 1;
+  scale: 1.25;
+}
+
+.join-node[data-joined] {
+  width: 1.5rem;
+  height: 1.5rem;
+  background: var(--foreground);
+  opacity: 0.9;
 }

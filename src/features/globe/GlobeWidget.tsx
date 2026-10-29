@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { HiOutlineClock } from "react-icons/hi2";
 
 import landMaskUrl from "@/assets/world/land-mask.png";
-import { debugNow, fromWallClock, useDebugStore, wallClock } from "@/lib/debug";
+import { debugNow, useDebugStore } from "@/lib/debug";
+import { motionTime, replayNow } from "@/lib/motion";
 import { getOrRequestLocation } from "@/lib/geolocation";
 import { ambientFrameMs, prefersReducedMotion } from "@/lib/power";
 import { readSettings } from "@/lib/settings";
@@ -17,22 +18,6 @@ const FALLBACK = { latitude: 40.7128, longitude: -74.006 };
 // is heavy, and the dots stay crisp at this density.
 const MAX_DPR = 1.5;
 const FRAME_MS = 1000 / 30;
-
-// On load the sun replays the day so far: time runs from local midnight to
-// now, a short sweep just after midnight and up to ~4 s by evening. It eases
-// in and out: a beat on the night side, then through the day, settling into
-// the present.
-function sweepDuration(from: Date, to: Date) {
-  const dayFraction = (to.getTime() - from.getTime()) / 86_400_000;
-  return 1200 + 2800 * Math.min(1, Math.max(0, dayFraction));
-}
-const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-
-/** Midnight at the start of this day, in a time zone (the browser's if omitted). */
-function localMidnight(date: Date, timeZone?: string) {
-  const { year, month, day } = wallClock(date, timeZone);
-  return fromWallClock(year, month, day, 0, 0, timeZone);
-}
 
 /** The browser's time zone as a place ("Chicago"), as the clock shows it. */
 function zonePlace() {
@@ -64,11 +49,12 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
   const debugPlace = useDebugStore((state) => state.location);
   const timeOffset = useDebugStore((state) => state.timeOffsetMs);
   const openDebugger = useDebugStore((state) => state.setPanelOpen);
-  // The replayed moment while the day sweeps in; null once it reaches now.
+  // The replayed moment while the day replays (shared with the solar chart
+  // and weather sky); null once it reaches now.
   const [sweepTime, setSweepTime] = useState<Date | null>(null);
-  const sweepRef = useRef<{ start: number; from: Date; to: Date; duration: number } | null>(null);
-  // Pulse clock, shared by every redraw so the ring never jumps.
-  const pulseStartRef = useRef(performance.now());
+  const replayingRef = useRef(false);
+  // Pulse clock (on the shared animation clock), so the ring never jumps.
+  const pulseStartRef = useRef(motionTime());
 
   const latitude = debugPlace?.latitude ?? savedLatitude ?? located?.latitude ?? FALLBACK.latitude;
   const longitude = debugPlace?.longitude ?? savedLongitude ?? located?.longitude ?? FALLBACK.longitude;
@@ -120,10 +106,10 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     let alive = true;
     let frame = 0;
     let lastFrame = 0;
-    const pulseTime = () => (performance.now() - pulseStartRef.current) / 1000;
+    const pulseTime = () => motionTime() - pulseStartRef.current;
 
     const renderScene = () => {
-      if (!canvas.clientWidth || sweepRef.current) return;
+      if (!canvas.clientWidth || replayingRef.current) return;
       renderer.renderScene({ ...sceneRef.current, now: debugNow() });
       renderer.renderFrame(pulseTime(), !prefersReducedMotion());
     };
@@ -146,36 +132,30 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     image.onload = () => {
       if (!alive) return;
       renderer.setLandMask(image);
-      if (prefersReducedMotion()) {
-        renderScene();
-        return;
-      }
-      const to = debugNow();
-      const from = localMidnight(to, useDebugStore.getState().location?.timeZone);
-      sweepRef.current = { start: performance.now(), from, to, duration: sweepDuration(from, to) };
+      renderScene();
     };
     image.src = landMaskUrl;
 
-    // The day sweep renders the planet every frame; after it, the pulse
-    // animates at 30 fps. With reduced motion it stays still and only
+    // During the day replay the planet renders every frame; after it, the
+    // pulse animates at 30 fps. With reduced motion it stays still and only
     // redraws when the scene does.
     const loop = (timestamp: number) => {
       frame = requestAnimationFrame(loop);
       if (!canvas.clientWidth || document.hidden) return;
-      const sweep = sweepRef.current;
-      if (sweep) {
-        const progress = Math.min(1, (performance.now() - sweep.start) / sweep.duration);
-        const at = new Date(sweep.from.getTime() + (sweep.to.getTime() - sweep.from.getTime()) * easeInOutCubic(progress));
+      const at = replayNow();
+      if (at) {
+        replayingRef.current = true;
         renderer.renderScene({ ...sceneRef.current, now: at });
         renderer.renderFrame(0, false);
         setSweepTime(at);
-        if (progress >= 1) {
-          // Landed on now: hand over to the live view, first ripple at once.
-          sweepRef.current = null;
-          setSweepTime(null);
-          pulseStartRef.current = performance.now();
-          renderScene();
-        }
+        return;
+      }
+      if (replayingRef.current) {
+        // Landed on now: hand over to the live view, first ripple at once.
+        replayingRef.current = false;
+        setSweepTime(null);
+        pulseStartRef.current = motionTime();
+        renderScene();
         return;
       }
       if (prefersReducedMotion()) return;
@@ -198,9 +178,9 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
   useEffect(() => {
     const renderer = rendererRef.current;
     const canvas = canvasRef.current;
-    if (!renderer || !canvas?.clientWidth || sweepRef.current) return;
+    if (!renderer || !canvas?.clientWidth || replayingRef.current) return;
     renderer.renderScene({ view, latitude, longitude, now });
-    renderer.renderFrame((performance.now() - pulseStartRef.current) / 1000, !prefersReducedMotion());
+    renderer.renderFrame(motionTime() - pulseStartRef.current, !prefersReducedMotion());
   }, [view, latitude, longitude, now]);
 
   // The caption follows the replay, then the clock, in the place's time zone.

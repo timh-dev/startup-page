@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WidgetInstance } from "@/lib/dashboard-dimensions";
-import { applyLayout, nearestSize, placeTile, resolveLayout, rowCount } from "./grid";
+import { PAGE_ROWS, applyLayout, nearestSize, pageCount, placeGroup, placeTile, resolveLayout, rowCount } from "./grid";
 
 const card = (id: string, size: WidgetInstance["size"] = "small", pos?: { x: number; y: number }): WidgetInstance => ({ id, type: "clock", size, config: {}, ...(pos ? { pos } : {}) });
 
@@ -77,5 +77,34 @@ describe("applyLayout / nearestSize", () => {
     expect(nearestSize(2, 2, ["small", "wide", "tall", "large", "feature"])).toBe("large");
     expect(nearestSize(3, 1, ["small", "wide", "large"])).toBe("wide");
     expect(nearestSize(3, 2, ["feature"])).toBe("feature");
+  });
+});
+
+describe("pages", () => {
+  it("continues onto a second page past four rows, never splitting a card", () => {
+    // Seven 1x2 cards in a 2-column grid: rows 0-1 and 2-3 fill page one,
+    // the rest start page two (row 4) rather than straddling.
+    const widgets = Array.from({ length: 7 }, (_, i) => card(`t${i}`, "tall"));
+    const layout = resolveLayout(widgets, 2);
+    for (const p of layout.values()) expect(Math.floor(p.y / PAGE_ROWS)).toBe(Math.floor((p.y + p.h - 1) / PAGE_ROWS));
+    expect(layout.get("t4")).toMatchObject({ x: 0, y: 4 });
+    expect(pageCount(layout)).toBe(2);
+  });
+
+  it("pulls a card up rather than let it hang onto the next page", () => {
+    const layout = resolveLayout([card("a", "tall"), card("b")], 3);
+    const next = placeTile(layout, "a", { x: 2, y: 3 }, { w: 1, h: 2 }, 3);
+    expect(next.get("a")).toMatchObject({ x: 2, y: 2 });
+  });
+});
+
+describe("placeGroup", () => {
+  it("moves joined cards together, keeping their shape", () => {
+    const layout = resolveLayout([card("a", "wide"), card("b"), card("c")], 4);
+    // a (0,0 2x1) and b (2,0) move down one row together.
+    const next = placeGroup(layout, [{ id: "a", x: 0, y: 1, w: 2, h: 1 }, { id: "b", x: 2, y: 1, w: 1, h: 1 }], 4);
+    expect(next.get("a")).toMatchObject({ x: 0, y: 1 });
+    expect(next.get("b")).toMatchObject({ x: 2, y: 1 });
+    expect(next.get("c")).toMatchObject({ x: 3, y: 0 });
   });
 });

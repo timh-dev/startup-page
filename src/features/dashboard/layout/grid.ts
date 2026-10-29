@@ -7,6 +7,8 @@
 import type { TileSize, WidgetInstance } from "@/lib/dashboard-dimensions";
 
 export const DEFAULT_COLUMNS = 7;
+/** Rows on one page; more cards continue on the next page down. */
+export const PAGE_ROWS = 4;
 export const MIN_COLUMNS = 4;
 export const MAX_COLUMNS = 10;
 
@@ -35,25 +37,29 @@ export function cellsFor(size: TileSize | undefined) {
 
 const overlaps = (a: Placement, b: Placement) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-function fits(candidate: Placement, placed: Iterable<Placement>, columns: number) {
+export const pageOf = (row: number, pageRows = PAGE_ROWS) => Math.floor(row / pageRows);
+
+function fits(candidate: Placement, placed: Iterable<Placement>, columns: number, pageRows = PAGE_ROWS) {
   if (candidate.x < 0 || candidate.y < 0 || candidate.x + candidate.w > columns) return false;
+  // A card never straddles two pages.
+  if (pageOf(candidate.y, pageRows) !== pageOf(candidate.y + candidate.h - 1, pageRows)) return false;
   for (const other of placed) if (other.id !== candidate.id && overlaps(candidate, other)) return false;
   return true;
 }
 
 /** The first free spot scanning rows top to bottom, left to right. */
-function firstFree(id: string, w: number, h: number, placed: Placement[], columns: number): Placement {
+function firstFree(id: string, w: number, h: number, placed: Placement[], columns: number, pageRows = PAGE_ROWS): Placement {
   const width = Math.min(w, columns);
   for (let y = 0; ; y++) {
     for (let x = 0; x + width <= columns; x++) {
       const candidate = { id, x, y, w: width, h };
-      if (fits(candidate, placed, columns)) return candidate;
+      if (fits(candidate, placed, columns, pageRows)) return candidate;
     }
   }
 }
 
 /** The free spot closest to (x, y); ties go to the higher, then leftmost spot. */
-function nearestFree(id: string, near: { x: number; y: number }, w: number, h: number, placed: Placement[], columns: number): Placement {
+function nearestFree(id: string, near: { x: number; y: number }, w: number, h: number, placed: Placement[], columns: number, pageRows = PAGE_ROWS): Placement {
   const width = Math.min(w, columns);
   const maxY = placed.reduce((m, p) => Math.max(m, p.y + p.h), 0) + h + 1;
   let best: Placement | null = null;
@@ -61,7 +67,7 @@ function nearestFree(id: string, near: { x: number; y: number }, w: number, h: n
   for (let y = 0; y <= maxY; y++) {
     for (let x = 0; x + width <= columns; x++) {
       const candidate = { id, x, y, w: width, h };
-      if (!fits(candidate, placed, columns)) continue;
+      if (!fits(candidate, placed, columns, pageRows)) continue;
       // Vertical moves cost a little more than sideways ones, so cards slide
       // along their row before dropping a row.
       const score = Math.abs(x - near.x) + Math.abs(y - near.y) * 1.2 + y * 0.001;
@@ -71,7 +77,7 @@ function nearestFree(id: string, near: { x: number; y: number }, w: number, h: n
       }
     }
   }
-  return best ?? firstFree(id, w, h, placed, columns);
+  return best ?? firstFree(id, w, h, placed, columns, pageRows);
 }
 
 /**
@@ -79,7 +85,7 @@ function nearestFree(id: string, near: { x: number; y: number }, w: number, h: n
  * bounds and free; the rest (new cards, ones saved before free placement,
  * ones pushed off a narrower grid) fill the first free spots in list order.
  */
-export function resolveLayout(widgets: WidgetInstance[], columns: number): Layout {
+export function resolveLayout(widgets: WidgetInstance[], columns: number, pageRows = PAGE_ROWS): Layout {
   const layout: Layout = new Map();
   const placed: Placement[] = [];
   const pending: WidgetInstance[] = [];
@@ -87,7 +93,7 @@ export function resolveLayout(widgets: WidgetInstance[], columns: number): Layou
     const { w, h } = cellsFor(widget.size);
     const pos = widget.pos;
     const candidate = pos ? { id: widget.id, x: pos.x, y: pos.y, w: Math.min(w, columns), h } : null;
-    if (candidate && fits(candidate, placed, columns)) {
+    if (candidate && fits(candidate, placed, columns, pageRows)) {
       placed.push(candidate);
       layout.set(widget.id, candidate);
     } else {
@@ -96,7 +102,7 @@ export function resolveLayout(widgets: WidgetInstance[], columns: number): Layou
   }
   for (const widget of pending) {
     const { w, h } = cellsFor(widget.size);
-    const spot = firstFree(widget.id, w, h, placed, columns);
+    const spot = firstFree(widget.id, w, h, placed, columns, pageRows);
     placed.push(spot);
     layout.set(widget.id, spot);
   }
@@ -108,21 +114,41 @@ export function resolveLayout(widgets: WidgetInstance[], columns: number): Layou
  * now covers, each to the free spot nearest where it was.
  */
 export function placeTile(layout: Layout, id: string, target: { x: number; y: number }, size: { w: number; h: number }, columns: number): Layout {
-  const w = Math.min(size.w, columns);
-  const moving: Placement = {
-    id,
-    x: Math.max(0, Math.min(columns - w, Math.round(target.x))),
-    y: Math.max(0, Math.round(target.y)),
-    w,
-    h: size.h,
-  };
-  const others = [...layout.values()].filter((p) => p.id !== id);
-  const staying = others.filter((p) => !overlaps(p, moving));
-  const displaced = others.filter((p) => overlaps(p, moving)).sort((a, b) => a.y - b.y || a.x - b.x);
-  const placed = [moving, ...staying];
-  // A pushed card first tries the spot the moved card left (a swap), then
-  // the free spot nearest where it was.
-  const vacated = layout.get(id);
+  return placeGroup(layout, [{ id, x: target.x, y: target.y, w: size.w, h: size.h }], columns);
+}
+
+/** Keeps a card inside one page: one that would hang over the bottom shifts up. */
+function withinPage(y: number, h: number) {
+  const top = pageOf(y) * PAGE_ROWS;
+  return Math.max(top, Math.min(y, top + PAGE_ROWS - h));
+}
+
+/**
+ * Places several cards at once (a joined group moving together), keeping
+ * their arrangement, and moves only the cards they now cover.
+ */
+export function placeGroup(layout: Layout, targets: Placement[], columns: number): Layout {
+  // Clamp the group as a whole, so it keeps its shape.
+  const minX = Math.min(...targets.map((t) => Math.round(t.x)));
+  const maxX = Math.max(...targets.map((t) => Math.round(t.x) + Math.min(t.w, columns)));
+  const dx = minX < 0 ? -minX : maxX > columns ? columns - maxX : 0;
+  const minY = Math.min(...targets.map((t) => Math.round(t.y)));
+  const dy = minY < 0 ? -minY : 0;
+  const shifted = targets.map((t) => ({ ...t, x: Math.round(t.x) + dx, y: Math.round(t.y) + dy, w: Math.min(t.w, columns) }));
+  // The group stays on one page: pull it up if it hangs over the bottom.
+  const top = Math.min(...shifted.map((t) => t.y));
+  const bottom = Math.max(...shifted.map((t) => t.y + t.h));
+  const fitTop = withinPage(top, bottom - top);
+  const movingAll: Placement[] = shifted.map((t) => ({ ...t, y: t.y + (fitTop - top) }));
+  const ids = new Set(movingAll.map((t) => t.id));
+  const others = [...layout.values()].filter((p) => !ids.has(p.id));
+  const hits = (p: Placement) => movingAll.some((m) => overlaps(p, m));
+  const staying = others.filter((p) => !hits(p));
+  const displaced = others.filter(hits).sort((a, b) => a.y - b.y || a.x - b.x);
+  const placed = [...movingAll, ...staying];
+  // A pushed card first tries the spot a single moved card left (a swap),
+  // then the free spot nearest where it was.
+  const vacated = movingAll.length === 1 ? layout.get(movingAll[0].id) : undefined;
   for (const card of displaced) {
     const swap = vacated ? { id: card.id, x: vacated.x, y: vacated.y, w: card.w, h: card.h } : null;
     placed.push(swap && fits(swap, placed, columns) ? swap : nearestFree(card.id, card, card.w, card.h, placed, columns));
@@ -133,6 +159,11 @@ export function placeTile(layout: Layout, id: string, target: { x: number; y: nu
 /** The first free spot for a new card of a size. */
 export function firstFreeSpot(layout: Layout, size: { w: number; h: number }, columns: number) {
   return firstFree("", size.w, size.h, [...layout.values()], columns);
+}
+
+/** Pages the layout uses (at least one). */
+export function pageCount(layout: Layout) {
+  return Math.max(1, Math.ceil(rowCount(layout) / PAGE_ROWS));
 }
 
 /** Rows the layout uses. */

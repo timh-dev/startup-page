@@ -3,6 +3,7 @@ import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { getFlashEnvelope } from "@/features/weather/lightning";
 import { ambientFrameMs } from "@/lib/power";
 import { debugNow, debugTimeZone, wallClock } from "@/lib/debug";
+import { motionTime, replayNow } from "@/lib/motion";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -832,7 +833,6 @@ export default function VolumetricCloudscape({
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     }
 
-    const startedAt = performance.now();
 
     // Uniform/attrib locations populated lazily on the first frame after link completes.
     let glReady = false;
@@ -910,7 +910,8 @@ export default function VolumetricCloudscape({
       if (flash < 0.01 && now - lastFrameTime < ambientFrameMs(CLOUD_FRAME_MS)) return;
       lastFrameTime = now;
 
-      const d = wallClock(debugNow(), debugTimeZone());
+      // During the day replay the sky follows the replayed hour.
+      const d = wallClock(replayNow() ?? debugNow(), debugTimeZone());
       const hourNow = p.hour ?? d.hours + d.minutes / 60 + d.seconds / 3600;
       const coverageValue = getCoverageValue(p.coverage);
       // Default density follows coverage when not supplied (legacy callers)
@@ -921,7 +922,7 @@ export default function VolumetricCloudscape({
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform2f(uRes,      canvas.width, canvas.height);
-      gl.uniform1f(uTime,     (now - startedAt) / 1000);
+      gl.uniform1f(uTime,     motionTime());
       gl.uniform1f(uPhase,    getPhaseValue(p.phase));
       gl.uniform1f(uCoverage, coverageValue);
       gl.uniform1f(uDensity,  Math.max(0, Math.min(densityValue, 1)));
