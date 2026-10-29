@@ -276,19 +276,16 @@ struct CloudLayer {
 
 CloudLayer cloudLayer() {
   // 1 stratocumulus, 2 cumulus, 3 stratus, 4 nimbostratus, 5 cumulonimbus, 6 supercell
-  // Bands are relative to the camera's height: we look along the layer, so
-  // thin decks run as a band across the middle of the frame and towers
-  // rise above it.
-  // Looking along the layer the eye passes through kilometres of cloud, so
-  // broken clouds need higher thresholds than from below to keep gaps.
-  // Rain and storm decks sit just above the camera: we see the underside
-  // overhead, receding into the distance, rather than standing inside it.
-  if (u_style < 1.5) return CloudLayer(-1.1, 0.9, 1.20, 0.40, 1.3, 22.0, 0.35);
-  if (u_style < 2.5) return CloudLayer(-1.3, 2.0, 1.00, 0.42, 1.0, 26.0, 1.0);
-  if (u_style < 3.5) return CloudLayer(-0.5, 0.45, 0.95, 0.28, 1.8, 16.0, 0.0);
-  if (u_style < 4.5) return CloudLayer(0.05, 3.5, 0.85, 0.28, 1.3, 30.0, 0.2);
-  if (u_style < 5.5) return CloudLayer(-0.4, 5.0, 0.70, 0.34, 0.8, 34.0, 0.8);
-  return CloudLayer(-0.5, 6.0, 0.65, 0.32, 0.7, 38.0, 0.7);
+  // base/top are the full vertical extent relative to the camera's height;
+  // cloudBands() places the layers within it. Looking along the layers the
+  // eye passes through kilometres of cloud, so broken clouds need higher
+  // thresholds than from below to keep gaps.
+  if (u_style < 1.5) return CloudLayer(-2.4, 2.1, 1.20, 0.40, 1.3, 22.0, 0.35);
+  if (u_style < 2.5) return CloudLayer(-2.2, 3.3, 1.00, 0.42, 1.0, 26.0, 1.0);
+  if (u_style < 3.5) return CloudLayer(-4.0, 4.0, 0.95, 0.28, 1.6, 16.0, 0.0);
+  if (u_style < 4.5) return CloudLayer(-4.5, 4.5, 0.85, 0.27, 1.3, 30.0, 0.2);
+  if (u_style < 5.5) return CloudLayer(-4.0, 7.0, 0.70, 0.30, 0.8, 34.0, 0.8);
+  return CloudLayer(-4.5, 8.0, 0.65, 0.28, 0.7, 38.0, 0.7);
 }
 
 // View direction for a screen position: a pinhole camera at cloud level
@@ -325,12 +322,29 @@ float fbm2(vec3 p) {
   return v / 0.75;
 }
 
-float heightProfile(float h, CloudLayer layer) {
-  // Fades at both ends of the band, so clouds round off instead of being
-  // cut by its edges; cumulus keeps a flatter base and a taller dome.
-  float bottom = smoothstep(0.0, mix(0.35, 0.2, layer.billow), h);
-  float top = 1.0 - smoothstep(mix(0.45, 0.3, layer.billow), 1.0, h);
-  return bottom * top;
+// One layer between heights lo and hi: fades at both ends so clouds round
+// off instead of being cut flat; cumulus keeps a flatter base and a taller
+// dome.
+float band(float y, float lo, float hi, float billow) {
+  float h = (y - lo) / (hi - lo);
+  if (h < 0.0 || h > 1.0) return 0.0;
+  return smoothstep(0.0, mix(0.35, 0.2, billow), h) * (1.0 - smoothstep(mix(0.45, 0.3, billow), 1.0, h));
+}
+
+// How much cloud a height can hold. Broken skies have layers at different
+// altitudes (low, middle, and thin wisps high up), so clouds fill the frame
+// at several heights; overcast and storm decks are one deep layer that
+// fills it top to bottom.
+float cloudBands(float y, CloudLayer layer) {
+  if (u_style < 1.5) {
+    return max(max(band(y, -2.4, -0.9, 0.35), band(y, -1.2, 0.7, 0.35)), 0.65 * band(y, 1.0, 2.1, 0.1));
+  }
+  if (u_style < 2.5) {
+    return max(max(band(y, -2.2, -0.1, 1.0), band(y, -0.4, 1.9, 1.0)), 0.55 * band(y, 2.2, 3.3, 0.1));
+  }
+  float h = (y - layer.base) / (layer.top - layer.base);
+  if (h < 0.0 || h > 1.0) return 0.0;
+  return smoothstep(0.0, 0.1, h) * (1.0 - smoothstep(0.9, 1.0, h));
 }
 
 vec3 cloudCoords(vec3 pos, CloudLayer layer, float wt) {
@@ -344,27 +358,30 @@ float coverageThreshold(CloudLayer layer, float coverage) {
   return mix(0.70, layer.threshold, pow(coverage, 0.75));
 }
 
-// The base undulates (rolls and lumps on the underside of a deck), so
-// overcast skies show texture instead of a flat slab.
+// Layer heights undulate: small rolls and lumps on bases and tops, and a
+// broad swell over kilometres, so no layer edge runs straight across the
+// frame (in perspective, flat layers converge into a seam at eye level).
 float undulate(vec3 q, float h) {
-  return h + (tnoise(q * 0.35 + vec3(5.2, 0.0, 1.3)) - 0.5) * 0.45;
+  return h + (tnoise(q * 0.35 + vec3(5.2, 0.0, 1.3)) - 0.5) * 0.45
+           + (tnoise(q * 0.11 + vec3(3.1, 7.7, 1.9)) - 0.5) * 1.6;
 }
 
 float cloudDensity(vec3 pos, CloudLayer layer, float coverage, float wt, float h) {
   if (h < 0.0 || h > 1.0) return 0.0;
   vec3 q = cloudCoords(pos, layer, wt);
-  h = undulate(q, h);
+  // The undulation shifts layer boundaries, so bases and tops aren't flat.
+  float y = pos.y + undulate(q, 0.0) * 1.3;
   float shape = fbm4(q);
-  // Cauliflower tops: billowing noise carved into the upper part.
-  shape = mix(shape, 1.0 - abs(shape * 2.0 - 1.0), layer.billow * 0.35 * clamp(h, 0.0, 1.0));
-  return clamp((shape * heightProfile(clamp(h, 0.0, 1.0), layer) - coverageThreshold(layer, coverage)) * 3.0, 0.0, 1.0);
+  // Cauliflower billows: ridged noise mixed into cumulus.
+  shape = mix(shape, 1.0 - abs(shape * 2.0 - 1.0), layer.billow * 0.2);
+  return clamp((shape * cloudBands(y, layer) - coverageThreshold(layer, coverage)) * 3.0, 0.0, 1.0);
 }
 
 float cloudDensityCheap(vec3 pos, CloudLayer layer, float coverage, float wt, float h) {
   if (h < 0.0 || h > 1.0) return 0.0;
   vec3 q = cloudCoords(pos, layer, wt);
-  h = clamp(undulate(q, h), 0.0, 1.0);
-  return clamp((fbm2(q) * heightProfile(h, layer) - coverageThreshold(layer, coverage)) * 3.0, 0.0, 1.0);
+  float y = pos.y + undulate(q, 0.0) * 1.3;
+  return clamp((fbm2(q) * cloudBands(y, layer) - coverageThreshold(layer, coverage)) * 3.0, 0.0, 1.0);
 }
 
 float henyeyGreenstein(float mu, float g) {
@@ -443,9 +460,13 @@ void main() {
       float t = tEnter + dt * rayJitter(gl_FragCoord.xy);
 
       float mu = dot(rd, lightDir);
-      vec3 sunColor = cloudLight() * (0.8 * dirStrength) * hueL;
-      vec3 ambientLow = cloudShadow();
-      vec3 ambientHigh = mix(cloudShadow(), skyColor(0.9), 0.55);
+      vec3 sunColor = cloudLight() * (1.0 * dirStrength) * hueL;
+      // At night clouds catch a little moonlight and city glow, so they
+      // read as slightly lighter than the sky instead of vanishing into it.
+      float night = smoothstep(1.3, 1.9, u_phase);
+      vec3 nightGlow = vec3(0.075, 0.085, 0.12) * night;
+      vec3 ambientLow = cloudShadow() + nightGlow * 0.7;
+      vec3 ambientHigh = mix(cloudShadow(), skyColor(0.9), 0.55) + nightGlow;
       float extinction = layer.extinction * mix(0.75, 1.4, density);
 
       for (int i = 0; i < CLOUD_STEPS; i++) {
@@ -460,7 +481,7 @@ void main() {
                 * (1.0 - smoothstep(MAX_DISTANCE_KM * 0.45, MAX_DISTANCE_KM, t)) * min(grazing, 1.0);
         if (d > 0.001) {
           float lightDepth = 0.0;
-          float lightStep = (layer.top - layer.base) * 0.06;
+          float lightStep = 0.12;
           vec3 lp3 = pos;
           for (int j = 0; j < LIGHT_STEPS; j++) {
             lp3 += lightDir * lightStep;
@@ -476,7 +497,9 @@ void main() {
           float sunlight = 0.0;
           float a = 1.0, b = 1.0, c = 1.0;
           for (int k = 0; k < 3; k++) {
-            float phase = mix(henyeyGreenstein(mu, -0.25 * c), henyeyGreenstein(mu, 0.62 * c), 0.72) * 12.566;
+            // Forward lobe kept moderate: a strong one blows out clouds in
+            // front of the sun.
+            float phase = min(mix(henyeyGreenstein(mu, -0.25 * c), henyeyGreenstein(mu, 0.5 * c), 0.7) * 12.566, 3.0);
             sunlight += a * exp(-tau * b) * phase;
             a *= 0.5; b *= 0.35; c *= 0.5;
           }
@@ -499,6 +522,8 @@ void main() {
                       + fbm2(q * 7.0 + vec3(0.0, 9.1, 0.0)) * 0.4;
           float deckShade = mix(0.32, 1.5, smoothstep(0.28, 0.72, rolls) * 0.85 + skyLight * 0.15);
           luminance *= mix(1.0, deckShade, smoothstep(2.5, 3.5, u_style));
+          // Roll off highlights instead of clipping them to white.
+          luminance /= 1.0 + max(max(luminance.r, luminance.g), luminance.b) * 0.3;
           float sampleT = exp(-d * extinction * dt);
           // Energy-conserving integration over the step.
           clouds += transmittance * (1.0 - sampleT) * luminance;
