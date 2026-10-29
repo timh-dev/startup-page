@@ -21,7 +21,6 @@ import {
   applyLayout,
   cellsFor,
   firstFreeSpot,
-  nearestSize,
   pageCount,
   pageOf,
   placeGroup,
@@ -92,7 +91,7 @@ function newInstance(type: WidgetType): WidgetInstance {
 
 type Drag =
   | { kind: "move"; id: string; members: Placement[]; g0: { x: number; y: number }; start: { x: number; y: number }; moved: boolean; base: Layout; key: string }
-  | { kind: "resize"; id: string; origin: Placement; allowed: TileSize[]; size: TileSize; base: Layout; key: string }
+  | { kind: "resize"; id: string; origin: Placement; allowed: TileSize[]; size: TileSize; base: Layout; key: string; start: { x: number; y: number } }
   | { kind: "new"; instance: WidgetInstance; size: { w: number; h: number }; start: { x: number; y: number }; moved: boolean; base: Layout; key: string; over: boolean };
 
 const isControl = (event: React.PointerEvent | PointerEvent) =>
@@ -429,6 +428,9 @@ export default function Index() {
   // ---- pointer drags: move (a card or its group), resize, new cards ----
   const endDrag = React.useRef<() => void>(() => {});
   const lastPointer = React.useRef<{ clientX: number; clientY: number } | null>(null);
+  // While resizing: an outline that follows the pointer, and which card.
+  const resizeOutlineRef = React.useRef<HTMLDivElement>(null);
+  const [resizingId, setResizingId] = React.useState<string | null>(null);
   const lastAutoScroll = React.useRef(0);
 
   // A dragged group's cards, plus its merged video or photo if it has one.
@@ -481,10 +483,27 @@ export default function Index() {
           setPreview(placeGroup(drag.base, drag.members.map((m) => ({ ...m, x: m.x + shiftX, y: m.y + shiftY })), columns, pageRows));
         }
       } else if (drag.kind === "resize") {
-        const g = toGrid(event.clientX, event.clientY);
-        const w = Math.max(1, Math.min(3, Math.round((g.x - drag.origin.x * cell) / cell)));
-        const h = Math.max(1, Math.min(2, Math.round((g.y - rowTop(drag.origin.y)) / cell)));
-        const size = nearestSize(w, h, drag.allowed);
+        // The outline follows the pointer exactly; the card snaps to the
+        // allowed size nearest it, and holds its current size until another
+        // is clearly nearer, so it doesn't flicker at a boundary.
+        const dx = event.clientX - drag.start.x;
+        const dy = event.clientY - drag.start.y;
+        const outlineW = Math.max(tile * 0.6, Math.min(span(3) + gap, span(drag.origin.w) + dx));
+        const outlineH = Math.max(tile * 0.6, Math.min(span(2) + gap, span(drag.origin.h) + dy));
+        const outline = resizeOutlineRef.current;
+        if (outline) {
+          outline.hidden = false;
+          outline.style.transform = `translate(${drag.origin.x * cell}px, ${rowTop(drag.origin.y)}px)`;
+          outline.style.width = `${outlineW}px`;
+          outline.style.height = `${outlineH}px`;
+        }
+        const rawW = (outlineW + gap) / cell;
+        const rawH = (outlineH + gap) / cell;
+        const score = (size: TileSize) => {
+          const cells = cellsFor(size);
+          return (cells.w - rawW) ** 2 + (cells.h - rawH) ** 2 - (size === drag.size ? 0.15 : 0);
+        };
+        const size = drag.allowed.reduce((best, candidate) => (score(candidate) < score(best) ? candidate : best), drag.size);
         if (size !== drag.key) {
           drag.key = size;
           drag.size = size;
@@ -525,6 +544,8 @@ export default function Index() {
     scrollerRef.current?.removeEventListener("scroll", onScrollDuringDrag);
     const current = previewRef.current;
     setPreview(null);
+    setResizingId(null);
+    if (resizeOutlineRef.current) resizeOutlineRef.current.hidden = true;
     if (drag?.kind === "move") {
       for (const el of elementsOf(drag.members.map((m) => m.id))) el.style.translate = "";
       if (drag.moved && current) commit(applyLayout(widgets, current));
@@ -587,7 +608,9 @@ export default function Index() {
       size: widget.size,
       base,
       key: widget.size,
+      start: { x: event.clientX, y: event.clientY },
     };
+    setResizingId(id);
     listen();
   };
 
@@ -807,6 +830,9 @@ export default function Index() {
           aria-label={`Add a widget here (page ${pageOf(y, pageRows) + 1}, column ${x + 1}, row ${(y % pageRows) + 1})`}
         />
       ))}
+
+      {/* While resizing: the pointer's box, which the card snaps to. */}
+      <div ref={resizeOutlineRef} className={`grid-resize-outline ${radiusClass}`} hidden aria-hidden="true" />
 
       {dropTargets.map((target) => (
         <div
