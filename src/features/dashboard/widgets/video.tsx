@@ -23,6 +23,9 @@ function VideoRender({ instance, cardClass }: WidgetRenderProps) {
   const zoom = config.zoom ?? 1.6;
   const offsetX = config.offsetX ?? 0;
   const offsetY = config.offsetY ?? 0;
+  // Ask for CORS so joined cards can read the video's edge colour; a server
+  // that refuses gets a plain load instead.
+  const [cors, setCors] = React.useState(true);
 
   return (
     <div className={`${cardClass || ""} relative overflow-hidden`}>
@@ -39,6 +42,9 @@ function VideoRender({ instance, cardClass }: WidgetRenderProps) {
           imageRendering: src === desert ? "pixelated" : undefined,
         }}
         src={src}
+        key={cors ? "cors" : "plain"}
+        crossOrigin={cors ? "anonymous" : undefined}
+        onError={() => cors && setCors(false)}
         autoPlay
         muted
         loop

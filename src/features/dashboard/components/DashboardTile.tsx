@@ -9,9 +9,9 @@ interface DashboardTileProps {
   instance: WidgetInstance;
   /** Position in the list, for the load-in stagger. */
   index: number;
-  /** Where the card's box sits on the grid, in px (grown across seams when joined). */
+  /** Where the card sits on the grid, in px. */
   rect: Rect;
-  /** For a joined card: its group's outline (the seam edge is a clip-path, animated). */
+  /** For a joined card: its group's outline plus fades on its joined edges (CSS mask layers). */
   mask?: string;
   editing: boolean;
   selected: boolean;
@@ -64,10 +64,6 @@ export default function DashboardTile({
 }: DashboardTileProps) {
   const label = getWidgetType(instance.type).label;
   const ref = React.useRef<HTMLDivElement>(null);
-  // Splitting a card off its group: drop the animated seam clip.
-  React.useEffect(() => {
-    if (!mask && ref.current) ref.current.style.clipPath = "";
-  }, [mask]);
 
   return (
     <div
@@ -86,6 +82,9 @@ export default function DashboardTile({
           height: rect.h,
           maskImage: mask,
           WebkitMaskImage: mask,
+          // The group outline and the edge fades all apply (intersect).
+          maskComposite: mask ? "intersect" : undefined,
+          WebkitMaskComposite: mask ? "source-in" : undefined,
           "--tile-index": index,
           "--wiggle-delay": `${(index * 137) % 400}ms`,
         } as React.CSSProperties

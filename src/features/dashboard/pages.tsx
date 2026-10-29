@@ -11,7 +11,6 @@ import { TILE_SIZE_OPTIONS, type TileSize, type WidgetInstance, type WidgetType 
 import DashboardTile from "@/features/dashboard/components/DashboardTile";
 import EditBar from "@/features/dashboard/components/EditBar";
 import { useRootFontSize } from "@/lib/use-root-font-size";
-import { motionTime } from "@/lib/motion";
 import {
   DEFAULT_COLUMNS,
   MAX_COLUMNS,
@@ -37,9 +36,7 @@ import {
   groupOutline,
   groupsOf,
   joinKey,
-  memberRegion,
   rectOf,
-  seamLine,
   seamPx,
   type Join,
   type Metrics,
@@ -47,6 +44,10 @@ import {
   type SeamPx,
 } from "@/features/dashboard/layout/joins";
 import { registerGalleryDrag } from "@/features/dashboard/layout/galleryDrag";
+import { edgeColors, type Side } from "@/features/dashboard/layout/edgeColor";
+
+/** Points sampled along each seam: the gap's colour follows each card's edge. */
+const SEAM_SAMPLES = 8;
 
 const ResourceVaultPage = React.lazy(() => import("@/pages/ResourceVaultPage"));
 const BookmarksPage = React.lazy(() => import("@/pages/BookmarksPage"));
@@ -188,7 +189,6 @@ export default function Index() {
   const ghostRef = React.useRef<HTMLDivElement>(null);
   const gridRef = React.useRef<HTMLDivElement>(null);
   const scrollerRef = React.useRef<HTMLDivElement>(null);
-  const seamLayerRef = React.useRef<SVGSVGElement>(null);
   const dragRef = React.useRef<Drag | null>(null);
   const shown = preview ?? layout;
   // A dragged group stays anchored at its start (the pointer offset rides on
@@ -206,14 +206,14 @@ export default function Index() {
 
   // ---- joined cards: groups, outlines, seams ----
   const metrics: Metrics = React.useMemo(() => ({ cell, gap, span: (n: number) => n * tile + (n - 1) * gap, rowTop }), [cell, gap, tile, rowTop]);
-  const amplitude = Math.round(gap * 0.5 + 6);
-  const reach = gap / 2 + amplitude * 1.35;
+  // How far each joined card's edge fades into the gradient between them.
+  const fade = Math.round(gap * 0.6);
   const joined = React.useMemo(() => {
     const seams = flow ? [] : activeSeams(rendered, joins);
     const groups = groupsOf(seams);
     const px = seams.map((seam) => seamPx(seam, metrics));
-    const members = new Map<string, { rect: Rect; box: Rect; seams: SeamPx[]; mask: string }>();
-    const outlines: Array<{ key: string; d: string }> = [];
+    const members = new Map<string, { mask: string }>();
+    const outlines: Array<{ key: string; d: string; seams: SeamPx[] }> = [];
     const radius = ui.cardStyle === "soft" ? 1.75 * rem : ui.cardStyle === "sharp" ? 0.625 * rem : 1.125 * rem;
     const done = new Set<string>();
     for (const [id, ids] of groups) {
@@ -222,47 +222,53 @@ export default function Index() {
       const groupSeams = px.filter((s) => ids.includes(s.a));
       const rects = ids.map((m) => rectOf(rendered.get(m)!, metrics));
       const d = groupOutline([...rects, ...groupSeams.map((s) => bridgeRect(s, gap))], radius);
-      outlines.push({ key: ids.slice().sort().join("|"), d });
+      outlines.push({ key: ids.slice().sort().join("|"), d, seams: groupSeams });
       for (const m of ids) {
+        // The card stays exactly where it is: the group outline rounds its
+        // outer corners, and each joined edge fades into the gap's gradient.
         const rect = rectOf(rendered.get(m)!, metrics);
-        const own = groupSeams.filter((s) => s.a === m || s.b === m);
-        const grow = (side: "l" | "t" | "r" | "b") =>
-          own.some((s) => (s.orientation === "v" ? (side === "r" ? s.a === m : side === "l" && s.b === m) : side === "b" ? s.a === m : side === "t" && s.b === m)) ? reach : 0;
-        const box = { x: rect.x - grow("l"), y: rect.y - grow("t"), w: rect.w + grow("l") + grow("r"), h: rect.h + grow("t") + grow("b") };
-        members.set(m, { rect, box, seams: own, mask: svgMask(d, box) });
+        const sides = new Set<string>();
+        for (const s of groupSeams) {
+          if (s.a === m) sides.add(s.orientation === "v" ? "right" : "bottom");
+          if (s.b === m) sides.add(s.orientation === "v" ? "left" : "top");
+        }
+        const layers = [svgMask(d, rect), ...[...sides].map((side) => `linear-gradient(to ${side}, #000 calc(100% - ${fade}px), transparent)`)];
+        members.set(m, { mask: layers.join(", ") });
       }
     }
-    return { seams: px, members, outlines, keys: new Set(seams.map((s) => joinKey(s.a, s.b))) };
-  }, [flow, rendered, joins, metrics, gap, reach, rem, ui.cardStyle]);
+    return { seams: px, members, outlines, keys: new Set(seams.map((s) => joinKey(s.a, s.b))), radius };
+  }, [flow, rendered, joins, metrics, gap, fade, rem, ui.cardStyle]);
 
-  // The seams move like oil and water: each joined card is clipped to its
-  // region with a wavy edge, redrawn every frame on the shared clock.
+  // Each joined card's colours along its joined edges (from its photo,
+  // video, sky or background), sampled now and every few seconds as the
+  // content changes. Keyed by seam: [card a's colours, card b's colours].
+  const [edgeColorMap, setEdgeColorMap] = React.useState<Record<string, Array<Array<string | null>>>>({});
   React.useEffect(() => {
-    if (!joined.members.size) return undefined;
-    let frame = 0;
-    let lastT = -1;
-    const tick = () => {
-      frame = requestAnimationFrame(tick);
-      const t = motionTime();
-      if (t === lastT) return; // paused
-      lastT = t;
+    if (!joined.seams.length) return undefined;
+    const sample = () => {
       const grid = gridRef.current;
       if (!grid) return;
-      for (const [id, member] of joined.members) {
-        const el = grid.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(id)}"]`);
-        if (el) el.style.clipPath = `path("${memberRegion(id, member.rect, member.box, member.seams, t, amplitude)}")`;
+      const origin = grid.getBoundingClientRect();
+      const next: Record<string, Array<Array<string | null>>> = {};
+      for (const s of joined.seams) {
+        const v = s.orientation === "v";
+        const start = (v ? origin.top : origin.left) + s.from;
+        const end = (v ? origin.top : origin.left) + s.to;
+        const ends: Array<[string, Side]> = v ? [[s.a, "right"], [s.b, "left"]] : [[s.a, "bottom"], [s.b, "top"]];
+        next[s.key] = ends.map(([id, side]) => {
+          const el = grid.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(id)}"]`);
+          return el ? edgeColors(el, side, start, end, SEAM_SAMPLES) : [];
+        });
       }
-      const layer = seamLayerRef.current;
-      if (layer) {
-        for (const s of joined.seams) {
-          const d = seamLine(s, t, amplitude);
-          layer.querySelectorAll<SVGPathElement>(`[data-seam="${CSS.escape(s.key)}"]`).forEach((path) => path.setAttribute("d", d));
-        }
-      }
+      setEdgeColorMap((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [joined, amplitude]);
+    const first = window.setTimeout(sample, 300);
+    const interval = window.setInterval(sample, 2500);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+    };
+  }, [joined]);
 
   const radiusClass = ui.cardStyle === "soft" ? "rounded-[1.75rem]" : ui.cardStyle === "sharp" ? "rounded-[0.625rem]" : "rounded-[1.125rem]";
   // Two materials (src/assets/styles/design-system.css): an opaque card for
@@ -738,17 +744,67 @@ export default function Index() {
         />
       ))}
 
-      {/* Joined groups: one shadowed silhouette under the cards. */}
-      <svg className="join-shadow-layer" width={gridWidth} height={gridHeight} aria-hidden="true">
-        {joined.outlines.map((outline) => (
-          <path key={outline.key} d={outline.d} />
+      {/* Joined groups, under the cards: one shadowed silhouette, and across
+          each gap a gradient from one card's edge colour to the other's
+          (also filling the rounded inner corners). */}
+      <svg className="join-fill-layer" width={gridWidth} height={gridHeight} aria-hidden="true">
+        <defs>
+          {joined.outlines.map((outline, gi) => (
+            <clipPath key={outline.key} id={`join-clip-${gi}`}>
+              <path d={outline.d} />
+            </clipPath>
+          ))}
+          <filter id="join-soften" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation={Math.max(4, gap * 0.45)} />
+          </filter>
+          {joined.seams.flatMap((s, si) => {
+            const v = s.orientation === "v";
+            const [sideA = [], sideB = []] = edgeColorMap[s.key] ?? [];
+            const start = s.center - gap / 2 - fade;
+            const end = s.center + gap / 2 + fade;
+            return Array.from({ length: SEAM_SAMPLES }, (_, i) => (
+              <linearGradient key={`${s.key}-${i}`} id={`join-gradient-${si}-${i}`} gradientUnits="userSpaceOnUse" x1={v ? start : 0} x2={v ? end : 0} y1={v ? 0 : start} y2={v ? 0 : end}>
+                <stop offset="0" style={{ stopColor: sideA[i] ?? sideB[i] ?? "var(--card)" }} />
+                <stop offset="1" style={{ stopColor: sideB[i] ?? sideA[i] ?? "var(--card)" }} />
+              </linearGradient>
+            ));
+          })}
+        </defs>
+        {joined.outlines.map((outline, gi) => (
+          <g key={outline.key}>
+            <path className="join-shadow" d={outline.d} />
+            <g clipPath={`url(#join-clip-${gi})`}>
+              {/* A strip per sample along the seam, blurred together. */}
+              <g filter="url(#join-soften)">
+                {outline.seams.flatMap((s) => {
+                  const si = joined.seams.indexOf(s);
+                  const v = s.orientation === "v";
+                  const across = gap / 2 + fade + 2;
+                  const length = s.to - s.from;
+                  const step = length / SEAM_SAMPLES;
+                  // The end strips reach past the seam to fill the rounded inner corners.
+                  const reachAlong = joined.radius + 4;
+                  return Array.from({ length: SEAM_SAMPLES }, (_, i) => {
+                    const a = s.from + step * i - (i === 0 ? reachAlong : 0);
+                    const b = s.from + step * (i + 1) + (i === SEAM_SAMPLES - 1 ? reachAlong : 0);
+                    const fill = `url(#join-gradient-${si}-${i})`;
+                    return v ? (
+                      <rect key={`${s.key}-${i}`} x={s.center - across} width={across * 2} y={a - 1} height={b - a + 2} fill={fill} />
+                    ) : (
+                      <rect key={`${s.key}-${i}`} y={s.center - across} height={across * 2} x={a - 1} width={b - a + 2} fill={fill} />
+                    );
+                  });
+                })}
+              </g>
+            </g>
+          </g>
         ))}
       </svg>
 
       {widgets.map((instance, index) => {
         const placement = rendered.get(instance.id) ?? layout.get(instance.id)!;
         const member = joined.members.get(instance.id);
-        const rect = member?.box ?? { x: placement.x * cell, y: rowTop(placement.y), w: span(placement.w), h: span(placement.h) };
+        const rect = { x: placement.x * cell, y: rowTop(placement.y), w: span(placement.w), h: span(placement.h) };
         return (
           <DashboardTile
             key={instance.id}
@@ -771,18 +827,6 @@ export default function Index() {
           />
         );
       })}
-
-      {/* The meniscus along each seam: where two liquids meet. */}
-      <svg ref={seamLayerRef} className="seam-layer" width={gridWidth} height={gridHeight} aria-hidden="true">
-        {joined.seams
-          .filter((s) => !draggingIds.includes(s.a))
-          .map((s) => (
-            <g key={s.key}>
-              <path data-seam={s.key} className="seam-shade" />
-              <path data-seam={s.key} className="seam-shine" />
-            </g>
-          ))}
-      </svg>
 
       {nodes.map((s) => {
         const isJoined = joined.keys.has(s.key);

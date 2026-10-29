@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeSeams, adjacentSeams, groupOutline, groupsOf, seamBetween, seamPx, seamWave } from "./joins";
+import { activeSeams, adjacentSeams, groupOutline, groupsOf, seamBetween, seamPx } from "./joins";
 import type { Placement } from "./grid";
 
 const p = (id: string, x: number, y: number, w = 1, h = 1): Placement => ({ id, x, y, w, h });
@@ -25,12 +25,10 @@ describe("seams", () => {
 describe("geometry", () => {
   const m = { cell: 110, gap: 10, span: (n: number) => n * 100 + (n - 1) * 10, rowTop: (r: number) => r * 110 };
 
-  it("waves to zero at the seam's ends and within the amplitude", () => {
+  it("puts a seam's centre line in the middle of the gap", () => {
     const s = seamPx({ a: "a", b: "b", orientation: "v", line: 1, from: 0, to: 1 }, m);
     expect(s.center).toBe(105);
-    expect(seamWave(s, s.from, 3, 12)).toBe(0);
-    expect(seamWave(s, s.to, 3, 12)).toBe(0);
-    for (let at = s.from; at <= s.to; at += 5) expect(Math.abs(seamWave(s, at, 3, 12))).toBeLessThanOrEqual(12 * 1.31);
+    expect([s.from, s.to]).toEqual([0, 100]);
   });
 
   it("traces one outline around an L-shaped group", () => {

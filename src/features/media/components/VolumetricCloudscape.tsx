@@ -703,7 +703,9 @@ export default function VolumetricCloudscape({
 
   useEffect(() => {
     const canvasEl = canvasRef.current;
-    const glContext = canvasEl?.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power" });
+    const glContext = canvasEl?.getContext("webgl", {
+      // Readable after drawing, so joined cards can sample the sky's edge colour.
+      preserveDrawingBuffer: true, antialias: false, alpha: false, powerPreference: "low-power" });
     if (!canvasEl || !glContext) { setSupported(false); return undefined; }
     // Re-bound as non-null consts so the nested render functions keep the narrowing.
     const canvas: HTMLCanvasElement = canvasEl;
