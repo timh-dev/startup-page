@@ -10,12 +10,18 @@
 // filtering, which only averages neighbouring pixels, so rendering more
 // than twice the output resolution costs GPU time without looking smoother.
 // On battery it renders at the screen's own density (see power.ts).
+//
+// Stepping down only removes supersampling: it never goes below the
+// screen's density, which would blur the canvas. Frames in the first two
+// seconds are ignored, since page load is always slow and shouldn't lower
+// the quality for the rest of the session.
 
 import { isOnBattery } from "./power";
 
 const SAMPLE_FRAMES = 45;
 const SLOW_FRAME_MS = 24;
 const STEP = 0.5;
+const WARM_UP_MS = 2000;
 
 export interface AdaptiveResolution {
   /** Canvas pixels per CSS pixel to render at right now. */
@@ -24,11 +30,14 @@ export interface AdaptiveResolution {
   sample(now: number): boolean;
 }
 
-export function createAdaptiveResolution({ supersample = 1, max = 2, min = 1 } = {}): AdaptiveResolution {
+export function createAdaptiveResolution({ supersample = 1, max = 2 }: { supersample?: number; max?: number } = {}): AdaptiveResolution {
+  const density = () => Math.min(window.devicePixelRatio || 1, max);
+  const min = () => Math.max(1, density());
   // Supersampling is skipped on battery; the scale follows when power changes.
-  const ideal = () => Math.max(min, Math.min((window.devicePixelRatio || 1) * (isOnBattery() ? 1 : supersample), max));
+  const ideal = () => Math.max(min(), Math.min(density() * (isOnBattery() ? 1 : supersample), max));
   let reduction = 0;
-  const current = () => Math.max(min, ideal() - reduction);
+  const current = () => Math.max(min(), ideal() - reduction);
+  let startedAt = 0;
   let reported = current();
   let last = 0;
   let total = 0;
@@ -44,8 +53,10 @@ export function createAdaptiveResolution({ supersample = 1, max = 2, min = 1 } =
         reported = current();
         return true;
       }
+      if (!startedAt) startedAt = now;
       const gap = last ? now - last : 0;
       last = now;
+      if (now - startedAt < WARM_UP_MS) return false;
       // Ignore gaps from a hidden or backgrounded tab.
       if (!gap || gap > 250) return false;
       total += gap;
@@ -54,7 +65,7 @@ export function createAdaptiveResolution({ supersample = 1, max = 2, min = 1 } =
       const average = total / count;
       total = 0;
       count = 0;
-      if (average > SLOW_FRAME_MS && current() > min) {
+      if (average > SLOW_FRAME_MS && current() > min()) {
         reduction += STEP;
         reported = current();
         return true;

@@ -761,7 +761,11 @@ export default function VolumetricCloudscape({
     let uFlash: WebGLUniformLocation | null = null;
     let uTextTex: WebGLUniformLocation | null = null;
 
-    const resolution = createAdaptiveResolution({ supersample: 2, max: 4 });
+    // One canvas pixel per CSS pixel, scaled up on high-density screens.
+    // Clouds are soft (the text over them is HTML), so this looks the same,
+    // and the raymarcher is costly per pixel: at 2x density it held the
+    // dashboard near 13 fps on an M1, and supersampled at 4x near 4 fps.
+    const resolution = createAdaptiveResolution({ max: 1 });
 
     function resize() {
       const dpr   = resolution.scale;

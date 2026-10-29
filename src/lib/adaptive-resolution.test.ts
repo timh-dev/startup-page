@@ -47,13 +47,22 @@ describe("createAdaptiveResolution", () => {
     expect(resolution.scale).toBe(2);
   });
 
-  it("steps down when frames are slow, but never below 1", () => {
+  it("drops supersampling when frames are slow, but never goes below the screen density", () => {
+    setDensity(2);
+    const resolution = createAdaptiveResolution({ supersample: 2, max: 4 });
+    // The first two seconds are load time and don't count.
+    expect(run(resolution, 60, 33).changed).toBe(false);
+    expect(run(resolution, 50, 33, 3000).changed).toBe(true);
+    expect(resolution.scale).toBe(3.5);
+    run(resolution, 2000, 33, 5000);
+    expect(resolution.scale).toBe(2);
+  });
+
+  it("does not step a native-density canvas down at all", () => {
     setDensity(2);
     const resolution = createAdaptiveResolution();
-    expect(run(resolution, 50, 33).changed).toBe(true);
-    expect(resolution.scale).toBe(1.5);
-    run(resolution, 500, 33);
-    expect(resolution.scale).toBe(1);
+    run(resolution, 2000, 33);
+    expect(resolution.scale).toBe(2);
   });
 
   it("ignores long gaps from a hidden tab", () => {

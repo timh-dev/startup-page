@@ -10,15 +10,12 @@ import { renderSun } from './renderSun';
 import { renderHorizonGlow } from './renderHorizonGlow';
 import { renderMarkers } from './renderMarkers';
 import { createAdaptiveResolution } from '@/lib/adaptive-resolution';
-import { ambientFrameMs, prefersReducedMotion } from '@/lib/power';
+import { ambientFrameMs } from '@/lib/power';
 
-const SWEEP_SPEED = 0.075;
-const SWEEP_INTERVAL = 22; // ms per sweep step
 const TARGET_FRAME_MS = 1000 / 30; // idle at 30 fps; hover upgrades to 60
 
 interface SolarGraphState {
   lst: number;
-  sweeping: boolean;
   stars: Star[] | null;
   solar: SolarContext | null;
   animationTime: number;
@@ -37,7 +34,6 @@ export default function SolarGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<SolarGraphState>({
     lst: 0,
-    sweeping: true,
     stars: null,
     solar: null,
     animationTime: 0,
@@ -67,12 +63,11 @@ export default function SolarGraph() {
     function initSolar(lat: number, lng: number) {
       // Cancel any in-flight animation from a previous initSolar call
       if (state.animFrameId) { cancelAnimationFrame(state.animFrameId); state.animFrameId = null; }
-      if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
       if (state._realTimeTimer) { clearInterval(state._realTimeTimer); state._realTimeTimer = null; }
       state.solar = calculateSolarContext(lat, lng);
-      state.stars = createStarField();
-      state.lst = 0;
-      state.sweeping = true;
+      // Keep the stars when only the location changes, so they don't jump.
+      state.stars = state.stars ?? createStarField();
+      state.lst = state.solar.currentTime;
       state.lastTimestamp = performance.now();
       startAnimation();
     }
@@ -108,43 +103,23 @@ export default function SolarGraph() {
     if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
     resize();
 
-    // Sweep timer for startup animation
-    let sweepTimer: ReturnType<typeof setInterval> | null = null;
-
+    // The chart opens at the current time. (It used to sweep from midnight,
+    // which flashed a whole day of sky colours on every load.)
     function startAnimation() {
-      const targetLst = state.solar?.currentTime ?? getCurrentLst();
-
-      // Startup sweep: animate from 0 to current time (skipped with reduced
-      // motion, which starts at the current time).
-      if (prefersReducedMotion()) {
-        state.lst = targetLst;
-        state.sweeping = false;
-      }
-      sweepTimer = setInterval(() => {
-        if (state.sweeping) {
-          state.lst += SWEEP_SPEED;
-          if (state.lst >= targetLst) {
-            state.lst = targetLst;
-            state.sweeping = false;
-            if (sweepTimer) clearInterval(sweepTimer);
-          }
-        }
-      }, SWEEP_INTERVAL);
-
-      // Real-time update every 60s after sweep completes
+      // Follow real time once a minute.
       const realTimeTimer = setInterval(() => {
-        if (!state.sweeping) {
-          state.lst = getCurrentLst();
-        }
+        state.lst = getCurrentLst();
       }, 60000);
 
       // Main render loop — 30 fps idle, 60 fps while hovering
       function frame(timestamp: number) {
         state.animFrameId = requestAnimationFrame(frame);
-        if (resolution.sample(timestamp)) resize();
+        // Resizing clears the canvas, so draw in the same frame after one.
+        const resized = resolution.sample(timestamp);
+        if (resized) resize();
         const elapsed = timestamp - state.lastTimestamp;
         const targetMs = state.hovering ? 1000 / 60 : ambientFrameMs(TARGET_FRAME_MS);
-        if (elapsed < targetMs) return;
+        if (!resized && elapsed < targetMs) return;
         if (!canvas.clientWidth) return; // ancestor has display:none — skip draw
         const dt = elapsed / 1000;
         state.lastTimestamp = timestamp;
@@ -161,7 +136,7 @@ export default function SolarGraph() {
 
     if (state.solar) {
       // StrictMode re-mount: stateRef survived cleanup — resume the animation
-      // from where it left off instead of restarting the sweep from zero.
+      // from where it left off.
       state.lastTimestamp = performance.now();
       startAnimation();
     } else {
@@ -263,7 +238,6 @@ export default function SolarGraph() {
 
     return () => {
       if (state.animFrameId) cancelAnimationFrame(state.animFrameId);
-      if (sweepTimer) clearInterval(sweepTimer);
       if (state._realTimeTimer) clearInterval(state._realTimeTimer);
       resizeObserver.disconnect();
       unsubscribeSettings();
