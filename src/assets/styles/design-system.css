@@ -561,3 +561,186 @@
 .dashboard-grid[data-wide="true"] .grid-feature-responsive {
   grid-column: span 3 / span 3;
 }
+
+/* --- Settings dialog --------------------------------------------------------
+   Sections are flat and separated by hairlines rather than cards inside a
+   card; headings are small and quiet so the controls lead. */
+
+.settings-dialog-body {
+  padding: 0.25rem 1.75rem 1rem;
+}
+
+.settings-dialog [data-slot="card"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 1.25rem 0;
+}
+
+.settings-dialog [data-slot="card"] + [data-slot="card"],
+.settings-dialog [data-slot="card"] ~ * [data-slot="card"],
+.settings-dialog * + * > [data-slot="card"]:first-child {
+  border-top: var(--hairline-width) solid var(--hairline);
+}
+
+.settings-dialog [data-slot="card-header"] {
+  gap: 0.2rem;
+  padding: 0 0 0.85rem;
+}
+
+.settings-dialog [data-slot="card-title"] {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-dialog [data-slot="card-description"] {
+  font-size: 0.8125rem;
+}
+
+.settings-dialog [data-slot="card-content"] {
+  padding: 0;
+}
+
+.settings-dialog [data-slot="tabs-trigger"] {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.settings-dialog [data-slot="input"] {
+  height: 2.25rem;
+  font-size: 0.8125rem;
+}
+
+.settings-dialog [data-slot="button"] {
+  height: 2rem;
+  padding: 0 0.85rem;
+  font-size: 0.8125rem;
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 0.125rem;
+  padding: 0.2rem;
+  border-radius: 0.7rem;
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.segmented-control-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.875rem;
+  padding: 0 0.9rem;
+  border-radius: 0.5rem;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.segmented-control-option:hover {
+  color: var(--foreground);
+}
+
+.segmented-control-option[aria-checked="true"] {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--elevation-1, 0 1px 2px rgb(0 0 0 / 0.08)), 0 0 0 var(--hairline-width) var(--hairline);
+}
+
+.palette-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.4rem 0.6rem;
+  border-radius: 0.9rem;
+  text-align: left;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.palette-option:hover {
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+
+.palette-option[aria-pressed="true"] .palette-preview {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 3.5px var(--primary);
+}
+
+.palette-option-name {
+  margin-top: 0.45rem;
+  padding: 0 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 550;
+}
+
+.palette-option-description {
+  padding: 0 0.2rem;
+  font-size: 0.71875rem;
+  line-height: 1.35;
+  color: var(--muted-foreground);
+}
+
+/* The mini dashboard inside each palette option. */
+.palette-preview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 0.3rem;
+  aspect-ratio: 16 / 10;
+  padding: 0.4rem;
+  border-radius: 0.65rem;
+  box-shadow: 0 0 0 var(--hairline-width) var(--hairline);
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.palette-preview-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  padding: 0.3rem;
+  border-radius: 0.35rem;
+}
+
+.palette-preview-wide {
+  grid-column: span 2;
+}
+
+.palette-preview-bar {
+  width: 55%;
+  height: 0.3rem;
+  border-radius: 9999px;
+}
+
+.palette-preview-line {
+  width: 80%;
+  height: 0.2rem;
+  border-radius: 9999px;
+  opacity: 0.9;
+}
+
+.palette-preview-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 9999px;
+}
+
+.settings-rows {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.settings-row-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}

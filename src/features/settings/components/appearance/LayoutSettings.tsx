@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { ChoiceButton, RangeControl } from "../controls";
+import { RangeControl, SegmentedControl } from "../controls";
 import { setUiValue, type SettingsSectionProps } from "./types";
 
 // Grid density, card shape, clock format, decorative media, feature pages
@@ -12,58 +12,51 @@ export default function LayoutSettings({ settings, updateSettings }: SettingsSec
 
   return (
     <>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Grid Density</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {["comfortable", "compact"].map((value) => (
-              <ChoiceButton
-                key={value}
-                selected={selectedGridDensity === value}
-                title={value.charAt(0).toUpperCase() + value.slice(1)}
-                description={value === "comfortable" ? "More air between modules." : "Tighter dashboard packing."}
-                onClick={() => setUiValue(updateSettings, "gridDensity", value)}
-              />
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Card Shape</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {["soft", "rounded", "sharp"].map((value) => (
-              <ChoiceButton
-                key={value}
-                selected={selectedCardStyle === value}
-                title={value.charAt(0).toUpperCase() + value.slice(1)}
-                description={value === "soft" ? "Large rounded corners." : value === "sharp" ? "Crisper corners." : "Balanced default radius."}
-                onClick={() => setUiValue(updateSettings, "cardStyle", value)}
-              />
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Clock Format</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {["12h", "24h"].map((value) => (
-              <ChoiceButton
-                key={value}
-                selected={selectedClockFormat === value}
-                title={value === "12h" ? "12-hour" : "24-hour"}
-                description={value === "12h" ? "Hours 1–12 (e.g. 9:45)." : "Hours 0–23 (e.g. 21:45)."}
-                onClick={() => setUiValue(updateSettings, "clockFormat", value)}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Layout</CardTitle>
+          <CardDescription>How tightly tiles pack, how round their corners are, and how the clock reads.</CardDescription>
+        </CardHeader>
+        <CardContent className="settings-rows">
+          <div className="settings-row">
+            <span className="settings-row-label">Density</span>
+            <SegmentedControl
+              label="Grid density"
+              value={selectedGridDensity}
+              onChange={(value) => setUiValue(updateSettings, "gridDensity", value)}
+              options={[
+                { value: "comfortable", label: "Comfortable" },
+                { value: "compact", label: "Compact" },
+              ]}
+            />
+          </div>
+          <div className="settings-row">
+            <span className="settings-row-label">Corners</span>
+            <SegmentedControl
+              label="Card shape"
+              value={selectedCardStyle}
+              onChange={(value) => setUiValue(updateSettings, "cardStyle", value)}
+              options={[
+                { value: "soft", label: "Soft" },
+                { value: "rounded", label: "Rounded" },
+                { value: "sharp", label: "Sharp" },
+              ]}
+            />
+          </div>
+          <div className="settings-row">
+            <span className="settings-row-label">Clock</span>
+            <SegmentedControl
+              label="Clock format"
+              value={selectedClockFormat}
+              onChange={(value) => setUiValue(updateSettings, "clockFormat", value)}
+              options={[
+                { value: "12h", label: "12-hour" },
+                { value: "24h", label: "24-hour" },
+              ]}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -113,7 +106,7 @@ export default function LayoutSettings({ settings, updateSettings }: SettingsSec
 
       <Card>
         <CardHeader>
-          <CardTitle>Tile Size</CardTitle>
+          <CardTitle>Tile size</CardTitle>
           <CardDescription>Scale how large each dashboard tile appears. Takes effect after saving.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">

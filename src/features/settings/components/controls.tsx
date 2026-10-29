@@ -2,7 +2,6 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/utils";
 
 type Swatches = Record<string, string>;
 
@@ -13,18 +12,54 @@ export interface CustomTheme {
   dark: Record<string, string>;
 }
 
+// A miniature dashboard in the palette's own colours: page, tiles, the
+// primary accent and muted text, so palettes compare at a glance.
 export function PaletteSwatchPreview({ swatches, mode }: { swatches: { light: Swatches; dark: Swatches }; mode: string }) {
-  const modeSwatches = mode === "dark" ? swatches.dark : swatches.light;
-  const keys = ["background", "card", "primary", "accent", "muted"];
+  const c = mode === "dark" ? swatches.dark : swatches.light;
+  const tile = { backgroundColor: c.card, boxShadow: `0 0 0 0.5px ${c.muted}` };
   return (
-    <div className="mb-2 flex h-12 items-center justify-center gap-1.5 rounded-md border border-border/40 bg-muted/30">
-      {keys.map((key) => (
-        <div
-          key={key}
-          className="size-5 rounded-full border border-border/60 shadow-sm"
-          style={{ backgroundColor: modeSwatches[key] }}
-          title={key}
-        />
+    <div className="palette-preview" style={{ backgroundColor: c.background }} aria-hidden="true">
+      <div className="palette-preview-tile palette-preview-wide" style={tile}>
+        <span style={{ backgroundColor: c.primary }} className="palette-preview-bar" />
+        <span style={{ backgroundColor: c.muted }} className="palette-preview-line" />
+      </div>
+      <div className="palette-preview-tile" style={tile}>
+        <span style={{ backgroundColor: c.accent }} className="palette-preview-dot" />
+      </div>
+      <div className="palette-preview-tile" style={{ ...tile, backgroundColor: c.primary }} />
+      <div className="palette-preview-tile palette-preview-wide" style={tile}>
+        <span style={{ backgroundColor: c.muted }} className="palette-preview-line" />
+      </div>
+    </div>
+  );
+}
+
+// Segmented control: a row of options in one pill, the selected one raised.
+export function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: Array<{ value: T; label: string; icon?: React.ComponentType<{ className?: string }> }>;
+  onChange: (value: T) => void;
+  label: string;
+}) {
+  return (
+    <div className="segmented-control" role="radiogroup" aria-label={label}>
+      {options.map(({ value: optionValue, label: optionLabel, icon: Icon }) => (
+        <button
+          key={optionValue}
+          type="button"
+          role="radio"
+          aria-checked={value === optionValue}
+          className="segmented-control-option"
+          onClick={() => onChange(optionValue)}
+        >
+          {Icon ? <Icon className="size-3.5" /> : null}
+          {optionLabel}
+        </button>
       ))}
     </div>
   );
@@ -69,23 +104,5 @@ export function RangeControl({
         onValueChange={(nextValue) => onChange(nextValue[0])}
       />
     </div>
-  );
-}
-
-export function ChoiceButton({ selected, title, description, onClick }: { selected: boolean; title: string; description: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-md border p-2.5 text-left text-xs transition",
-        selected
-          ? "border-primary bg-accent text-accent-foreground shadow-sm"
-          : "border-border bg-card hover:bg-accent/50"
-      )}
-    >
-      <div className="font-medium leading-tight">{title}</div>
-      <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{description}</div>
-    </button>
   );
 }

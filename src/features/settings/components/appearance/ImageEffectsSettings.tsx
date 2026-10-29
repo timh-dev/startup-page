@@ -78,7 +78,7 @@ export default function ImageEffectsSettings({ settings, updateSettings }: Setti
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Image Effects</CardTitle>
+        <CardTitle>Image effects</CardTitle>
         <CardDescription>
           Enable one or more filters for photo tiles. When multiple filters are enabled, each image tile picks one at random.
         </CardDescription>

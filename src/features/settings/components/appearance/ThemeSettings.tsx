@@ -1,12 +1,12 @@
 import React, { useContext, useState } from "react";
+import { HiOutlineComputerDesktop, HiOutlineMoon, HiOutlineSun } from "react-icons/hi2";
 import { ThemeContext, type ThemeMode, type ThemeVarsByMode } from "@/components/layout/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { StartupSettings } from "@/features/settings/stores";
 import { BUILT_IN_PALETTES, getSwatchesFromCustomTheme, parseCustomThemeCSS } from "@/lib/theme-palettes";
-import { cn } from "@/lib/utils";
-import { ChoiceButton, PaletteSwatchPreview, SettingField, type CustomTheme } from "../controls";
+import { PaletteSwatchPreview, SegmentedControl, SettingField, type CustomTheme } from "../controls";
 import { setUiValue, type SettingsSectionProps } from "./types";
 
 // Theme mode, palette (built-in and custom), and adding custom themes.
@@ -71,47 +71,40 @@ export default function ThemeSettings({ settings, updateSettings }: SettingsSect
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Theme Mode</CardTitle>
-          <CardDescription>Choose how light and dark mode should be resolved.</CardDescription>
+          <CardTitle>Mode</CardTitle>
+          <CardDescription>Follow your system, or keep the page light or dark.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-2 md:grid-cols-3">
-          {([
-            { value: "system", title: "System", description: "Follow the OS preference." },
-            { value: "light", title: "Light", description: "Force the brighter variant." },
-            { value: "dark", title: "Dark", description: "Force the darker variant." }
-          ] satisfies Array<{ value: ThemeMode; title: string; description: string }>).map((option) => (
-            <ChoiceButton
-              key={option.value}
-              selected={selectedThemeMode === option.value}
-              title={option.title}
-              description={option.description}
-              onClick={() => handleThemeModeChange(option.value)}
-            />
-          ))}
+        <CardContent>
+          <SegmentedControl
+            label="Theme mode"
+            value={selectedThemeMode as ThemeMode}
+            onChange={handleThemeModeChange}
+            options={[
+              { value: "system", label: "System", icon: HiOutlineComputerDesktop },
+              { value: "light", label: "Light", icon: HiOutlineSun },
+              { value: "dark", label: "Dark", icon: HiOutlineMoon },
+            ]}
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Theme Palette</CardTitle>
-          <CardDescription>Switch the base visual language of the interface.</CardDescription>
+          <CardTitle>Palette</CardTitle>
+          <CardDescription>The colours used across the page.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-2 lg:grid-cols-3">
+        <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {BUILT_IN_PALETTES.map((option) => (
             <button
               key={option.value}
               type="button"
               onClick={() => handleThemePaletteChange(option.value)}
-              className={cn(
-                "rounded-md border p-2.5 text-left transition",
-                selectedThemePalette === option.value
-                  ? "border-primary bg-accent shadow-sm"
-                  : "border-border bg-card hover:bg-accent/50"
-              )}
+              className="palette-option"
+              aria-pressed={selectedThemePalette === option.value}
             >
               <PaletteSwatchPreview swatches={option.swatches} mode={theme} />
-              <div className="text-xs font-medium leading-tight">{option.title}</div>
-              <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{option.description}</div>
+              <div className="palette-option-name">{option.title}</div>
+              <div className="palette-option-description">{option.description}</div>
             </button>
           ))}
           {(settings.customThemes || []).map((ct: CustomTheme) => {
@@ -124,16 +117,12 @@ export default function ThemeSettings({ settings, updateSettings }: SettingsSect
                 key={ct.id}
                 type="button"
                 onClick={() => handleThemePaletteChange(ct.id, { light: ct.light, dark: ct.dark })}
-                className={cn(
-                  "rounded-md border p-2.5 text-left transition",
-                  selectedThemePalette === ct.id
-                    ? "border-primary bg-accent shadow-sm"
-                    : "border-border bg-card hover:bg-accent/50"
-                )}
+                className="palette-option"
+                aria-pressed={selectedThemePalette === ct.id}
               >
                 <PaletteSwatchPreview swatches={swatches} mode={theme} />
-                <div className="text-xs font-medium leading-tight">{ct.name}</div>
-                <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">Custom theme</div>
+                <div className="palette-option-name">{ct.name}</div>
+                <div className="palette-option-description">Custom theme</div>
               </button>
             );
           })}
@@ -142,13 +131,13 @@ export default function ThemeSettings({ settings, updateSettings }: SettingsSect
 
       <Card>
         <CardHeader>
-          <CardTitle>Custom Theme</CardTitle>
+          <CardTitle>Custom theme</CardTitle>
           <CardDescription>
             Paste CSS from a shadcn theme generator. Use <code>:root</code> for light and <code>.dark</code> for dark mode variables.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <SettingField label="Theme Name">
+          <SettingField label="Theme name">
             <Input
               value={customThemeName}
               onChange={(e) => setCustomThemeName(e.target.value)}
@@ -168,7 +157,7 @@ export default function ThemeSettings({ settings, updateSettings }: SettingsSect
             <p className="text-xs text-destructive">{customThemeError}</p>
           ) : null}
           <Button type="button" onClick={handleAddCustomTheme}>
-            Add Theme
+            Add theme
           </Button>
 
           {(settings.customThemes || []).length > 0 ? (

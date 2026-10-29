@@ -7,10 +7,17 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { settingsNavItems } from "@/features/settings/constants";
 import { getStorageDiagnostics } from "@/lib/settings";
+import { BUILT_IN_PALETTES } from "@/lib/theme-palettes";
 import { useSettingsStore, type StartupSettings } from "@/features/settings/stores";
 import AppearanceTab from "@/features/settings/components/appearance/AppearanceTab";
 import { merge3 } from "@/lib/sync/merge";
 import DataTab from "@/features/settings/components/DataTab";
+
+const MODE_NAMES: Record<string, string> = { system: "System", light: "Light", dark: "Dark" };
+
+function paletteName(id: string, customThemes: Array<{ id: string; name: string }> | undefined) {
+  return BUILT_IN_PALETTES.find((palette) => palette.value === id)?.title ?? customThemes?.find((theme) => theme.id === id)?.name ?? id;
+}
 
 function SettingsButton() {
   const savedSettings = useSettingsStore((state) => state.settings);
@@ -110,7 +117,7 @@ function SettingsButton() {
           <HiOutlineCog6Tooth />
         </button>
       </DialogTrigger>
-      <DialogContent className="settings-dialog w-[min(92vw,1040px)] border-border/60 bg-background p-0 text-[13px] [&_[data-slot=card]]:rounded-xl [&_[data-slot=card]]:shadow-none [&_[data-slot=card-header]]:gap-1 [&_[data-slot=card-header]]:p-4 [&_[data-slot=card-content]]:p-4 [&_[data-slot=card-content]]:pt-0 [&_[data-slot=card-title]]:text-[15px] [&_[data-slot=card-title]]:tracking-tight [&_[data-slot=card-description]]:text-[13px] [&_[data-slot=tabs-trigger]]:px-3 [&_[data-slot=tabs-trigger]]:py-2 [&_[data-slot=tabs-trigger]]:text-[13px] [&_[data-slot=input]]:h-9 [&_[data-slot=input]]:text-[13px] [&_[data-slot=button]]:h-8 [&_[data-slot=button]]:px-3 [&_[data-slot=button]]:text-[13px]">
+      <DialogContent className="settings-dialog w-[min(92vw,960px)] border-border/60 bg-background p-0 text-[13px]">
         <Tabs defaultValue="appearance" orientation="vertical" className="grid min-h-[76vh] lg:grid-cols-[160px_1fr] gap-0">
           <div className="border-b border-border bg-sidebar text-sidebar-foreground lg:border-r lg:border-b-0">
             <div className="p-2.5">
@@ -135,8 +142,8 @@ function SettingsButton() {
           </div>
 
           <div className="flex flex-col">
-            <div className="max-h-[76vh] overflow-y-auto p-2.5 md:p-3">
-              <TabsContent value="appearance" className="mt-0 space-y-3">
+            <div className="settings-dialog-body max-h-[76vh] overflow-y-auto">
+              <TabsContent value="appearance" className="mt-0">
                 <AppearanceTab settings={settingsState} updateSettings={updateSettings} />
               </TabsContent>
 
@@ -145,11 +152,13 @@ function SettingsButton() {
               </TabsContent>
             </div>
 
-            <div className="border-t border-border bg-card/60 px-6 py-4">
+            <div className="border-t border-border/70 px-6 py-3.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1 text-sm text-muted-foreground">
                   <p>
-                    Active preview: <span className="font-medium text-foreground">{selectedThemePalette}</span> in <span className="font-medium text-foreground">{selectedThemeMode}</span> mode
+                    Previewing <span className="font-medium text-foreground">{paletteName(selectedThemePalette, settingsState.customThemes)}</span>
+                    {" · "}
+                    <span className="font-medium text-foreground">{MODE_NAMES[selectedThemeMode] ?? selectedThemeMode}</span>
                   </p>
                   {statusMessage ? <p className="text-foreground">{statusMessage}</p> : null}
                 </div>
