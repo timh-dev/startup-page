@@ -133,7 +133,7 @@ export default function Index() {
 
   // Fit a page (its rows) to the space left beside the side panel.
   const panelOffset = panel ? SIDE_PANEL_REM * rem : 0;
-  const pad = { top: 5 * rem, bottom: 1.5 * rem, side: 2 * rem };
+  const pad = { top: 4.25 * rem, bottom: 1.5 * rem, side: 2 * rem };
   const availW = viewport.width - pad.side * 2 - panelOffset;
   const availH = viewport.height - pad.top - pad.bottom;
   const fill = 0.81;
@@ -336,9 +336,10 @@ export default function Index() {
       case "photo":
       case "video":
       case "weather":
-      case "weatherV2":
       case "iframe":
         return media();
+      case "weatherV2":
+        return tileClass("overflow-hidden");
       case "solarGraph":
       case "globe":
         return media("bg-black");
@@ -747,6 +748,16 @@ export default function Index() {
   React.useEffect(() => {
     if (!editing && panel && panel.kind !== "settings") closePanel();
   }, [editing, panel, closePanel]);
+
+  // Settings opens with the grid in edit mode (however it was opened). When
+  // the side panel closes (not when Settings gives way to a card's inspector
+  // or the gallery), edit mode ends again if Settings is what started it.
+  const panelKind = panel?.kind ?? null;
+  React.useEffect(() => {
+    const store = useLayoutEditStore.getState();
+    if (panelKind === "settings") store.startEditingForSettings();
+    else if (panelKind === null && store.editing && store.editingFromSettings) store.setEditing(false);
+  }, [panelKind]);
 
   // Empty cells in edit mode: click one to add a card there.
   const emptyCells: Array<{ x: number; y: number }> = [];

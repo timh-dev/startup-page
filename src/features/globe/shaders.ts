@@ -71,9 +71,9 @@ vec2 hitSphere(vec3 ro, vec3 rd, float r) {
 }
 
 // Land as dots: rows of equal latitude spacing, each row with as many dots as
-// fit around it (so spacing stays even toward the poles), alternate rows
-// offset half a step. Returns the nearest dot's centre; onLand is 1 if the
-// land mask has land there.
+// fit around it (so spacing stays even toward the poles), every row starting
+// at the same meridian (a strict grid, not a staggered one). Returns the
+// nearest dot's centre; onLand is 1 if the land mask has land there.
 vec3 dotCenter(vec3 e, out float onLand) {
   float lat = asin(clamp(e.z, -1.0, 1.0));
   float lon = atan(e.y, e.x);
@@ -81,19 +81,29 @@ vec3 dotCenter(vec3 e, out float onLand) {
   float latC = row * uDotSpacing;
   float count = max(1.0, floor(2.0 * PI * cos(latC) / uDotSpacing + 0.5));
   float stepLon = 2.0 * PI / count;
-  float offset = mod(row, 2.0) * 0.5 * stepLon;
-  float lonC = floor((lon - offset) / stepLon + 0.5) * stepLon + offset;
+  float lonC = floor(lon / stepLon + 0.5) * stepLon;
   vec2 uv = vec2(fract((lonC + PI) / (2.0 * PI)), clamp((0.5 * PI - latC) / PI, 0.0, 1.0));
   onLand = step(0.5, texture(uLand, uv).r);
   return vec3(cos(latC) * cos(lonC), cos(latC) * sin(lonC), sin(latC));
 }
 
-// 0..1 coverage of a land dot at an Earth-fixed point, antialiased.
+// Distance from a point to c measured as a square aligned with c's east and
+// north: the largest of the two offsets. Dots, the marker and its ring are
+// squares, not discs.
+float boxDist(vec3 e, vec3 c) {
+  vec3 east = normalize(vec3(-c.y, c.x, 0.0) + vec3(1e-6, 0.0, 0.0));
+  vec3 north = cross(c, east);
+  vec3 d = e - c;
+  return max(abs(dot(d, east)), abs(dot(d, north)));
+}
+
+// 0..1 coverage of a land dot (a small square) at an Earth-fixed point, antialiased.
 float landDot(vec3 e, out vec3 center) {
   float onLand;
   center = dotCenter(e, onLand);
-  float aa = max(length(fwidth(e)), 1e-5);
-  return onLand * (1.0 - smoothstep(uDotRadius - aa, uDotRadius + aa, length(e - center)));
+  float aa = max(length(fwidth(e)), 1e-5) * 0.7;
+  float half_ = uDotRadius * 0.82;
+  return onLand * (1.0 - smoothstep(half_ - aa, half_ + aa, boxDist(e, center)));
 }
 `;
 
@@ -289,15 +299,27 @@ vec4 here(vec2 uv) {
 
   // The viewer's dot: a solid core that breathes, and a ring that expands
   // and fades with each pulse.
-  float d = length(e - uHere);
-  float coreR = uDotRadius * 2.3;
+  float d = boxDist(e, uHere);
+  float coreR = uDotRadius * 1.9;
   float core = 1.0 - smoothstep(coreR - aa, coreR + aa, d);
   // A thin dark outline so the dot stands out on bright land dots.
   float outline = (1.0 - smoothstep(coreR + aa, coreR * 1.45 + aa, d)) * (1.0 - core);
   float breathe = 0.85 + 0.15 * sin(t * 2.0 * PI / PULSE_PERIOD * 2.0);
   float ringR = coreR * mix(1.3, 5.5, cycle);
-  float ring = (1.0 - smoothstep(0.0, aa * 1.5 + uDotRadius * 0.45, abs(d - ringR))) * (1.0 - cycle) * uPulse;
-  float halo = exp(-d * d / (coreR * coreR * 9.0)) * 0.45;
+  float ring = (1.0 - smoothstep(0.0, aa * 1.2 + uDotRadius * 0.3, abs(d - ringR))) * (1.0 - cycle) * uPulse;
+  float halo = exp(-d * d / (coreR * coreR * 9.0)) * 0.25;
+  // Crosshair ticks along the viewer's latitude and meridian, out past the ring.
+  vec3 hEast = normalize(vec3(-uHere.y, uHere.x, 0.0) + vec3(1e-6, 0.0, 0.0));
+  vec3 hNorth = cross(uHere, hEast);
+  vec3 off = e - uHere;
+  float ax = abs(dot(off, hEast));
+  float ay = abs(dot(off, hNorth));
+  float thin = aa * 0.9;
+  float tickLen = coreR * 7.0;
+  float ticks = max(
+    (1.0 - smoothstep(thin, thin + aa, ay)) * step(coreR * 2.2, ax) * (1.0 - step(tickLen, ax)),
+    (1.0 - smoothstep(thin, thin + aa, ax)) * step(coreR * 2.2, ay) * (1.0 - step(tickLen, ay))
+  ) * 0.7;
 
   // The ripple: a band of light running out across the globe along the
   // surface, lighting the land dots it passes and fading as it travels.
@@ -314,7 +336,7 @@ vec4 here(vec2 uv) {
 
   float ripple = land * clamp(band * 1.2 + wake, 0.0, 1.0);
   float glowA = clamp(halo * breathe + ring * 0.9, 0.0, 1.0);
-  float a = clamp(max(core * breathe, max(glowA, max(ripple * 0.85, outline * 0.8))), 0.0, 1.0) * facing;
+  float a = clamp(max(max(core * breathe, ticks), max(glowA, max(ripple * 0.85, outline * 0.8))), 0.0, 1.0) * facing;
   vec3 rgb = mix(yellow, vec3(1.0, 0.93, 0.7), clamp(ripple - core, 0.0, 1.0) * 0.4);
   // The outline is near-black ink, except where the ring or halo is brighter.
   rgb = mix(rgb, vec3(0.08, 0.06, 0.03), outline * (1.0 - glowA));

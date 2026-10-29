@@ -1,6 +1,5 @@
 import React from "react";
 import { HiArrowUpRight, HiPlus } from "react-icons/hi2";
-import { useFitCount } from "@/lib/use-fit-count";
 
 function getParsableUrl(url: string | null | undefined) {
   if (typeof url !== "string") {
@@ -210,14 +209,24 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: Bookm
     </span>
   );
 
-  // Show only the rows that fit; when some don't, the last row becomes a
-  // "+N more" link to the folder instead of a half-visible bookmark.
+  // Every bookmark, scrolling inside the card; the edges fade when there's
+  // more above or below.
   const listRef = React.useRef<HTMLDivElement>(null);
-  const itemsRef = React.useRef<HTMLUListElement>(null);
-  const fit = useFitCount(listRef, itemsRef, content.length);
-  const shown = fit < content.length ? Math.max(0, fit - 1) : content.length;
-  const visible = content.slice(0, shown);
-  const hiddenCount = content.length - shown;
+  const [edges, setEdges] = React.useState({ top: false, bottom: false });
+  const measure = React.useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const next = { top: el.scrollTop > 1, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1 };
+    setEdges((prev) => (prev.top === next.top && prev.bottom === next.bottom ? prev : next));
+  }, []);
+  React.useLayoutEffect(() => {
+    measure();
+    const el = listRef.current;
+    if (!el) return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, content.length]);
 
   return (
     <div className={cardClass || "surface-tile col-span-1 h-36 w-36 overflow-hidden rounded-[1.125rem]"}>
@@ -246,9 +255,15 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: Bookm
           )}
         </div>
 
-        <div ref={listRef} className="bookmark-list min-h-0 flex-1 overflow-hidden">
-          <ul ref={itemsRef} className="bookmark-items">
-            {visible.map(({ name, url }, key) => (
+        <div
+          ref={listRef}
+          className="bookmark-list min-h-0 flex-1"
+          data-fade-top={edges.top || undefined}
+          data-fade-bottom={edges.bottom || undefined}
+          onScroll={measure}
+        >
+          <ul className="bookmark-items">
+            {content.map(({ name, url }, key) => (
               <li key={key}>
                 <a href={url} className="bookmark-link" title={url}>
                   <BookmarkFavicon name={name} url={url} />
@@ -259,17 +274,6 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: Bookm
                 </a>
               </li>
             ))}
-            {hiddenCount > 0 && (
-              <li>
-                {onTitleClick ? (
-                  <button type="button" onClick={onTitleClick} className="bookmark-more">
-                    +{hiddenCount} more
-                  </button>
-                ) : (
-                  <span className="bookmark-more">+{hiddenCount} more</span>
-                )}
-              </li>
-            )}
           </ul>
         </div>
       </div>

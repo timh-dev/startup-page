@@ -221,42 +221,6 @@ function AppLayoutInner() {
       <BookmarkDialogs />
       <SidePanel />
       <header className="app-header">
-        <nav className="app-nav surface-glass" aria-label="Pages">
-          {vaultEnabled && (
-            <button
-              type="button"
-              className="app-nav-item"
-              onClick={() => navigate("/resources")}
-              title="Resource Vault (1)"
-              aria-current={isResources ? "page" : undefined}
-            >
-              <HiOutlineArchiveBox aria-hidden="true" />
-              <span>Vault</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="app-nav-item"
-            onClick={() => navigate("/")}
-            title="Dashboard (2)"
-            aria-current={isDashboard ? "page" : undefined}
-          >
-            <HiOutlineHome aria-hidden="true" />
-            <span>Home</span>
-          </button>
-          {bookmarksEnabled && (
-            <button
-              type="button"
-              className="app-nav-item"
-              onClick={() => navigate("/bookmarks")}
-              title="Bookmarks (3)"
-              aria-current={isBookmarks ? "page" : undefined}
-            >
-              <HiOutlineBookmark aria-hidden="true" />
-              <span>Bookmarks</span>
-            </button>
-          )}
-        </nav>
         <div className="app-toolbar surface-glass">
           {isDashboard && (
             <button

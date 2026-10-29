@@ -1,384 +1,249 @@
 import React from "react";
-import { WiDaySunny, WiCloudy, WiStrongWind, WiRain, WiSnow } from "react-icons/wi";
-import { useWeatherStore, useWeatherInstance } from "@/features/weather/stores/weatherStore";
+import { WiCloudy, WiDaySunny, WiNightClear, WiRain, WiSnow, WiStrongWind } from "react-icons/wi";
 import { useWeatherData, type WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
-import { WeatherStatus } from "./WeatherStatus";
-import { getEffectiveWind, getOpenWeatherCondition, getOpenWeatherVisualProfile } from "@/features/weather/utils";
+import { useWeatherInstance, useWeatherStore } from "@/features/weather/stores/weatherStore";
 import type { WeatherCondition, WeatherData } from "@/features/weather/types/weather";
+import { getEffectiveWind, getOpenWeatherCondition, getOpenWeatherVisualProfile } from "@/features/weather/utils";
 import { debugNowMs } from "@/lib/debug";
+import { WeatherStatus } from "./WeatherStatus";
 
-type FrostedCategory = "sunny" | "cloudy" | "windy" | "rainy" | "snowy";
+// The forecast card: what it's like now (big), today's high and low, and the
+// next hours as a temperature line with the chance of rain under it. It
+// looks ahead from now; for a day picked on the other weather card it shows
+// that day from morning to night. Drawn on the dashboard's own card surface,
+// tinted by the weather, so it sits with the rest of the page.
 
-const CATEGORY_ICON: Record<FrostedCategory, React.ComponentType<{ className?: string }>> = {
+type Tone = "sunny" | "night" | "cloudy" | "windy" | "rainy" | "snowy";
+
+const TONE_ICON: Record<Tone, React.ComponentType<{ className?: string }>> = {
   sunny: WiDaySunny,
+  night: WiNightClear,
   cloudy: WiCloudy,
   windy: WiStrongWind,
   rainy: WiRain,
   snowy: WiSnow,
 };
 
-const CATEGORY_LABEL: Record<FrostedCategory, string> = {
-  sunny: "Sunny",
+const TONE_LABEL: Record<Tone, string> = {
+  sunny: "Clear",
+  night: "Clear night",
   cloudy: "Cloudy",
   windy: "Windy",
-  rainy: "Rainy",
-  snowy: "Snowy",
+  rainy: "Rain",
+  snowy: "Snow",
 };
 
-// The design this widget is based on only knows 5 looks, so the real 7-way
-// WeatherCondition collapses down: precipitation always wins (rainy/snowy),
-// then strong wind gets its own look even on an otherwise clear/cloudy day,
-// otherwise it's just sunny vs. cloudy.
-function categorize(condition: WeatherCondition, windEffective: number): FrostedCategory {
+function toneFor(condition: WeatherCondition, wind: number, isDay: boolean): Tone {
   if (condition === "Rain" || condition === "Drizzle" || condition === "Thunderstorm") return "rainy";
   if (condition === "Snow") return "snowy";
-  if (windEffective > 0.55) return "windy";
-  if (condition === "Clear") return "sunny";
+  if (wind > 0.55) return "windy";
+  if (condition === "Clear") return isDay ? "sunny" : "night";
   return "cloudy";
 }
 
-interface FrostedHourPoint {
-  offsetHours: number;
+interface HourPoint {
+  time: number;
   label: string;
   temperature: number | null;
+  rain: number | null;
   weatherId: number | null;
-  windSpeed: number | null;
-  isCenter: boolean;
+  wind: number | null;
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-// OpenWeather's free forecast is 3-hour-stepped. Interpolate a symmetric,
-// 1-hour-step window around an arbitrary center time by absolute timestamp
-// (not by day-bucket, like the detail view does) so the center point is
-// always exactly centered and the window never breaks at midnight — used
-// both for "today, centered on now" and "a future day, centered on noon".
-function buildHourlyWindow(data: WeatherData, centerTime: number, span: number): FrostedHourPoint[] {
-  const times = data.hourly?.time ?? [];
-  const temps = data.hourly?.temperature_2m ?? [];
-  const ids = data.hourly?.weather_code ?? [];
-  const winds = data.hourly?.wind_speed_10m ?? [];
-
-  const points = times
-    .map((time, index) => ({
+// OpenWeather's free forecast comes in 3-hour steps; this interpolates hourly
+// points from `start` (each hour on the hour after the first).
+function hourlyFrom(data: WeatherData, start: number, count: number, firstLabel: string): HourPoint[] {
+  const h = data.hourly;
+  const points = (h?.time ?? [])
+    .map((time, i) => ({
       ts: new Date(time).getTime(),
-      temp: temps[index] ?? null,
-      id: ids[index] ?? null,
-      wind: winds[index] ?? null,
+      temp: h?.temperature_2m?.[i] ?? null,
+      rain: h?.precipitation_probability?.[i] ?? null,
+      id: h?.weather_code?.[i] ?? null,
+      wind: h?.wind_speed_10m?.[i] ?? null,
     }))
-    .filter((point) => Number.isFinite(point.ts))
+    .filter((p) => Number.isFinite(p.ts))
     .sort((a, b) => a.ts - b.ts);
-
   if (!points.length) return [];
-
-  const stepMs = 60 * 60 * 1000;
-  const result: FrostedHourPoint[] = [];
-
-  for (let offset = -span; offset <= span; offset++) {
-    const targetTs = centerTime + offset * stepMs;
+  const lerp = (a: number | null, b: number | null, t: number) => (a != null && b != null ? a + (b - a) * t : (a ?? b));
+  const out: HourPoint[] = [];
+  const firstHour = new Date(start);
+  firstHour.setMinutes(0, 0, 0);
+  for (let i = 0; i < count; i++) {
+    const ts = i === 0 ? start : firstHour.getTime() + i * 3_600_000;
     let prev = points[0];
     let next = points[points.length - 1];
-    for (const point of points) {
-      if (point.ts <= targetTs) prev = point;
-    }
-    for (let i = points.length - 1; i >= 0; i--) {
-      if (points[i].ts >= targetTs) next = points[i];
-    }
-
-    const span2 = next.ts - prev.ts;
-    const t = span2 > 0 ? (targetTs - prev.ts) / span2 : 0;
-    const nearest = t < 0.5 ? prev : next;
-    const temperature = prev.temp != null && next.temp != null
-      ? lerp(prev.temp, next.temp, t)
-      : prev.temp ?? next.temp;
-    const windSpeed = prev.wind != null && next.wind != null
-      ? lerp(prev.wind, next.wind, t)
-      : prev.wind ?? next.wind;
-
-    result.push({
-      offsetHours: offset,
-      label: new Date(targetTs).toLocaleTimeString([], { hour: "numeric" }),
-      temperature: temperature != null ? Math.round(temperature) : null,
-      weatherId: nearest.id,
-      windSpeed,
-      isCenter: offset === 0,
+    for (const p of points) if (p.ts <= ts) prev = p;
+    for (let k = points.length - 1; k >= 0; k--) if (points[k].ts >= ts) next = points[k];
+    const t = next.ts > prev.ts ? (ts - prev.ts) / (next.ts - prev.ts) : 0;
+    const temp = lerp(prev.temp, next.temp, t);
+    const rain = lerp(prev.rain, next.rain, t);
+    out.push({
+      time: ts,
+      label: i === 0 ? firstLabel : new Date(ts).toLocaleTimeString([], { hour: "numeric" }),
+      temperature: temp != null ? Math.round(temp) : null,
+      rain: rain != null ? Math.round(rain) : null,
+      weatherId: (t < 0.5 ? prev : next).id,
+      wind: lerp(prev.wind, next.wind, t),
     });
   }
-
-  return result;
+  return out;
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-  const value = hex.replace("#", "");
-  return [
-    Number.parseInt(value.slice(0, 2), 16),
-    Number.parseInt(value.slice(2, 4), 16),
-    Number.parseInt(value.slice(4, 6), 16),
-  ];
+/** A sentence about the hours shown: how the temperature moves, and whether rain is likely. */
+function summarize(hours: HourPoint[], tone: Tone): string {
+  const temps = hours.map((h) => h.temperature).filter((t): t is number => t != null);
+  const wettest = hours.reduce<HourPoint | null>((best, h) => ((h.rain ?? 0) > (best?.rain ?? 0) ? h : best), null);
+  const last = hours[hours.length - 1]?.label;
+  let trend = "";
+  if (temps.length > 1) {
+    const delta = temps[temps.length - 1] - temps[0];
+    trend = Math.abs(delta) < 3 ? "Steady temperatures" : delta > 0 ? `Warming ${delta}° by ${last}` : `Cooling ${-delta}° by ${last}`;
+  }
+  const wet = wettest && (wettest.rain ?? 0) >= 30 ? `${wettest.rain}% chance of ${tone === "snowy" ? "snow" : "rain"} around ${wettest.label}` : "no rain expected";
+  return trend ? `${trend}, ${wet}.` : `${wet.charAt(0).toUpperCase()}${wet.slice(1)}.`;
 }
 
-function mixHex(from: string, to: string, amount: number): string {
-  const t = Math.max(0, Math.min(amount, 1));
-  const a = hexToRgb(from);
-  const b = hexToRgb(to);
-  const mixed = a.map((channel, index) => Math.round(channel + (b[index] - channel) * t).toString(16).padStart(2, "0"));
-  return `#${mixed.join("")}`;
-}
-
-// Cold -> icy blue, through white, to warm orange/yellow — same visual
-// language as the design's fixed rainbow ribbon, but driven by each hour's
-// actual temperature relative to the window's own range.
-function temperatureToColor(temp: number, min: number, max: number): string {
-  const range = Math.max(max - min, 1);
-  const t = Math.max(0, Math.min((temp - min) / range, 1));
-  if (t < 0.45) return mixHex("#d6eef7", "#ffffff", t / 0.45);
-  if (t < 0.7) return mixHex("#ffffff", "#f2764a", (t - 0.45) / 0.25);
-  return mixHex("#f2764a", "#ffe45e", (t - 0.7) / 0.3);
-}
-
-// Deterministic (index-based, not Math.random()) so first render is stable —
-// same technique the source design's own generator script used.
-function makeDrops(count: number) {
-  return Array.from({ length: count }, (_, i) => ({
-    left: `${(3 + (i * 4.7) % 95).toFixed(1)}%`,
-    delay: `${(-(i * 0.13) % 1.6).toFixed(2)}s`,
-    duration: `${(1.5 + ((i * 7) % 5) * 0.14).toFixed(2)}s`,
+/** The temperature line in a 100 x 100 box (stretched to the card). */
+function chartGeometry(hours: HourPoint[]) {
+  const temps = hours.map((h) => h.temperature).filter((t): t is number => t != null);
+  const min = temps.length ? Math.min(...temps) : 0;
+  const max = temps.length ? Math.max(...temps) : 0;
+  const range = Math.max(max - min, 4);
+  const mid = (max + min) / 2;
+  const points = hours.map((h, i) => ({
+    x: hours.length > 1 ? 4 + (i / (hours.length - 1)) * 92 : 50,
+    // Kept clear of the top (values sit above the points) and the bottom (rain bars).
+    y: h.temperature == null ? 52 : 52 - ((h.temperature - mid) / range) * 52,
   }));
-}
-
-function makeFlakes(count: number) {
-  return Array.from({ length: count }, (_, i) => ({
-    left: `${(3 + (i * 6.1) % 94).toFixed(1)}%`,
-    delay: `${(-(i * 0.6) % 8).toFixed(2)}s`,
-    duration: `${(9 + ((i * 3) % 5) * 1.1).toFixed(2)}s`,
-  }));
-}
-
-function makeGusts() {
-  return [10, 30, 48, 66, 84].map((top, i) => ({
-    top: `${top}%`,
-    delay: `${(-(i * 0.85)).toFixed(2)}s`,
-    duration: `${(2.8 + i * 0.4).toFixed(2)}s`,
-  }));
-}
-
-const DROPS = makeDrops(22);
-const FLAKES = makeFlakes(18);
-const GUSTS = makeGusts();
-
-function FrostedBackground({ category }: { category: FrostedCategory }): React.ReactElement {
-  if (category === "sunny") {
-    return (
-      <>
-        <div className="weather-v2-bg-base weather-v2-bg-sunny-base" />
-        <div className="weather-v2-bg-sunny-wash" />
-        <div className="weather-v2-bg-sunny-glow-outer" />
-        <div className="weather-v2-bg-sunny-glow-core" />
-      </>
-    );
+  // A smooth curve through the points (Catmull-Rom as cubic Béziers).
+  let d = points.length ? `M${points[0].x} ${points[0].y}` : "";
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    d += ` C${p1.x + (p2.x - p0.x) / 6} ${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6} ${p2.y - (p3.y - p1.y) / 6} ${p2.x} ${p2.y}`;
   }
-
-  if (category === "cloudy") {
-    return (
-      <>
-        <div className="weather-v2-bg-base weather-v2-bg-cloudy-base" />
-        <div className="weather-v2-bg-cloudy-drift weather-v2-bg-cloudy-drift-a" />
-        <div className="weather-v2-bg-cloudy-drift weather-v2-bg-cloudy-drift-b" />
-      </>
-    );
-  }
-
-  if (category === "windy") {
-    return (
-      <>
-        <div className="weather-v2-bg-base weather-v2-bg-windy-base" />
-        {GUSTS.map((gust, index) => (
-          <span
-            key={index}
-            className="weather-v2-gust"
-            style={{ top: gust.top, animationDelay: gust.delay, animationDuration: gust.duration }}
-          />
-        ))}
-      </>
-    );
-  }
-
-  if (category === "rainy") {
-    return (
-      <>
-        <div className="weather-v2-bg-base weather-v2-bg-rainy-base" />
-        {DROPS.map((drop, index) => (
-          <span
-            key={index}
-            className="weather-v2-raindrop"
-            style={{ left: drop.left, animationDelay: drop.delay, animationDuration: drop.duration }}
-          />
-        ))}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <div className="weather-v2-bg-base weather-v2-bg-snowy-base" />
-      {FLAKES.map((flake, index) => (
-        <span
-          key={index}
-          className="weather-v2-snowflake"
-          style={{ left: flake.left, animationDelay: flake.delay, animationDuration: flake.duration }}
-        />
-      ))}
-    </>
-  );
+  const first = points[0];
+  const lastPoint = points[points.length - 1];
+  return { points, line: d, area: points.length ? `${d} L${lastPoint.x} 100 L${first.x} 100 Z` : "" };
 }
 
-function FrostedLoading(): React.ReactElement {
-  return (
-    <div className="weather-v2-card weather-v2-state relative flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit]">
-      <div className="weather-v2-spinner" />
-    </div>
-  );
-}
-
-function FrostedError({ message, instanceId }: { message: string; instanceId?: string }): React.ReactElement {
-  return <WeatherStatus error={message} instanceId={instanceId} />;
-}
-
-interface FrostedContentProps {
+interface ForecastProps {
   data: WeatherData;
   clockTime: number;
-  centerTime: number;
-  hourSpan: number;
+  location?: string;
+  /** A picked day: show it from 6 AM, not from now. */
+  dayStart?: number | null;
+  hourCount: number;
 }
 
-function FrostedContent({ data, clockTime, centerTime, hourSpan }: FrostedContentProps): React.ReactElement {
-  const hours = buildHourlyWindow(data, centerTime, hourSpan);
-  const centerHour = hours.find((hour) => hour.isCenter) ?? hours[Math.floor(hours.length / 2)];
-
-  // Derived from the CENTERED hour's own data — not "right now" — so a
-  // future selected day shows that day's condition/wind, not today's.
-  const weatherId = centerHour?.weatherId ?? 800;
+function Forecast({ data, clockTime, location, dayStart, hourCount }: ForecastProps) {
+  const hours = hourlyFrom(data, dayStart ?? clockTime, hourCount, dayStart ? new Date(dayStart).toLocaleTimeString([], { hour: "numeric" }) : "Now");
+  const first = hours[0];
+  const weatherId = dayStart ? (first?.weatherId ?? 800) : (data.current?.weather_code ?? first?.weatherId ?? 800);
   const condition = getOpenWeatherCondition(weatherId, "");
-  const visual = getOpenWeatherVisualProfile(weatherId);
-  const windEffective = getEffectiveWind(visual, centerHour?.windSpeed ?? undefined, data.unit);
-  const category = categorize(condition, windEffective);
-  const Icon = CATEGORY_ICON[category];
-
-  const centerDate = new Date(centerTime);
-  const isToday = centerDate.toDateString() === new Date(clockTime).toDateString();
-  const centerLabel = isToday ? "NOW" : centerDate.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase();
-  const headlineTail = isToday
-    ? "conditions will continue for the rest of the day"
-    : `conditions expected ${centerDate.toLocaleDateString(undefined, { weekday: "long" })}`;
-
-  const temps = hours.map((hour) => hour.temperature).filter((value): value is number => value != null);
-  const minTemp = temps.length ? Math.min(...temps) : (centerHour?.temperature ?? 0) - 5;
-  const maxTemp = temps.length ? Math.max(...temps) : (centerHour?.temperature ?? 0) + 5;
-
-  const blobWidthPct = 34;
-  const spanStart = -8;
-  const spanEnd = 108;
-  const gridColumns = { gridTemplateColumns: `repeat(${hours.length}, 1fr)` };
+  const wind = getEffectiveWind(getOpenWeatherVisualProfile(weatherId), dayStart ? (first?.wind ?? undefined) : data.current?.wind_speed, data.unit);
+  const isDay = dayStart ? true : data.current?.is_day !== 0;
+  const tone = toneFor(condition, wind, isDay);
+  const Icon = TONE_ICON[tone];
+  const temperature = dayStart ? first?.temperature : Math.round(data.current?.temperature_2m ?? first?.temperature ?? 0);
+  const description = !dayStart ? data.openWeather?.description : undefined;
+  const days = data.daily?.time ?? [];
+  const dayIndex = dayStart ? Math.max(0, days.findIndex((t) => new Date(`${t}T12:00:00`).toDateString() === new Date(dayStart).toDateString())) : 0;
+  const high = data.daily?.temperature_2m_max?.[dayIndex];
+  const low = data.daily?.temperature_2m_min?.[dayIndex];
+  const { points, line, area } = chartGeometry(hours);
+  const fillId = `forecast-fill-${React.useId().replace(/:/g, "")}`;
+  // Values on every second or third hour (always the first and last).
+  const labelEvery = hours.length > 9 ? 3 : 2;
+  // A regular label too close to the last one is skipped, so they don't overlap.
+  const showLabel = (i: number) => i === 0 || i === hours.length - 1 || (i % labelEvery === 0 && hours.length - 1 - i >= labelEvery);
+  const eyebrow = [location, dayStart ? new Date(dayStart).toLocaleDateString(undefined, { weekday: "long" }) : null].filter(Boolean).join(" · ");
+  const conditionText = description ? description.charAt(0).toUpperCase() + description.slice(1) : TONE_LABEL[tone];
 
   return (
-    <div
-      className="weather-v2-card relative isolate flex h-full w-full flex-col overflow-hidden rounded-[inherit]"
-      data-category={category}
-    >
-      <div className="weather-v2-bg-layer absolute inset-0" aria-hidden="true">
-        <FrostedBackground category={category} />
+    <div className="forecast" data-tone={tone}>
+      <header className="forecast-head">
+        <div className="forecast-now">
+          {eyebrow && <p className="forecast-eyebrow">{eyebrow}</p>}
+          <p className="forecast-reading">
+            <span className="forecast-temp numeric">{temperature != null ? `${temperature}°` : "--"}</span>
+            <span className="forecast-condition">
+              <Icon className="forecast-icon" aria-hidden="true" />
+              <span className="forecast-condition-text">{conditionText}</span>
+            </span>
+          </p>
+        </div>
+        {high != null && low != null && (
+          <p className="forecast-hilo numeric" aria-label={`High ${Math.round(high)}°, low ${Math.round(low)}°`}>
+            <span>H {Math.round(high)}°</span>
+            <span>L {Math.round(low)}°</span>
+          </p>
+        )}
+      </header>
+
+      <p className="forecast-summary">{summarize(hours, tone)}</p>
+
+      <div
+        className="forecast-chart"
+        role="img"
+        aria-label={hours.map((h) => `${h.label} ${h.temperature ?? "--"}°${h.rain ? `, ${h.rain}% rain` : ""}`).join("; ")}
+      >
+        <svg className="forecast-plot" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id={fillId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stopColor="var(--forecast-line)" stopOpacity="0.2" />
+              <stop offset="1" stopColor="var(--forecast-line)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {hours.map((h, i) =>
+            h.rain ? <rect key={i} className="forecast-rain" x={points[i].x - 1.4} width={2.8} y={100 - h.rain * 0.24} height={h.rain * 0.24} /> : null,
+          )}
+          <path d={area} fill={`url(#${fillId})`} />
+          <path d={line} className="forecast-line" />
+        </svg>
+        {hours.map((h, i) =>
+          showLabel(i) ? (
+            <span key={i} className="forecast-point" data-first={i === 0 || undefined} data-last={i === hours.length - 1 || undefined} style={{ left: `${points[i].x}%`, top: `${points[i].y}%` }}>
+              <span className="forecast-point-value numeric">{h.temperature != null ? `${h.temperature}°` : ""}</span>
+            </span>
+          ) : null,
+        )}
       </div>
-      <div className="weather-v2-glass absolute inset-0" aria-hidden="true" />
-      <div className="weather-v2-content relative z-10 flex h-full w-full flex-col">
-        <p className="weather-v2-headline">
-          {CATEGORY_LABEL[category]}{" "}
-          <Icon className="weather-v2-headline-icon" aria-hidden="true" />{" "}
-          <span className="weather-v2-headline-tail">{headlineTail}</span>
-        </p>
 
-        <div className="weather-v2-rule" aria-hidden="true" />
-
-        <div className="weather-v2-temp-row" style={gridColumns}>
-          {hours.map((hour) => (
-            <div key={hour.offsetHours} className={`weather-v2-temp-cell ${hour.isCenter ? "weather-v2-temp-cell-now" : ""}`}>
-              {hour.isCenter && <span className="weather-v2-now-label">{centerLabel}</span>}
-              <span className="weather-v2-temp-value">{hour.temperature != null ? `${hour.temperature}°` : "--"}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="weather-v2-ribbon">
-          <div className="weather-v2-ribbon-blur" aria-hidden="true">
-            {hours.map((hour, index) => {
-              if (hour.temperature == null) return null;
-              const color = temperatureToColor(hour.temperature, minTemp, maxTemp);
-              const centerPct = spanStart + (index / (hours.length - 1)) * (spanEnd - spanStart);
-              return (
-                <span
-                  key={hour.offsetHours}
-                  className="weather-v2-ribbon-blob"
-                  style={{
-                    left: `${centerPct - blobWidthPct / 2}%`,
-                    width: `${blobWidthPct}%`,
-                    background: `radial-gradient(50% 50% at 50% 50%, ${color} 0%, ${color} 42%, transparent 100%)`,
-                  }}
-                />
-              );
-            })}
-          </div>
-          <span className="weather-v2-ribbon-marker" aria-hidden="true" />
-          <span className="weather-v2-ribbon-dot" aria-hidden="true" />
-        </div>
-
-        <div className="weather-v2-rule" aria-hidden="true" />
-
-        <div className="weather-v2-hour-row" style={gridColumns}>
-          {hours.map((hour) => (
-            <div key={hour.offsetHours} className="weather-v2-hour-cell">
-              {hour.isCenter ? <span className="weather-v2-hour-pill">{hour.label}</span> : hour.label}
-            </div>
-          ))}
-        </div>
+      <div className="forecast-hours" aria-hidden="true">
+        {hours.map((h, i) =>
+          showLabel(i) ? (
+            <span key={i} style={{ left: `${points[i].x}%` }} data-first={i === 0 || undefined} data-last={i === hours.length - 1 || undefined}>
+              {h.label}
+            </span>
+          ) : null,
+        )}
       </div>
     </div>
   );
 }
 
-const LIVE_HOUR_SPAN = 6;
-/** Hours either side of the centre on a narrow card (seven points, not thirteen). */
-const NARROW_HOUR_SPAN = 3;
-const NARROW_WIDTH = 420;
-
-/** Fewer hours when the card is narrow (a 2 x 1 card), so the temperatures stay readable. */
-function useHourSpan(ref: React.RefObject<HTMLDivElement | null>) {
-  const [span, setSpan] = React.useState(LIVE_HOUR_SPAN);
+/** Eight hours on a narrow (2 x 1) card, twelve when there's room. */
+function useHourCount(ref: React.RefObject<HTMLDivElement | null>) {
+  const [count, setCount] = React.useState(12);
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
-    const update = () => setSpan(el.clientWidth && el.clientWidth < NARROW_WIDTH ? NARROW_HOUR_SPAN : LIVE_HOUR_SPAN);
+    const update = () => setCount(el.clientWidth && el.clientWidth < 420 ? 8 : 12);
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
     return () => observer.disconnect();
   }, [ref]);
-  return span;
+  return count;
 }
 
-function LiveFrostedCard({ instanceId, overrides }: { instanceId: string; overrides?: WeatherOverrides }): React.ReactElement {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const hourSpan = useHourSpan(ref);
-  return (
-    <div ref={ref} className="h-full w-full">
-      <LiveFrostedContent instanceId={instanceId} overrides={overrides} hourSpan={hourSpan} />
-    </div>
-  );
-}
-
-function LiveFrostedContent({ instanceId, overrides, hourSpan }: { instanceId: string; overrides?: WeatherOverrides; hourSpan: number }): React.ReactElement {
+function LiveForecast({ instanceId, overrides, hourCount }: { instanceId: string; overrides?: WeatherOverrides; hourCount: number }) {
   useWeatherData(instanceId, overrides);
-  const { data, error, selectedDay } = useWeatherInstance(instanceId);
+  const { data, error, selectedDay, location } = useWeatherInstance(instanceId);
   const clockTime = useWeatherStore((state) => state.clockTime);
   const tickClock = useWeatherStore((state) => state.tickClock);
 
@@ -387,44 +252,33 @@ function LiveFrostedContent({ instanceId, overrides, hourSpan }: { instanceId: s
     return () => window.clearInterval(timer);
   }, [tickClock]);
 
-  if (error) return <FrostedError message={error} instanceId={instanceId} />;
-  if (!data) return <FrostedLoading />;
-
-  // A selected forecast day (from the v1 widget's date pills, sharing this
-  // same weatherStore instance) has no "now" of its own — center on its noon.
-  const centerTime = selectedDay ? new Date(`${selectedDay.day.date}T12:00:00`).getTime() : clockTime;
-
-  return <FrostedContent data={data} clockTime={clockTime} centerTime={centerTime} hourSpan={hourSpan} />;
+  if (error) return <WeatherStatus error={error} instanceId={instanceId} />;
+  if (!data) return <div className="forecast forecast-loading" aria-busy="true" />;
+  // A day picked on the other weather card: that day from 6 AM.
+  const dayStart = selectedDay ? new Date(`${selectedDay.day.date}T06:00:00`).getTime() : null;
+  return <Forecast data={data} clockTime={clockTime} location={location} dayStart={dayStart} hourCount={dayStart ? 16 : hourCount} />;
 }
 
 export interface WeatherFrostedCardProps {
   instanceId?: string;
   overrides?: WeatherOverrides;
+  /** Sample data instead of a live card (the weather preview page). */
   data?: WeatherData;
   clockTime?: number;
-  /** Hour to center the ribbon on; defaults to `clockTime` ("now"). */
-  centerTime?: number;
-  /** Hours shown before/after the center point; defaults to 6 (13 points). */
-  hourSpan?: number;
 }
 
-// Dual-mode like WeatherBox: pass instanceId for a live dashboard widget
-// (fetches + caches per-instance via useWeatherData/useWeatherStore, and
-// follows the instance's selectedDay so it doubles as the v1 widget's
-// day-detail view), or pass a synthetic `data` fixture directly to preview a
-// specific condition without needing that weather to actually be happening.
+// Live on the dashboard (pass instanceId: fetches and caches per card, and
+// follows a day picked on the other weather card), or with sample `data`.
 export default function WeatherFrostedCard(props: WeatherFrostedCardProps = {}): React.ReactElement {
-  if (!props.data) {
-    return <LiveFrostedCard instanceId={props.instanceId ?? ""} overrides={props.overrides} />;
-  }
-
-  const clockTime = props.clockTime ?? debugNowMs();
+  const ref = React.useRef<HTMLDivElement>(null);
+  const hourCount = useHourCount(ref);
   return (
-    <FrostedContent
-      data={props.data}
-      clockTime={clockTime}
-      centerTime={props.centerTime ?? clockTime}
-      hourSpan={props.hourSpan ?? LIVE_HOUR_SPAN}
-    />
+    <div ref={ref} className="h-full w-full">
+      {props.data ? (
+        <Forecast data={props.data} clockTime={props.clockTime ?? debugNowMs()} location="Preview" hourCount={hourCount} />
+      ) : (
+        <LiveForecast instanceId={props.instanceId ?? ""} overrides={props.overrides} hourCount={hourCount} />
+      )}
+    </div>
   );
 }

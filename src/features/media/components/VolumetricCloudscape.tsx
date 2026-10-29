@@ -202,20 +202,22 @@ vec3 drawSun(vec2 uv, vec3 col) {
   // a coverage attenuation (scattered out before reaching the viewer).
   float block = clamp(u_coverage * (0.35 + u_density * 0.65), 0.0, 1.0);
 
-  float coR = mix(0.26, 0.44, smoothstep(0.0,1.0,u_phase));
-  float corona = pow(max(0.0, 1.0 - d / coR), 2.4) * vis * (1.0 - block * 0.75);
-  col += hue * corona * 0.52;
+  // Kept soft: a bright, wide sun washed out the sky around it and the
+  // clouds drifting past it.
+  float coR = mix(0.20, 0.36, smoothstep(0.0,1.0,u_phase));
+  float corona = pow(max(0.0, 1.0 - d / coR), 2.6) * vis * (1.0 - block * 0.8);
+  col += hue * corona * 0.24;
 
-  float glow = pow(max(0.0, 1.0 - d / 0.09), 3.8) * vis * (1.0 - block * 0.8);
-  col += hue * glow * 0.58;
+  float glow = pow(max(0.0, 1.0 - d / 0.07), 3.8) * vis * (1.0 - block * 0.85);
+  col += hue * glow * 0.28;
 
-  float disc = smoothstep(0.030, 0.020, d) * vis * (1.0 - block * 0.55);
-  col = mix(col, hue * 1.5, disc);
+  float disc = smoothstep(0.024, 0.016, d) * vis * (1.0 - block * 0.6);
+  col = mix(col, hue * 1.3, disc);
 
   float nearHorizon = smoothstep(0.28, 1.0, u_phase);
   if (nearHorizon > 0.01) {
     float hg = exp(-abs(uv.y - 0.13) * 6.5) * exp(-abs(uv.x - sp.x) * 1.6);
-    hg *= nearHorizon * (1.0 - block * 0.65) * 0.55;
+    hg *= nearHorizon * (1.0 - block * 0.65) * 0.38;
     vec3 hCol = mix(vec3(1.0,0.72,0.28), vec3(0.88,0.30,0.48), smoothstep(0.28,1.0,u_phase));
     col += hCol * hg;
   }
@@ -226,7 +228,7 @@ vec3 drawSun(vec2 uv, vec3 col) {
     float rayDir = atan(uv.y - sp.y, uv.x - sp.x);
     float rayDist = length(aspectCorrect(uv - sp));
     float rays = noise(vec3(rayDir * 3.2, u_time * 0.045, 0.5));
-    rays *= exp(-rayDist * 3.8) * gapRays * (1.3 - u_phase) * 0.13;
+    rays *= exp(-rayDist * 3.8) * gapRays * (1.3 - u_phase) * 0.06;
     col += hue * max(0.0, rays);
   }
   return col;
@@ -462,7 +464,7 @@ void main() {
       float t = tEnter + dt * rayJitter(gl_FragCoord.xy);
 
       float mu = dot(rd, lightDir);
-      vec3 sunColor = cloudLight() * (1.0 * dirStrength) * hueL;
+      vec3 sunColor = cloudLight() * (0.78 * dirStrength) * hueL;
       // At night clouds catch a little moonlight and city glow, so they
       // read as slightly lighter than the sky instead of vanishing into it.
       float night = smoothstep(1.3, 1.9, u_phase);
@@ -501,7 +503,7 @@ void main() {
           for (int k = 0; k < 3; k++) {
             // Forward lobe kept moderate: a strong one blows out clouds in
             // front of the sun.
-            float phase = min(mix(henyeyGreenstein(mu, -0.25 * c), henyeyGreenstein(mu, 0.5 * c), 0.7) * 12.566, 3.0);
+            float phase = min(mix(henyeyGreenstein(mu, -0.25 * c), henyeyGreenstein(mu, 0.38 * c), 0.7) * 12.566, 1.9);
             sunlight += a * exp(-tau * b) * phase;
             a *= 0.5; b *= 0.35; c *= 0.5;
           }
@@ -545,7 +547,7 @@ void main() {
   // Bright smudge where the sun sits behind a translucent deck
   float deckGlow = lightProx * (1.0 - smoothstep(0.55, 0.95, density))
                  * alpha * clamp(1.6 - u_phase, 0.0, 1.0);
-  clouds += hueL * deckGlow * 0.12;
+  clouds += hueL * deckGlow * 0.06;
 
   // ---- fog ground bands ----
   if (u_fog > 0.01) {

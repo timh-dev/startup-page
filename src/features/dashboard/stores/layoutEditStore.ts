@@ -6,6 +6,8 @@ const HISTORY_LIMIT = 30;
 
 interface LayoutEditStore {
   editing: boolean;
+  /** Editing was turned on by opening Settings, so closing Settings turns it off. */
+  editingFromSettings: boolean;
   /** The card whose inspector is open. */
   selectedId: string | null;
   /** Earlier versions of the card list, newest last, for Undo. */
@@ -14,6 +16,8 @@ interface LayoutEditStore {
   insertAt: { x: number; y: number } | null;
   setInsertAt: (cell: { x: number; y: number } | null) => void;
   setEditing: (editing: boolean) => void;
+  /** Opening Settings starts editing (unless it's already on). */
+  startEditingForSettings: () => void;
   toggleEditing: () => void;
   select: (id: string | null) => void;
   pushHistory: (widgets: WidgetInstance[]) => void;
@@ -24,11 +28,15 @@ interface LayoutEditStore {
 // the edit bar and the inspector. Not persisted: a reload leaves edit mode.
 export const useLayoutEditStore = create<LayoutEditStore>((set, get) => ({
   editing: false,
+  editingFromSettings: false,
   selectedId: null,
   history: [],
   insertAt: null,
   setInsertAt: (insertAt) => set({ insertAt }),
-  setEditing: (editing) => set(editing ? { editing } : { editing, selectedId: null, insertAt: null }),
+  setEditing: (editing) => set(editing ? { editing, editingFromSettings: false } : { editing, editingFromSettings: false, selectedId: null, insertAt: null }),
+  startEditingForSettings: () => {
+    if (!get().editing) set({ editing: true, editingFromSettings: true });
+  },
   toggleEditing: () => get().setEditing(!get().editing),
   select: (selectedId) => set({ selectedId }),
   pushHistory: (widgets) => set((state) => ({ history: [...state.history, widgets].slice(-HISTORY_LIMIT) })),

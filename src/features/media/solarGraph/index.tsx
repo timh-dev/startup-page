@@ -35,6 +35,8 @@ interface SolarGraphState {
 
 export default function SolarGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // A small copy of each frame, blurred over the chart: the poster's halation.
+  const bloomRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<SolarGraphState>({
     lst: 0,
     stars: null,
@@ -137,6 +139,7 @@ export default function SolarGraph() {
         state.lastTimestamp = timestamp;
         state.animationTime += dt;
         draw(ctx, canvas, state);
+        drawBloom(canvas);
       }
 
       state.animFrameId = requestAnimationFrame(frame);
@@ -164,6 +167,23 @@ export default function SolarGraph() {
           if (coords) state.solar = calculateSolarContext(coords.lat, coords.lon);
         });
       }
+    }
+
+    // Only the bright parts bloom (sun, curve, horizon): a dimmed, high
+    // contrast copy at an eighth of the size, which the CSS blurs and screens.
+    const bloomCtx = bloomRef.current?.getContext('2d') ?? null;
+    function drawBloom(source: HTMLCanvasElement) {
+      const bloom = bloomRef.current;
+      if (!bloom || !bloomCtx) return;
+      const bw = Math.max(1, Math.round((state.renderWidth || source.clientWidth) / 8));
+      const bh = Math.max(1, Math.round((state.renderHeight || source.clientHeight) / 8));
+      if (bloom.width !== bw || bloom.height !== bh) {
+        bloom.width = bw;
+        bloom.height = bh;
+      }
+      bloomCtx.filter = 'brightness(0.75) contrast(2.4)';
+      bloomCtx.clearRect(0, 0, bw, bh);
+      bloomCtx.drawImage(source, 0, 0, bw, bh);
     }
 
     function draw(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, state: SolarGraphState) {
@@ -270,13 +290,14 @@ export default function SolarGraph() {
   }, []);
 
   return (
-    <div id="container" className="w-full h-full rounded-[inherit] overflow-hidden">
+    <div id="container" className="poster-finish relative w-full h-full rounded-[inherit] overflow-hidden">
       <canvas
         ref={canvasRef}
         className="w-full h-full rounded-[inherit]"
         id="canvas"
         style={{ cursor: 'crosshair' }}
       />
+      <canvas ref={bloomRef} className="poster-bloom" aria-hidden="true" />
     </div>
   );
 }
