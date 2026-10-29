@@ -778,3 +778,104 @@
   font-size: clamp(0.64rem, 4.4cqw, 0.75rem);
   color: rgb(255 255 255 / 0.7);
 }
+
+/* Globe time debugger: a clock button on hover, opening date + time controls. */
+.globe-debug-toggle {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  color: var(--foreground);
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.globe-widget:hover .globe-debug-toggle,
+.globe-debug-toggle:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .globe-debug-toggle {
+    opacity: 0.8;
+  }
+}
+
+.globe-debug {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  left: 0.6rem;
+  z-index: 2;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem 0.55rem;
+  border-radius: 0.85rem;
+  color: var(--foreground);
+  font-size: 0.75rem;
+}
+
+/* The limb view's caption is at the bottom, so the debugger sits on top. */
+.globe-debug-toggle[data-view="limb"],
+.globe-debug[data-view="limb"] {
+  top: 0.6rem;
+  bottom: auto;
+}
+
+.globe-debug-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.globe-debug-row input[type="date"] {
+  flex: 1;
+  min-width: 0;
+  height: 1.65rem;
+  padding: 0 0.4rem;
+  border-radius: 0.45rem;
+  background: color-mix(in oklab, var(--foreground) 7%, transparent);
+  color: inherit;
+  font: inherit;
+  color-scheme: light dark;
+}
+
+.globe-debug-now,
+.globe-debug-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.65rem;
+  border-radius: 0.45rem;
+  font-weight: 600;
+  transition: background-color var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+
+.globe-debug-now {
+  padding: 0 0.6rem;
+  background: color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+.globe-debug-now:disabled {
+  opacity: 0.4;
+}
+
+.globe-debug-close {
+  width: 1.65rem;
+}
+
+.globe-debug-now:not(:disabled):hover,
+.globe-debug-close:hover {
+  background: color-mix(in oklab, var(--foreground) 16%, transparent);
+}
+
+.globe-debug-slider {
+  width: 100%;
+  accent-color: #f5c542;
+}

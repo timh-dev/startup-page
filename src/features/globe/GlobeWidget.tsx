@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { HiOutlineClock, HiXMark } from "react-icons/hi2";
 
 import landMaskUrl from "@/assets/world/land-mask.png";
 import { getOrRequestLocation } from "@/lib/geolocation";
@@ -58,6 +59,11 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
   const savedLongitude = useSettingsStore((state) => state.settings.longitude);
   const [located, setLocated] = useState<{ latitude: number; longitude: number } | null>(null);
   const [now, setNow] = useState(() => new Date());
+  // The time debugger: a chosen moment to show instead of now.
+  const [override, setOverride] = useState<Date | null>(null);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const overrideRef = useRef<Date | null>(null);
+  overrideRef.current = override;
   // The replayed moment while the day sweeps in; null once it reaches now.
   const [sweepTime, setSweepTime] = useState<Date | null>(null);
   const sweepRef = useRef<{ start: number; from: Date; to: Date; duration: number } | null>(null);
@@ -115,7 +121,7 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
 
     const renderScene = () => {
       if (!canvas.clientWidth || sweepRef.current) return;
-      renderer.renderScene({ ...sceneRef.current, now: new Date() });
+      renderer.renderScene({ ...sceneRef.current, now: overrideRef.current ?? new Date() });
       renderer.renderFrame(pulseTime(), !prefersReducedMotion());
     };
 
@@ -190,12 +196,21 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     const renderer = rendererRef.current;
     const canvas = canvasRef.current;
     if (!renderer || !canvas?.clientWidth || sweepRef.current) return;
-    renderer.renderScene({ view, latitude, longitude, now });
+    renderer.renderScene({ view, latitude, longitude, now: override ?? now });
     renderer.renderFrame((performance.now() - pulseStartRef.current) / 1000, !prefersReducedMotion());
-  }, [view, latitude, longitude, now]);
+  }, [view, latitude, longitude, now, override]);
 
-  // The caption follows the sweep, then the clock.
-  const shown = sweepTime ?? now;
+  // Choosing a time stops the replay and shows that moment.
+  const showTime = (next: Date | null) => {
+    if (sweepRef.current) {
+      sweepRef.current = null;
+      setSweepTime(null);
+    }
+    setOverride(next);
+  };
+
+  // The caption follows the replay, then the chosen time, then the clock.
+  const shown = sweepTime ?? override ?? now;
   const elevation = sunElevation(latitude, longitude, shown);
   const time = shown.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const place = placeLabel();
@@ -218,6 +233,86 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
           {time} · {daylightLabel(elevation)}
         </p>
       </div>
+      <TimeDebugger
+        view={view}
+        open={debugOpen}
+        onToggle={() => setDebugOpen((value) => !value)}
+        value={shown}
+        live={override === null}
+        onChange={showTime}
+      />
+    </div>
+  );
+}
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+/**
+ * Scrub the globe to any moment: a date (for the seasons) and a slider
+ * through the day. Hidden behind a clock button that shows on hover.
+ */
+function TimeDebugger({
+  view,
+  open,
+  onToggle,
+  value,
+  live,
+  onChange,
+}: {
+  view: GlobeView;
+  open: boolean;
+  onToggle: () => void;
+  value: Date;
+  live: boolean;
+  onChange: (next: Date | null) => void;
+}) {
+  const minutes = value.getHours() * 60 + value.getMinutes();
+  const dateValue = `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+
+  const setMinutes = (next: number) => {
+    const date = new Date(value);
+    date.setHours(Math.floor(next / 60), next % 60, 0, 0);
+    onChange(date);
+  };
+  const setDate = (text: string) => {
+    const [year, month, day] = text.split("-").map(Number);
+    if (!year || !month || !day) return;
+    const date = new Date(value);
+    date.setFullYear(year, month - 1, day);
+    onChange(date);
+  };
+
+  if (!open) {
+    return (
+      <button type="button" className="globe-debug-toggle surface-glass" data-view={view} onClick={onToggle} title="Change the time" aria-label="Change the time">
+        <HiOutlineClock className="size-3.5" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="globe-debug surface-glass" data-view={view} role="group" aria-label="Globe time">
+      <div className="globe-debug-row">
+        <input type="date" value={dateValue} onChange={(event) => setDate(event.target.value)} aria-label="Date" />
+        <button type="button" className="globe-debug-now" onClick={() => onChange(null)} disabled={live}>
+          Now
+        </button>
+        <button type="button" className="globe-debug-close" onClick={onToggle} aria-label="Close">
+          <HiXMark className="size-3.5" />
+        </button>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={1439}
+        step={5}
+        value={minutes}
+        onChange={(event) => setMinutes(Number(event.target.value))}
+        aria-label="Time of day"
+        className="globe-debug-slider"
+      />
     </div>
   );
 }
