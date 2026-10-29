@@ -154,7 +154,7 @@ interface UnsplashResult {
 
 interface WikimediaPage {
   title?: string;
-  imageinfo?: Array<{ thumburl?: string; url?: string; descriptionurl?: string }>;
+  imageinfo?: Array<{ thumburl?: string; url?: string; descriptionurl?: string; width?: number; height?: number }>;
 }
 
 class Unsplash extends Component<UnsplashProps, UnsplashState> {
@@ -287,30 +287,42 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
     return ratio > 1.3 ? "landscape" : ratio < 0.77 ? "portrait" : "squarish";
   }
 
-  // Without an Unsplash key: Wikimedia Commons' best-rated photography.
-  // Topical Featured Pictures first (landscapes, mountains, lakes, cities —
-  // the general Featured set also holds historical photos and engravings),
-  // then Quality Images, then all Featured Pictures, then a curated set. A
-  // plain file search turned up snapshots of road signs and hangars.
+  // Without an Unsplash key: Wikimedia Commons' Featured Pictures, limited
+  // to scenic topics (the general Featured set also holds historical photos
+  // and engravings; Quality Images turned up product shots like a camera
+  // lens). Only high-resolution files whose shape suits the tile are used,
+  // so a crop never leaves a sliver of a panorama. The search term is tried
+  // first, then any scenic picture, then a curated set.
   async _fetchFallback(category: string, searchTerms: string[], updateDisplay: boolean) {
+    const root = this._rootRef.current?.getBoundingClientRect();
+    const tileRatio = root?.width && root.height ? root.width / root.height : 1;
     const { width } = targetSize(this._rootRef.current);
-    const sources = [
-      "Featured_pictures_of_landscapes|Featured_pictures_of_mountains|Featured_pictures_of_lakes|Featured_pictures_of_cityscapes",
-      "Quality_images",
-      "Featured_pictures_on_Wikimedia_Commons",
-    ];
+    const scenic = [
+      "Featured_pictures_of_landscapes",
+      "Featured_pictures_of_mountains",
+      "Featured_pictures_of_lakes",
+      "Featured_pictures_of_waterfalls",
+      "Featured_pictures_of_forests",
+      "Featured_pictures_of_cityscapes",
+    ].join("|");
+    const queries = [`${category} filetype:bitmap incategory:${scenic}`, `filetype:bitmap incategory:${scenic}`];
 
-    for (const commonsCategory of sources) {
+    for (const query of queries) {
       try {
-        const query = `${category} filetype:bitmap incategory:${commonsCategory}`;
         const response = await fetch(
           `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}` +
-            `&gsrnamespace=6&gsrlimit=30&prop=imageinfo&iiprop=url&iiurlwidth=${width}&format=json&origin=*`,
+            `&gsrnamespace=6&gsrlimit=50&gsroffset=${Math.floor(Math.random() * 4) * 50}` +
+            `&prop=imageinfo&iiprop=url|size&iiurlwidth=${width}&format=json&origin=*`,
         );
         const data = await response.json();
-        const pages = (Object.values(data.query?.pages || {}) as WikimediaPage[]).filter(
-          (page) => page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url,
-        );
+        const pages = (Object.values(data.query?.pages || {}) as WikimediaPage[]).filter((page) => {
+          const info = page.imageinfo?.[0];
+          if (!info?.width || !info.height || !(info.thumburl || info.url)) return false;
+          // At least as wide as the tile needs, and an aspect ratio within
+          // about 1.6x of the tile's.
+          const fit = info.width / info.height / tileRatio;
+          return info.width >= Math.min(width, 1600) && fit > 0.62 && fit < 1.6;
+        });
         if (!pages.length) continue;
 
         const page = pages[Math.floor(Math.random() * pages.length)];
@@ -319,7 +331,7 @@ class Unsplash extends Component<UnsplashProps, UnsplashState> {
         await this._useFoundPhoto({ url: (info.thumburl || info.url)!, color: null, credit }, category, searchTerms, updateDisplay);
         return;
       } catch {
-        // Try the next source.
+        // Try the next query.
       }
     }
 
