@@ -6,7 +6,7 @@
 // Cell logic (which cards touch, which joins still hold, the groups) and
 // pixel geometry (the group's outline, the bridges across seams) live here;
 // the dashboard draws them.
-import { pageOf, type Layout, type Placement } from "./grid";
+import { PAGE_ROWS, pageOf, type Layout, type Placement } from "./grid";
 
 /**
  * "bridge": one shape, the gap between filled. "window": the cards keep
@@ -32,8 +32,8 @@ export interface Seam {
 export const joinKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /** The seam between two cards, if they share an edge on the same page. */
-export function seamBetween(p: Placement, q: Placement): Seam | null {
-  if (pageOf(p.y) !== pageOf(q.y)) return null;
+export function seamBetween(p: Placement, q: Placement, pageRows = PAGE_ROWS): Seam | null {
+  if (pageOf(p.y, pageRows) !== pageOf(q.y, pageRows)) return null;
   const [left, right] = p.x <= q.x ? [p, q] : [q, p];
   if (left.x + left.w === right.x) {
     const from = Math.max(left.y, right.y);
@@ -50,12 +50,12 @@ export function seamBetween(p: Placement, q: Placement): Seam | null {
 }
 
 /** Every pair of cards that touch (where a join node can go). */
-export function adjacentSeams(layout: Layout): Seam[] {
+export function adjacentSeams(layout: Layout, pageRows = PAGE_ROWS): Seam[] {
   const cards = [...layout.values()];
   const seams: Seam[] = [];
   for (let i = 0; i < cards.length; i++) {
     for (let j = i + 1; j < cards.length; j++) {
-      const seam = seamBetween(cards[i], cards[j]);
+      const seam = seamBetween(cards[i], cards[j], pageRows);
       if (seam) seams.push(seam);
     }
   }
@@ -63,7 +63,7 @@ export function adjacentSeams(layout: Layout): Seam[] {
 }
 
 /** The saved joins that still hold (both cards exist and still touch). */
-export function activeSeams(layout: Layout, joins: Join[]): Seam[] {
+export function activeSeams(layout: Layout, joins: Join[], pageRows = PAGE_ROWS): Seam[] {
   const seams: Seam[] = [];
   const seen = new Set<string>();
   for (const [a, b, mode] of joins) {
@@ -71,7 +71,7 @@ export function activeSeams(layout: Layout, joins: Join[]): Seam[] {
     const p = layout.get(a);
     const q = layout.get(b);
     if (!p || !q || seen.has(key)) continue;
-    const seam = seamBetween(p, q);
+    const seam = seamBetween(p, q, pageRows);
     if (seam) {
       seams.push({ ...seam, mode: mode ?? "bridge" });
       seen.add(key);

@@ -7,10 +7,13 @@
 import type { TileSize, WidgetInstance } from "@/lib/dashboard-dimensions";
 
 export const DEFAULT_COLUMNS = 7;
-/** Rows on one page; more cards continue on the next page down. */
+/** Rows on one page by default; more cards continue on the next page down. */
 export const PAGE_ROWS = 4;
 export const MIN_COLUMNS = 4;
 export const MAX_COLUMNS = 10;
+/** Two rows is the least that fits every card size (tall cards are two high). */
+export const MIN_ROWS = 2;
+export const MAX_ROWS = 8;
 
 /** Width and height in cells for each tile size. */
 export const SIZE_CELLS: Record<TileSize, { w: number; h: number }> = {
@@ -113,21 +116,28 @@ export function resolveLayout(widgets: WidgetInstance[], columns: number, pageRo
  * Puts one card at a spot (clamped to the grid) and moves only the cards it
  * now covers, each to the free spot nearest where it was.
  */
-export function placeTile(layout: Layout, id: string, target: { x: number; y: number }, size: { w: number; h: number }, columns: number): Layout {
-  return placeGroup(layout, [{ id, x: target.x, y: target.y, w: size.w, h: size.h }], columns);
+export function placeTile(
+  layout: Layout,
+  id: string,
+  target: { x: number; y: number },
+  size: { w: number; h: number },
+  columns: number,
+  pageRows = PAGE_ROWS,
+): Layout {
+  return placeGroup(layout, [{ id, x: target.x, y: target.y, w: size.w, h: size.h }], columns, pageRows);
 }
 
 /** Keeps a card inside one page: one that would hang over the bottom shifts up. */
-function withinPage(y: number, h: number) {
-  const top = pageOf(y) * PAGE_ROWS;
-  return Math.max(top, Math.min(y, top + PAGE_ROWS - h));
+function withinPage(y: number, h: number, pageRows: number) {
+  const top = pageOf(y, pageRows) * pageRows;
+  return Math.max(top, Math.min(y, top + pageRows - h));
 }
 
 /**
  * Places several cards at once (a joined group moving together), keeping
  * their arrangement, and moves only the cards they now cover.
  */
-export function placeGroup(layout: Layout, targets: Placement[], columns: number): Layout {
+export function placeGroup(layout: Layout, targets: Placement[], columns: number, pageRows = PAGE_ROWS): Layout {
   // Clamp the group as a whole, so it keeps its shape.
   const minX = Math.min(...targets.map((t) => Math.round(t.x)));
   const maxX = Math.max(...targets.map((t) => Math.round(t.x) + Math.min(t.w, columns)));
@@ -138,7 +148,7 @@ export function placeGroup(layout: Layout, targets: Placement[], columns: number
   // The group stays on one page: pull it up if it hangs over the bottom.
   const top = Math.min(...shifted.map((t) => t.y));
   const bottom = Math.max(...shifted.map((t) => t.y + t.h));
-  const fitTop = withinPage(top, bottom - top);
+  const fitTop = withinPage(top, bottom - top, pageRows);
   const movingAll: Placement[] = shifted.map((t) => ({ ...t, y: t.y + (fitTop - top) }));
   const ids = new Set(movingAll.map((t) => t.id));
   const others = [...layout.values()].filter((p) => !ids.has(p.id));
@@ -151,19 +161,39 @@ export function placeGroup(layout: Layout, targets: Placement[], columns: number
   const vacated = movingAll.length === 1 ? layout.get(movingAll[0].id) : undefined;
   for (const card of displaced) {
     const swap = vacated ? { id: card.id, x: vacated.x, y: vacated.y, w: card.w, h: card.h } : null;
-    placed.push(swap && fits(swap, placed, columns) ? swap : nearestFree(card.id, card, card.w, card.h, placed, columns));
+    placed.push(swap && fits(swap, placed, columns, pageRows) ? swap : nearestFree(card.id, card, card.w, card.h, placed, columns, pageRows));
   }
   return new Map(placed.map((p) => [p.id, p]));
 }
 
 /** The first free spot for a new card of a size. */
-export function firstFreeSpot(layout: Layout, size: { w: number; h: number }, columns: number) {
-  return firstFree("", size.w, size.h, [...layout.values()], columns);
+export function firstFreeSpot(layout: Layout, size: { w: number; h: number }, columns: number, pageRows = PAGE_ROWS) {
+  return firstFree("", size.w, size.h, [...layout.values()], columns, pageRows);
 }
 
 /** Pages the layout uses (at least one). */
-export function pageCount(layout: Layout) {
-  return Math.max(1, Math.ceil(rowCount(layout) / PAGE_ROWS));
+export function pageCount(layout: Layout, pageRows = PAGE_ROWS) {
+  return Math.max(1, Math.ceil(rowCount(layout) / pageRows));
+}
+
+/**
+ * Saved positions for a new number of rows per page: each card stays on its
+ * page, in the same row of it. One that no longer fits (its row is gone, or it
+ * would hang over the new bottom) loses its position and takes the first
+ * free spot, like a card pushed off a narrower grid.
+ */
+export function reflowRows(widgets: WidgetInstance[], fromRows: number, toRows: number): WidgetInstance[] {
+  if (fromRows === toRows) return widgets;
+  return widgets.map((widget) => {
+    if (!widget.pos) return widget;
+    const page = Math.floor(widget.pos.y / fromRows);
+    const row = widget.pos.y % fromRows;
+    if (row + cellsFor(widget.size).h > toRows) {
+      const { pos: _dropped, ...rest } = widget;
+      return rest;
+    }
+    return { ...widget, pos: { x: widget.pos.x, y: page * toRows + row } };
+  });
 }
 
 /** Rows the layout uses. */

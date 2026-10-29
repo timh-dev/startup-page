@@ -256,6 +256,7 @@ export function applyScene<T extends SettingsLike>(settings: T, id: SceneId, mod
     ...settings,
     ui,
     widgets: sceneWidgets(scene, folderIds),
-    layout: { ...(settings.layout || {}), columns: 7, joins: [] },
+    // Theme layouts are designed for one 7 x 4 page.
+    layout: { ...(settings.layout || {}), columns: 7, rows: 4, joins: [] },
   };
 }

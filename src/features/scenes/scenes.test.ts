@@ -56,7 +56,7 @@ describe("applyScene", () => {
   it("replaces the cards and clears joins (layout), keeping everything else", () => {
     const next = applyScene(settings, "arctic", "layout");
     expect(next.widgets.every((w) => w.id.startsWith("arctic-"))).toBe(true);
-    expect(next.layout).toEqual({ columns: 7, joins: [] });
+    expect(next.layout).toEqual({ columns: 7, rows: 4, joins: [] });
     expect(next.bookmark).toBe(settings.bookmark);
     expect(next.readItems).toBe(settings.readItems);
   });

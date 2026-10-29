@@ -15,6 +15,8 @@ import {
   DEFAULT_COLUMNS,
   MAX_COLUMNS,
   MIN_COLUMNS,
+  MAX_ROWS,
+  MIN_ROWS,
   PAGE_ROWS,
   applyLayout,
   cellsFor,
@@ -126,16 +128,17 @@ export default function Index() {
   const columns = Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, Number(settings.layout?.columns) || DEFAULT_COLUMNS));
   const widgets: WidgetInstance[] = React.useMemo(() => (Array.isArray(settings.widgets) ? settings.widgets : []), [settings.widgets]);
   const joins: Join[] = React.useMemo(() => (Array.isArray(settings.layout?.joins) ? settings.layout.joins : []), [settings.layout?.joins]);
-  const base = React.useMemo(() => resolveLayout(widgets, columns), [widgets, columns]);
+  const pageRows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, Number(settings.layout?.rows) || PAGE_ROWS));
+  const base = React.useMemo(() => resolveLayout(widgets, columns, pageRows), [widgets, columns, pageRows]);
 
-  // Fit a page (4 rows) to the space left beside the side panel.
+  // Fit a page (its rows) to the space left beside the side panel.
   const panelOffset = panel ? SIDE_PANEL_REM * rem : 0;
   const pad = { top: 5 * rem, bottom: 1.5 * rem, side: 2 * rem };
   const availW = viewport.width - pad.side * 2 - panelOffset;
   const availH = viewport.height - pad.top - pad.bottom;
   const fill = 0.81;
   const widthFit = ((availW - (columns - 1) * gap) / columns) * fill;
-  const heightFit = ((availH - (PAGE_ROWS - 1) * gap) / PAGE_ROWS) * fill;
+  const heightFit = ((availH - (pageRows - 1) * gap) / pageRows) * fill;
   // With the panel open the grid may shrink further before giving up on
   // pages, so opening an inspector never reflows the dashboard.
   const flow = widthFit < (panel ? minTile * 0.55 : minTile);
@@ -163,8 +166,8 @@ export default function Index() {
   const cell = tile + gap;
   const span = (n: number) => n * tile + (n - 1) * gap;
   const pageH = viewport.height;
-  // Each page centres its four rows in the window.
-  const pageTop = Math.max(pad.top, (pageH - span(PAGE_ROWS)) / 2);
+  // Each page centres its rows in the window.
+  const pageTop = Math.max(pad.top, (pageH - span(pageRows)) / 2);
   // One vertical pager: the first card page, then the Vault and Bookmarks
   // pages (when turned on), then any further card pages.
   const specials: SpecialPage[] = React.useMemo(
@@ -174,8 +177,8 @@ export default function Index() {
   const screenOf = React.useCallback((cardPage: number) => (cardPage === 0 ? 0 : cardPage + specials.length), [specials.length]);
   const cardPageAt = (screen: number) => (screen === 0 ? 0 : screen <= specials.length ? null : screen - specials.length);
   const rowTop = React.useCallback(
-    (row: number) => (flow ? row * cell : screenOf(pageOf(row)) * pageH + pageTop + (row % PAGE_ROWS) * cell),
-    [flow, cell, pageH, pageTop, screenOf],
+    (row: number) => (flow ? row * cell : screenOf(pageOf(row, pageRows)) * pageH + pageTop + (row % pageRows) * cell),
+    [flow, cell, pageH, pageTop, screenOf, pageRows],
   );
 
   const [preview, setPreviewState] = React.useState<Layout | null>(null);
@@ -228,16 +231,16 @@ export default function Index() {
     return next;
   }, [shown, draggingIds, base]);
 
-  const pages = flow ? 1 : pageCount(shown) + (editing ? 1 : 0);
+  const pages = flow ? 1 : pageCount(shown, pageRows) + (editing ? 1 : 0);
   const screens = flow ? 1 : pages + specials.length;
-  const shownRows = flow ? Math.max(1, rowCount(shown)) : pages * PAGE_ROWS;
+  const shownRows = flow ? Math.max(1, rowCount(shown)) : pages * pageRows;
 
   // ---- joined cards: groups, outlines, seams ----
   const metrics: Metrics = React.useMemo(() => ({ cell, gap, span: (n: number) => n * tile + (n - 1) * gap, rowTop }), [cell, gap, tile, rowTop]);
   // How far each joined card's edge fades into the gradient between them.
   const fade = Math.round(gap * 0.6);
   const joined = React.useMemo(() => {
-    const seams = flow ? [] : activeSeams(rendered, joins);
+    const seams = flow ? [] : activeSeams(rendered, joins, pageRows);
     const groups = groupsOf(seams);
     const px = seams.map((seam) => seamPx(seam, metrics));
     const members = new Map<string, { mask?: string; merged?: boolean }>();
@@ -287,7 +290,7 @@ export default function Index() {
     const blended = px.filter((s) => !members.get(s.a)?.merged);
     const modes = new Map(px.map((s) => [s.key, s.mode]));
     return { seams: px, blended, members, outlines, merged, modes, radius };
-  }, [flow, rendered, joins, widgets, metrics, gap, fade, rem, ui.cardStyle]);
+  }, [flow, rendered, joins, pageRows, widgets, metrics, gap, fade, rem, ui.cardStyle]);
 
   // Each joined card's colours along its joined edges (from its photo,
   // video, sky or background), sampled now and every few seconds as the
@@ -403,7 +406,7 @@ export default function Index() {
     // Over the Vault or Bookmarks page: the nearer card page.
     const p = cardPageAt(screen) ?? (screen <= specials.length / 2 ? 0 : 1);
     const within = Math.round((top - screenOf(p) * pageH - pageTop) / cell);
-    return { x, y: p * PAGE_ROWS + Math.max(0, Math.min(PAGE_ROWS - h, within)) };
+    return { x, y: p * pageRows + Math.max(0, Math.min(pageRows - h, within)) };
   };
 
   // Adds a card: at a dropped spot, the clicked empty cell, or the first free one.
@@ -413,13 +416,13 @@ export default function Index() {
       let next = at;
       if (!next) {
         const cellPick = useLayoutEditStore.getState().insertAt;
-        next = placeTile(base, instance.id, cellPick ?? firstFreeSpot(base, cells, columns), cells, columns);
+        next = placeTile(base, instance.id, cellPick ?? firstFreeSpot(base, cells, columns, pageRows), cells, columns, pageRows);
       }
       commit(applyLayout([...widgets, instance], next));
       setInsertAt(null);
       openInspector(instance.id);
     },
-    [base, columns, commit, openInspector, setInsertAt, widgets],
+    [base, columns, pageRows, commit, openInspector, setInsertAt, widgets],
   );
 
   // ---- pointer drags: move (a card or its group), resize, new cards ----
@@ -474,7 +477,7 @@ export default function Index() {
           drag.key = key;
           const shiftX = target.x - grabbed.x;
           const shiftY = target.y - grabbed.y;
-          setPreview(placeGroup(drag.base, drag.members.map((m) => ({ ...m, x: m.x + shiftX, y: m.y + shiftY })), columns));
+          setPreview(placeGroup(drag.base, drag.members.map((m) => ({ ...m, x: m.x + shiftX, y: m.y + shiftY })), columns, pageRows));
         }
       } else if (drag.kind === "resize") {
         const g = toGrid(event.clientX, event.clientY);
@@ -484,7 +487,7 @@ export default function Index() {
         if (size !== drag.key) {
           drag.key = size;
           drag.size = size;
-          setPreview(placeTile(drag.base, drag.id, drag.origin, cellsFor(size), columns));
+          setPreview(placeTile(drag.base, drag.id, drag.origin, cellsFor(size), columns, pageRows));
         }
       } else {
         if (!drag.moved && Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y) < 5) return;
@@ -499,12 +502,12 @@ export default function Index() {
         const key = g.inside ? `${target.x},${target.y}` : "out";
         if (key !== drag.key) {
           drag.key = key;
-          setPreview(g.inside ? placeTile(drag.base, drag.instance.id, target, drag.size, columns) : null);
+          setPreview(g.inside ? placeTile(drag.base, drag.instance.id, target, drag.size, columns, pageRows) : null);
         }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cell, columns, gap, tile, flow, pageH, pageTop, rowTop, viewport.height],
+    [cell, columns, pageRows, gap, tile, flow, pageH, pageTop, rowTop, viewport.height],
   );
 
   // A page turn mid-drag moves the grid under a still pointer.
@@ -546,7 +549,7 @@ export default function Index() {
     scrollerRef.current?.addEventListener("scroll", onScrollDuringDrag);
   };
 
-  const groupOf = (id: string) => groupsOf(activeSeams(base, joins)).get(id) ?? [id];
+  const groupOf = (id: string) => groupsOf(activeSeams(base, joins, pageRows)).get(id) ?? [id];
 
   const startMove = (id: string, event: React.PointerEvent<HTMLElement>) => {
     if (!editing || event.button !== 0 || isControl(event)) return;
@@ -648,13 +651,13 @@ export default function Index() {
       if (step) {
         event.preventDefault();
         const members = groupOf(id).map((m) => base.get(m)!);
-        commit(applyLayout(widgets, placeGroup(base, members.map((m) => ({ ...m, x: m.x + step[0], y: m.y + step[1] })), columns)));
+        commit(applyLayout(widgets, placeGroup(base, members.map((m) => ({ ...m, x: m.x + step[0], y: m.y + step[1] })), columns, pageRows)));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [base, joins, closePanel, columns, commit, flow, removeWidget, select, setEditing, undo, widgets]);
+  }, [base, joins, closePanel, columns, pageRows, commit, flow, removeWidget, select, setEditing, undo, widgets]);
 
   // One scroll gesture turns exactly one page (snapping alone would pull a
   // short trackpad swipe back). Cards that scroll themselves keep the wheel.
@@ -756,7 +759,7 @@ export default function Index() {
   // Nodes between touching cards, to join or split them.
   const nodes =
     editing && !flow && !draggingIds.length && !ghost
-      ? adjacentSeams(shown)
+      ? adjacentSeams(shown, pageRows)
           .filter((seam) => joined.modes.has(joinKey(seam.a, seam.b)) || joinKey(seam.a, seam.b) === nodeMenu || seam.a === hoverId || seam.b === hoverId)
           .map((seam) => seamPx(seam, metrics))
       : [];
@@ -790,7 +793,7 @@ export default function Index() {
             select(null);
             openPanel({ kind: "gallery" });
           }}
-          aria-label={`Add a widget here (page ${pageOf(y) + 1}, column ${x + 1}, row ${(y % PAGE_ROWS) + 1})`}
+          aria-label={`Add a widget here (page ${pageOf(y, pageRows) + 1}, column ${x + 1}, row ${(y % pageRows) + 1})`}
         />
       ))}
 

@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { useSidePanelStore } from "@/components/layout/sidePanelStore";
 import { useCredentialsStore, type CredentialName } from "@/lib/credentials";
 import { useDebugStore } from "@/lib/debug";
-import { DEFAULT_COLUMNS, MAX_COLUMNS, MIN_COLUMNS } from "@/features/dashboard/layout/grid";
+import { DEFAULT_COLUMNS, MAX_COLUMNS, MAX_ROWS, MIN_COLUMNS, MIN_ROWS, PAGE_ROWS, reflowRows } from "@/features/dashboard/layout/grid";
 import { RangeControl, SegmentedControl } from "./controls";
 import { setUiValue, type SettingsSectionProps } from "./appearance/types";
 
@@ -146,13 +146,22 @@ export function DashboardSettings({ settings, updateSettings }: SettingsSectionP
   const columns = Number(settings.layout?.columns) || DEFAULT_COLUMNS;
   const setColumns = (next: number) =>
     updateSettings((prev) => ({ ...prev, layout: { ...(prev.layout || {}), columns: Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, next)) } }));
+  const rows = Number(settings.layout?.rows) || PAGE_ROWS;
+  // Cards keep their page and their row on it; ones that no longer fit move.
+  const setRows = (next: number) =>
+    updateSettings((prev) => {
+      const from = Number(prev.layout?.rows) || PAGE_ROWS;
+      const to = Math.max(MIN_ROWS, Math.min(MAX_ROWS, next));
+      const widgets = Array.isArray(prev.widgets) ? reflowRows(prev.widgets, from, to) : prev.widgets;
+      return { ...prev, widgets, layout: { ...(prev.layout || {}), rows: to } };
+    });
 
   return (
     <>
       <Card>
         <CardHeader>
           <CardTitle>Grid</CardTitle>
-          <CardDescription>Cards scale with the window; this sets how many fit across.</CardDescription>
+          <CardDescription>Cards scale with the window; this sets how many fit across and down a page.</CardDescription>
         </CardHeader>
         <CardContent className="settings-rows">
           <Row label="Columns" description="Cards past the edge move to the first free spot.">
@@ -162,6 +171,17 @@ export function DashboardSettings({ settings, updateSettings }: SettingsSectionP
               </button>
               <span className="numeric">{columns}</span>
               <button type="button" className="debug-button" onClick={() => setColumns(columns + 1)} disabled={columns >= MAX_COLUMNS} aria-label="More columns">
+                +
+              </button>
+            </div>
+          </Row>
+          <Row label="Rows" description="Per page. Cards stay on their page; any that no longer fit move to the first free spot.">
+            <div className="settings-stepper">
+              <button type="button" className="debug-button" onClick={() => setRows(rows - 1)} disabled={rows <= MIN_ROWS} aria-label="Fewer rows">
+                −
+              </button>
+              <span className="numeric">{rows}</span>
+              <button type="button" className="debug-button" onClick={() => setRows(rows + 1)} disabled={rows >= MAX_ROWS} aria-label="More rows">
                 +
               </button>
             </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WidgetInstance } from "@/lib/dashboard-dimensions";
-import { PAGE_ROWS, applyLayout, nearestSize, pageCount, placeGroup, placeTile, resolveLayout, rowCount } from "./grid";
+import { PAGE_ROWS, applyLayout, nearestSize, pageCount, placeGroup, placeTile, reflowRows, resolveLayout, rowCount } from "./grid";
 
 const card = (id: string, size: WidgetInstance["size"] = "small", pos?: { x: number; y: number }): WidgetInstance => ({ id, type: "clock", size, config: {}, ...(pos ? { pos } : {}) });
 
@@ -106,5 +106,29 @@ describe("placeGroup", () => {
     expect(next.get("a")).toMatchObject({ x: 0, y: 1 });
     expect(next.get("b")).toMatchObject({ x: 2, y: 1 });
     expect(next.get("c")).toMatchObject({ x: 3, y: 0 });
+  });
+});
+
+describe("rows per page", () => {
+  const card = (id: string, y: number, size: WidgetInstance["size"] = "small"): WidgetInstance => ({ id, type: "clock", size, config: {}, pos: { x: 0, y } });
+
+  it("keeps each card on its page and row when rows change", () => {
+    // Page 2 starts at row 4 with four rows, at row 5 with five.
+    const next = reflowRows([card("a", 1), card("b", 4), card("c", 6)], 4, 5);
+    expect(next.map((w) => w.pos?.y)).toEqual([1, 5, 7]);
+  });
+
+  it("frees cards whose row is gone, or that would hang over the new bottom", () => {
+    const next = reflowRows([card("a", 3), card("b", 2, "tall"), card("c", 0, "tall")], 4, 3);
+    expect(next.map((w) => w.pos)).toEqual([undefined, undefined, { x: 0, y: 0 }]);
+  });
+
+  it("pages and placement follow the number of rows", () => {
+    const widgets = [card("a", 0), card("b", 5)];
+    expect(pageCount(resolveLayout(widgets, 7, 6), 6)).toBe(1);
+    expect(pageCount(resolveLayout(widgets, 7, 4), 4)).toBe(2);
+    // A tall card can't straddle the page edge at row 3 of a 3-row page.
+    const moved = placeTile(resolveLayout([card("t", 0, "tall")], 7, 3), "t", { x: 0, y: 2 }, { w: 1, h: 2 }, 7, 3);
+    expect(moved.get("t")).toMatchObject({ y: 1 });
   });
 });
