@@ -18,7 +18,11 @@ import {
   type BackupSummary,
 } from "@/lib/settings";
 
-type ApplySettingsOptions = { clearCustomThemeVars?: boolean };
+type ApplySettingsOptions = {
+  clearCustomThemeVars?: boolean;
+  /** The action already saved these settings (reset, restore) rather than leaving them for "Save". */
+  persisted?: boolean;
+};
 
 interface DataTabProps {
   settings: Record<string, any>;
@@ -129,13 +133,16 @@ function DataTab({ settings, applySettings, storageState }: DataTabProps) {
     const resetResult = await resetSettings();
     await applySettings(resetResult.settings, "Settings reset and backup history refreshed.", {
       clearCustomThemeVars: true,
+      persisted: true,
     });
     await refreshBackups();
   };
 
   const handleRestoreBackup = async (backup: BackupSummary) => {
     const result = await restoreBackup(backup.id);
-    await applySettings(result.settings, `Restored the backup from ${new Date(backup.createdAt).toLocaleString()}.`);
+    await applySettings(result.settings, `Restored the backup from ${new Date(backup.createdAt).toLocaleString()}.`, {
+      persisted: true,
+    });
     await refreshBackups();
   };
 

@@ -1,27 +1,49 @@
 import { useRef, useEffect } from 'react';
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 import { readSettings } from '@/lib/settings';
 import { getOrRequestLocation } from '@/lib/geolocation';
 import { useSettingsStore } from '@/features/settings/stores';
-import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour } from './solarMath';
+import { calculateSolarContext, getCurrentLst, sunElevation, dayFractionToHour, type SolarContext } from './solarMath';
 import { renderSky } from './renderSky';
-import { createStarField, renderStars } from './renderStars';
-import { renderCurve } from './renderCurve';
+import { createStarField, renderStars, type Star } from './renderStars';
+import { getHorizonY, renderCurve } from './renderCurve';
 import { renderSun } from './renderSun';
 import { renderHorizonGlow } from './renderHorizonGlow';
 import { renderMarkers } from './renderMarkers';
+import { createAdaptiveResolution } from '@/lib/adaptive-resolution';
+import { ambientFrameMs } from '@/lib/power';
+import { debugLocation, debugTimeZone, useDebugStore, wallClock } from '@/lib/debug';
+import { replayNow, useMotionStore } from '@/lib/motion';
 
-const SWEEP_SPEED = 0.075;
-const SWEEP_INTERVAL = 22; // ms per sweep step
-const TARGET_FRAME_MS = 1000 / 30; // idle at 30 fps; hover upgrades to 60
+const TARGET_FRAME_MS = 1000 / 20; // idle at 20 fps (the sky changes slowly); hover upgrades to 60
+
+interface SolarGraphState {
+  lst: number;
+  stars: Star[] | null;
+  solar: SolarContext | null;
+  animationTime: number;
+  replaying: boolean;
+  animFrameId: number | null;
+  lastTimestamp: number;
+  hovering: boolean;
+  hoverHour: number | null;
+  pixelRatio: number;
+  renderWidth: number;
+  renderHeight: number;
+  _realTimeTimer: ReturnType<typeof setInterval> | null;
+  _frameFunc: FrameRequestCallback | null;
+}
 
 export default function SolarGraph() {
-  const canvasRef = useRef(null);
-  const stateRef = useRef({
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // A small copy of each frame, blurred over the chart: the poster's halation.
+  const bloomRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef<SolarGraphState>({
     lst: 0,
-    sweeping: true,
     stars: null,
     solar: null,
     animationTime: 0,
+    replaying: false,
     animFrameId: null,
     lastTimestamp: 0,
     hovering: false,
@@ -29,37 +51,44 @@ export default function SolarGraph() {
     pixelRatio: 1,
     renderWidth: 0,
     renderHeight: 0,
-    _realTimeTimer: null as ReturnType<typeof setInterval> | null,
-    _frameFunc: null as FrameRequestCallback | null,
+    _realTimeTimer: null,
+    _frameFunc: null,
   });
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const canvasEl = canvasRef.current;
+    const context = canvasEl?.getContext('2d');
+    if (!canvasEl || !context) return;
+    // Re-bound as non-null consts so the nested functions keep the narrowing.
+    const canvas: HTMLCanvasElement = canvasEl;
+    const ctx: CanvasRenderingContext2D = context;
     const state = stateRef.current;
 
     // Resolve location
     const settings = readSettings();
 
-    function initSolar(lat, lng) {
+    function initSolar(lat: number, lng: number) {
       // Cancel any in-flight animation from a previous initSolar call
       if (state.animFrameId) { cancelAnimationFrame(state.animFrameId); state.animFrameId = null; }
-      if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
       if (state._realTimeTimer) { clearInterval(state._realTimeTimer); state._realTimeTimer = null; }
       state.solar = calculateSolarContext(lat, lng);
-      state.stars = createStarField();
-      state.lst = 0;
-      state.sweeping = true;
+      // Keep the stars when only the location changes, so they don't jump.
+      state.stars = state.stars ?? createStarField();
+      state.lst = state.solar.currentTime;
       state.lastTimestamp = performance.now();
       startAnimation();
     }
 
+    // Supersampled on standard screens (twice their density) for smoother
+    // curves; a high-density screen is already sharp, so never past 2x (4x
+    // was four times the pixels to fill every frame). Steps down if slow.
+    const resolution = createAdaptiveResolution({ supersample: 2, max: 2 });
+
     // Resize handler
     function resize() {
       const container = canvas.parentElement;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (!container) return;
+      const dpr = resolution.scale;
       const w = container.clientWidth;
       const h = container.clientHeight;
       const nextWidth = Math.max(1, Math.round(w * dpr));
@@ -79,45 +108,40 @@ export default function SolarGraph() {
     }
 
     const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(canvas.parentElement);
+    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
     resize();
 
-    // Sweep timer for startup animation
-    let sweepTimer = null;
-
+    // The chart opens at the current time. (It used to sweep from midnight,
+    // which flashed a whole day of sky colours on every load.)
     function startAnimation() {
-      const targetLst = state.solar.currentTime;
-
-      // Startup sweep: animate from 0 to current time
-      sweepTimer = setInterval(() => {
-        if (state.sweeping) {
-          state.lst += SWEEP_SPEED;
-          if (state.lst >= targetLst) {
-            state.lst = targetLst;
-            state.sweeping = false;
-            clearInterval(sweepTimer);
-          }
-        }
-      }, SWEEP_INTERVAL);
-
-      // Real-time update every 60s after sweep completes
+      // Follow real time once a minute.
       const realTimeTimer = setInterval(() => {
-        if (!state.sweeping) {
-          state.lst = getCurrentLst();
-        }
+        state.lst = getCurrentLst();
       }, 60000);
 
       // Main render loop — 30 fps idle, 60 fps while hovering
-      function frame(timestamp) {
+      function frame(timestamp: number) {
         state.animFrameId = requestAnimationFrame(frame);
+        // Resizing clears the canvas, so draw in the same frame after one.
+        const resized = resolution.sample(timestamp);
+        if (resized) resize();
         const elapsed = timestamp - state.lastTimestamp;
-        const targetMs = state.hovering ? 1000 / 60 : TARGET_FRAME_MS;
-        if (elapsed < targetMs) return;
-        if (!canvas.clientWidth) return; // ancestor has display:none — skip draw
-        const dt = elapsed / 1000;
+        const targetMs = state.hovering ? 1000 / 60 : ambientFrameMs(TARGET_FRAME_MS);
+        // The day replay (shared with the globe and weather sky) runs at 60 fps.
+        const replayed = replayNow();
+        if (replayed) {
+          const wall = wallClock(replayed, debugTimeZone());
+          state.lst = wall.hours + wall.minutes / 60 + wall.seconds / 3600;
+        }
+        else if (state.replaying) state.lst = getCurrentLst();
+        state.replaying = !!replayed;
+        if (!resized && !replayed && elapsed < targetMs) return;
+        if (!canvas.clientWidth || !isOnScreen(canvas)) return; // hidden or off screen: skip draw
+        const dt = (elapsed / 1000) * useMotionStore.getState().speed;
         state.lastTimestamp = timestamp;
         state.animationTime += dt;
         draw(ctx, canvas, state);
+        drawBloom(canvas);
       }
 
       state.animFrameId = requestAnimationFrame(frame);
@@ -129,24 +153,42 @@ export default function SolarGraph() {
 
     if (state.solar) {
       // StrictMode re-mount: stateRef survived cleanup — resume the animation
-      // from where it left off instead of restarting the sweep from zero.
+      // from where it left off.
       state.lastTimestamp = performance.now();
       startAnimation();
     } else {
+      const place = debugLocation();
       initSolar(
-        settings.latitude  ?? 40.7128,
-        settings.longitude ?? -74.006
+        place?.latitude ?? settings.latitude ?? 40.7128,
+        place?.longitude ?? settings.longitude ?? -74.006
       );
 
       // Refine with real geolocation if no saved coordinates.
-      if (!settings.latitude) {
+      if (!place && !settings.latitude) {
         void getOrRequestLocation().then((coords) => {
           if (coords) state.solar = calculateSolarContext(coords.lat, coords.lon);
         });
       }
     }
 
-    function draw(ctx, canvas, state) {
+    // Only the bright parts bloom (sun, curve, horizon): a dimmed, high
+    // contrast copy at an eighth of the size, which the CSS blurs and screens.
+    const bloomCtx = bloomRef.current?.getContext('2d') ?? null;
+    function drawBloom(source: HTMLCanvasElement) {
+      const bloom = bloomRef.current;
+      if (!bloom || !bloomCtx) return;
+      const bw = Math.max(1, Math.round((state.renderWidth || source.clientWidth) / 8));
+      const bh = Math.max(1, Math.round((state.renderHeight || source.clientHeight) / 8));
+      if (bloom.width !== bw || bloom.height !== bh) {
+        bloom.width = bw;
+        bloom.height = bh;
+      }
+      bloomCtx.filter = 'brightness(0.75) contrast(2.4)';
+      bloomCtx.clearRect(0, 0, bw, bh);
+      bloomCtx.drawImage(source, 0, 0, bw, bh);
+    }
+
+    function draw(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, state: SolarGraphState) {
       if (!state.solar || !state.stars) return;
 
       const w = state.renderWidth || canvas.clientWidth;
@@ -154,7 +196,7 @@ export default function SolarGraph() {
       const solar = state.solar;
 
       // Use hovered time when hovering, otherwise real time
-      const effectiveLst = state.hovering ? state.hoverHour : state.lst;
+      const effectiveLst = state.hovering && state.hoverHour !== null ? state.hoverHour : state.lst;
 
       // Compute once — shared by stars, horizon glow, and sun renderers
       const cachedElev = sunElevation(solar.lat, solar.lng, effectiveLst, solar.doy);
@@ -167,23 +209,24 @@ export default function SolarGraph() {
       // 2. Stars
       renderStars(ctx, w, h, state.stars, state.animationTime, effectiveLst, solar, cachedElev);
 
-      // 3. Solar curve + horizon line
-      const { horizonY } = renderCurve(ctx, w, h, solar);
-
-      // 4. Horizon glow (sunrise/sunset effects)
+      // 3. Atmosphere along the horizon (behind the curve)
+      const horizonY = getHorizonY(h, solar);
       renderHorizonGlow(ctx, w, h, effectiveLst, solar, horizonY, cachedElev);
+
+      // 4. Solar curve + horizon line
+      renderCurve(ctx, w, h, solar);
 
       // 5. Sun
       renderSun(ctx, w, h, effectiveLst, solar, horizonY, cachedElev);
 
       // 6. Markers (only when hovering)
       if (state.hovering) {
-        renderMarkers(ctx, w, h, state.hoverHour, solar, horizonY, state.lst);
+        renderMarkers(ctx, w, h, effectiveLst, solar, horizonY, state.lst);
       }
     }
 
     // Mouse event handlers for hover interaction
-    function onMouseMove(e) {
+    function onMouseMove(e: MouseEvent) {
       if (!state.solar) return;
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -202,6 +245,13 @@ export default function SolarGraph() {
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseleave', onMouseLeave);
 
+    // The debugger (another time or place) re-centres the chart at once.
+    const unsubscribeDebug = useDebugStore.subscribe((next, prev) => {
+      if (next.location === prev.location && next.timeOffsetMs === prev.timeOffsetMs) return;
+      const current = useSettingsStore.getState().settings;
+      initSolar(next.location?.latitude ?? current.latitude ?? 40.7128, next.location?.longitude ?? current.longitude ?? -74.006);
+    });
+
     // React to coordinate changes from the settings panel without a reload.
     let lastLat = settings.latitude;
     let lastLng = settings.longitude;
@@ -210,6 +260,7 @@ export default function SolarGraph() {
       if (latitude !== lastLat || longitude !== lastLng) {
         lastLat = latitude;
         lastLng = longitude;
+        if (useDebugStore.getState().location) return; // the debugger's place wins
         initSolar(latitude ?? 40.7128, longitude ?? -74.006);
       }
     });
@@ -230,10 +281,11 @@ export default function SolarGraph() {
 
     return () => {
       if (state.animFrameId) cancelAnimationFrame(state.animFrameId);
-      if (sweepTimer) clearInterval(sweepTimer);
+      forgetOnScreen(canvas);
       if (state._realTimeTimer) clearInterval(state._realTimeTimer);
       resizeObserver.disconnect();
       unsubscribeSettings();
+      unsubscribeDebug();
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseleave', onMouseLeave);
       document.removeEventListener('visibilitychange', onVisibilityChange);
@@ -241,13 +293,14 @@ export default function SolarGraph() {
   }, []);
 
   return (
-    <div id="container" className="w-full h-full rounded-[inherit] overflow-hidden">
+    <div id="container" className="poster-finish relative w-full h-full rounded-[inherit] overflow-hidden">
       <canvas
         ref={canvasRef}
         className="w-full h-full rounded-[inherit]"
         id="canvas"
         style={{ cursor: 'crosshair' }}
       />
+      <canvas ref={bloomRef} className="poster-bloom" aria-hidden="true" />
     </div>
   );
 }

@@ -1,21 +1,22 @@
+import type { SolarContext } from './solarMath';
 import { sunElevation, formatHour } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
-const EVENT_COLORS = {
+const EVENT_COLORS: Record<string, { fill: string; glow: string }> = {
   horizon:       { fill: 'rgba(255, 200, 60, 0.9)',  glow: 'rgba(255, 200, 60, 0.3)' },
   civil:         { fill: 'rgba(230, 140, 50, 0.85)', glow: 'rgba(230, 140, 50, 0.25)' },
   nautical:      { fill: 'rgba(140, 160, 190, 0.8)', glow: 'rgba(140, 160, 190, 0.25)' },
   astronomical:  { fill: 'rgba(70, 90, 160, 0.8)',   glow: 'rgba(70, 90, 160, 0.25)' },
 };
 
-const EVENT_RADIUS = {
+const EVENT_RADIUS: Record<string, number> = {
   horizon: 4.5,
   civil: 3.5,
   nautical: 3.5,
   astronomical: 3.5,
 };
 
-function drawPill(ctx, x, y, text, fontSize) {
+function drawPill(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, fontSize: number) {
   ctx.font = `${fontSize}px sans-serif`;
   const metrics = ctx.measureText(text);
   const padX = 5;
@@ -38,7 +39,7 @@ function drawPill(ctx, x, y, text, fontSize) {
 }
 
 // Render event markers, labels, tooltip, time cursor, and current-time indicator
-export function renderMarkers(ctx, w, h, hoverHour, solar, horizonY, realLst) {
+export function renderMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, hoverHour: number, solar: SolarContext, horizonY: number, realLst: number) {
   // --- Time cursor: vertical dashed line from sun to horizon ---
   const hoverElev = sunElevation(solar.lat, solar.lng, hoverHour, solar.doy);
   const { x: sunX, y: sunY } = solarToCanvas(hoverHour, w, h, solar);
@@ -56,6 +57,12 @@ export function renderMarkers(ctx, w, h, hoverHour, solar, horizonY, realLst) {
 
   // --- Event marker dots + labels (label only when cursor is near) ---
   const LABEL_PROXIMITY = 0.5; // hours — how close cursor must be to show label
+  // Twilight events sit minutes apart, so only the one nearest the cursor
+  // gets a label; otherwise their labels pile up on top of each other.
+  const nearest = solar.events.reduce<(typeof solar.events)[number] | null>(
+    (best, evt) => (Math.abs(hoverHour - evt.hour) < (best ? Math.abs(hoverHour - best.hour) : Infinity) ? evt : best),
+    null,
+  );
   for (const evt of solar.events) {
     const { type, hour, label } = evt;
     const colors = EVENT_COLORS[type];
@@ -76,7 +83,7 @@ export function renderMarkers(ctx, w, h, hoverHour, solar, horizonY, realLst) {
 
     // Label at bottom of chart when hovering near this event's time
     const dist = Math.abs(hoverHour - hour);
-    if (dist < LABEL_PROXIMITY) {
+    if (evt === nearest && dist < LABEL_PROXIMITY) {
       const labelAlpha = 1 - dist / LABEL_PROXIMITY;
       ctx.globalAlpha = labelAlpha;
       const timeStr = formatHour(hour);

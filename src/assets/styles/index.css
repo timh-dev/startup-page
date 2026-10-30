@@ -1,6 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Lora:wght@400;500;600;700&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./design-system.css";
 @config "../../../tailwind.config.cjs";
 
 @custom-variant dark (&:is(.dark *));
@@ -42,9 +42,9 @@
   --sidebar-accent-foreground: oklch(0.3012 0 0);
   --sidebar-border: oklch(0.8434 0.0231 87.1621);
   --sidebar-ring: oklch(0.3012 0 0);
-  --font-sans: "Inter", sans-serif;
-  --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
@@ -90,9 +90,9 @@
   --sidebar-accent-foreground: oklch(0.852 0.0205 100.6306);
   --sidebar-border: oklch(0.2931 0 0);
   --sidebar-ring: oklch(0.852 0.0205 100.6306);
-  --font-sans: "Inter", sans-serif;
-  --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
   --shadow-xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
@@ -678,6 +678,389 @@
   --tracking-normal: 0.02em;
 }
 
+/* Theme palettes (src/features/scenes): one per theme, light and dark. */
+
+:root[data-theme="space"] {
+  --background: oklch(0.9250 0.0140 268);
+  --foreground: oklch(0.2200 0.0350 268);
+  --card: oklch(0.9620 0.0100 268);
+  --card-foreground: oklch(0.2200 0.0350 268);
+  --popover: oklch(0.9620 0.0100 268);
+  --popover-foreground: oklch(0.2200 0.0350 268);
+  --primary: oklch(0.3300 0.0750 272);
+  --primary-foreground: oklch(0.9620 0.0100 268);
+  --secondary: oklch(0.8925 0.0200 268);
+  --secondary-foreground: oklch(0.2200 0.0350 268);
+  --muted: oklch(0.8600 0.0200 268);
+  --muted-foreground: oklch(0.5000 0.0300 268);
+  --accent: oklch(0.9050 0.0220 268);
+  --accent-foreground: oklch(0.2200 0.0350 268);
+  --destructive: oklch(0.5771 0.2152 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.8550 0.0200 268);
+  --input: oklch(0.8550 0.0200 268);
+  --ring: oklch(0.3300 0.0750 272);
+  --chart-1: oklch(0.3300 0.0750 272);
+  --chart-2: oklch(0.2200 0.0350 268);
+  --chart-3: oklch(0.5000 0.0300 268);
+  --chart-4: oklch(0.8550 0.0200 268);
+  --chart-5: oklch(0.8600 0.0200 268);
+  --sidebar: oklch(0.9050 0.0140 268);
+  --sidebar-foreground: oklch(0.2200 0.0350 268);
+  --sidebar-primary: oklch(0.3300 0.0750 272);
+  --sidebar-primary-foreground: oklch(0.9620 0.0100 268);
+  --sidebar-accent: oklch(0.9050 0.0220 268);
+  --sidebar-accent-foreground: oklch(0.2200 0.0350 268);
+  --sidebar-border: oklch(0.8550 0.0200 268);
+  --sidebar-ring: oklch(0.3300 0.0750 272);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.25);
+  --tracking-normal: 0.01em;
+}
+
+:root[data-theme="space"].dark {
+  --background: oklch(0.1500 0.0300 268);
+  --foreground: oklch(0.9350 0.0120 268);
+  --card: oklch(0.1920 0.0340 268);
+  --card-foreground: oklch(0.9350 0.0120 268);
+  --popover: oklch(0.1920 0.0340 268);
+  --popover-foreground: oklch(0.9350 0.0120 268);
+  --primary: oklch(0.8300 0.0750 250);
+  --primary-foreground: oklch(0.2000 0.0300 268);
+  --secondary: oklch(0.2025 0.0350 268);
+  --secondary-foreground: oklch(0.9350 0.0120 268);
+  --muted: oklch(0.2550 0.0350 268);
+  --muted-foreground: oklch(0.6800 0.0300 268);
+  --accent: oklch(0.2900 0.0400 268);
+  --accent-foreground: oklch(0.9350 0.0120 268);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.2500 0.0350 268);
+  --input: oklch(0.2500 0.0350 268);
+  --ring: oklch(0.8300 0.0750 250);
+  --chart-1: oklch(0.8300 0.0750 250);
+  --chart-2: oklch(0.9350 0.0120 268);
+  --chart-3: oklch(0.6800 0.0300 268);
+  --chart-4: oklch(0.2500 0.0350 268);
+  --chart-5: oklch(0.2550 0.0350 268);
+  --sidebar: oklch(0.1300 0.0300 268);
+  --sidebar-foreground: oklch(0.9350 0.0120 268);
+  --sidebar-primary: oklch(0.8300 0.0750 250);
+  --sidebar-primary-foreground: oklch(0.2000 0.0300 268);
+  --sidebar-accent: oklch(0.2900 0.0400 268);
+  --sidebar-accent-foreground: oklch(0.9350 0.0120 268);
+  --sidebar-border: oklch(0.2500 0.0350 268);
+  --sidebar-ring: oklch(0.8300 0.0750 250);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow-md: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 2px 4px -1px hsl(0 0% 0% / 0.3);
+  --shadow-lg: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 4px 6px -1px hsl(0 0% 0% / 0.3);
+  --shadow-xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 8px 10px -1px hsl(0 0% 0% / 0.3);
+  --shadow-2xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.75);
+}
+
+:root[data-theme="ocean"] {
+  --background: oklch(0.9300 0.0180 200);
+  --foreground: oklch(0.2400 0.0350 225);
+  --card: oklch(0.9650 0.0120 195);
+  --card-foreground: oklch(0.2400 0.0350 225);
+  --popover: oklch(0.9650 0.0120 195);
+  --popover-foreground: oklch(0.2400 0.0350 225);
+  --primary: oklch(0.4600 0.0950 218);
+  --primary-foreground: oklch(0.9650 0.0120 195);
+  --secondary: oklch(0.8950 0.0300 200);
+  --secondary-foreground: oklch(0.2400 0.0350 225);
+  --muted: oklch(0.8600 0.0300 200);
+  --muted-foreground: oklch(0.5000 0.0350 215);
+  --accent: oklch(0.9100 0.0300 190);
+  --accent-foreground: oklch(0.2400 0.0350 225);
+  --destructive: oklch(0.5771 0.2152 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.8600 0.0300 200);
+  --input: oklch(0.8600 0.0300 200);
+  --ring: oklch(0.4600 0.0950 218);
+  --chart-1: oklch(0.4600 0.0950 218);
+  --chart-2: oklch(0.2400 0.0350 225);
+  --chart-3: oklch(0.5000 0.0350 215);
+  --chart-4: oklch(0.8600 0.0300 200);
+  --chart-5: oklch(0.8600 0.0300 200);
+  --sidebar: oklch(0.9100 0.0180 200);
+  --sidebar-foreground: oklch(0.2400 0.0350 225);
+  --sidebar-primary: oklch(0.4600 0.0950 218);
+  --sidebar-primary-foreground: oklch(0.9650 0.0120 195);
+  --sidebar-accent: oklch(0.9100 0.0300 190);
+  --sidebar-accent-foreground: oklch(0.2400 0.0350 225);
+  --sidebar-border: oklch(0.8600 0.0300 200);
+  --sidebar-ring: oklch(0.4600 0.0950 218);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.25);
+  --tracking-normal: 0.01em;
+}
+
+:root[data-theme="ocean"].dark {
+  --background: oklch(0.1700 0.0320 228);
+  --foreground: oklch(0.9350 0.0150 200);
+  --card: oklch(0.2080 0.0360 225);
+  --card-foreground: oklch(0.9350 0.0150 200);
+  --popover: oklch(0.2080 0.0360 225);
+  --popover-foreground: oklch(0.9350 0.0150 200);
+  --primary: oklch(0.8000 0.0950 195);
+  --primary-foreground: oklch(0.2000 0.0320 228);
+  --secondary: oklch(0.2200 0.0400 225);
+  --secondary-foreground: oklch(0.9350 0.0150 200);
+  --muted: oklch(0.2700 0.0400 225);
+  --muted-foreground: oklch(0.6800 0.0350 205);
+  --accent: oklch(0.3000 0.0500 215);
+  --accent-foreground: oklch(0.9350 0.0150 200);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.2700 0.0400 225);
+  --input: oklch(0.2700 0.0400 225);
+  --ring: oklch(0.8000 0.0950 195);
+  --chart-1: oklch(0.8000 0.0950 195);
+  --chart-2: oklch(0.9350 0.0150 200);
+  --chart-3: oklch(0.6800 0.0350 205);
+  --chart-4: oklch(0.2700 0.0400 225);
+  --chart-5: oklch(0.2700 0.0400 225);
+  --sidebar: oklch(0.1500 0.0320 228);
+  --sidebar-foreground: oklch(0.9350 0.0150 200);
+  --sidebar-primary: oklch(0.8000 0.0950 195);
+  --sidebar-primary-foreground: oklch(0.2000 0.0320 228);
+  --sidebar-accent: oklch(0.3000 0.0500 215);
+  --sidebar-accent-foreground: oklch(0.9350 0.0150 200);
+  --sidebar-border: oklch(0.2700 0.0400 225);
+  --sidebar-ring: oklch(0.8000 0.0950 195);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow-md: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 2px 4px -1px hsl(0 0% 0% / 0.3);
+  --shadow-lg: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 4px 6px -1px hsl(0 0% 0% / 0.3);
+  --shadow-xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 8px 10px -1px hsl(0 0% 0% / 0.3);
+  --shadow-2xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.75);
+}
+
+:root[data-theme="arctic"] {
+  --background: oklch(0.9550 0.0120 232);
+  --foreground: oklch(0.2500 0.0300 248);
+  --card: oklch(0.9880 0.0060 232);
+  --card-foreground: oklch(0.2500 0.0300 248);
+  --popover: oklch(0.9880 0.0060 232);
+  --popover-foreground: oklch(0.2500 0.0300 248);
+  --primary: oklch(0.5000 0.1100 242);
+  --primary-foreground: oklch(0.9880 0.0060 232);
+  --secondary: oklch(0.9275 0.0200 232);
+  --secondary-foreground: oklch(0.2500 0.0300 248);
+  --muted: oklch(0.9000 0.0200 232);
+  --muted-foreground: oklch(0.5200 0.0300 240);
+  --accent: oklch(0.9300 0.0250 225);
+  --accent-foreground: oklch(0.2500 0.0300 248);
+  --destructive: oklch(0.5771 0.2152 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.8850 0.0200 232);
+  --input: oklch(0.8850 0.0200 232);
+  --ring: oklch(0.5000 0.1100 242);
+  --chart-1: oklch(0.5000 0.1100 242);
+  --chart-2: oklch(0.2500 0.0300 248);
+  --chart-3: oklch(0.5200 0.0300 240);
+  --chart-4: oklch(0.8850 0.0200 232);
+  --chart-5: oklch(0.9000 0.0200 232);
+  --sidebar: oklch(0.9350 0.0120 232);
+  --sidebar-foreground: oklch(0.2500 0.0300 248);
+  --sidebar-primary: oklch(0.5000 0.1100 242);
+  --sidebar-primary-foreground: oklch(0.9880 0.0060 232);
+  --sidebar-accent: oklch(0.9300 0.0250 225);
+  --sidebar-accent-foreground: oklch(0.2500 0.0300 248);
+  --sidebar-border: oklch(0.8850 0.0200 232);
+  --sidebar-ring: oklch(0.5000 0.1100 242);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.25);
+  --tracking-normal: 0.01em;
+}
+
+:root[data-theme="arctic"].dark {
+  --background: oklch(0.1900 0.0220 242);
+  --foreground: oklch(0.9500 0.0100 225);
+  --card: oklch(0.2320 0.0240 240);
+  --card-foreground: oklch(0.9500 0.0100 225);
+  --popover: oklch(0.2320 0.0240 240);
+  --popover-foreground: oklch(0.9500 0.0100 225);
+  --primary: oklch(0.8600 0.0700 220);
+  --primary-foreground: oklch(0.2000 0.0220 242);
+  --secondary: oklch(0.2400 0.0300 240);
+  --secondary-foreground: oklch(0.9500 0.0100 225);
+  --muted: oklch(0.2900 0.0300 240);
+  --muted-foreground: oklch(0.7000 0.0250 232);
+  --accent: oklch(0.3200 0.0350 238);
+  --accent-foreground: oklch(0.9500 0.0100 225);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.2900 0.0300 240);
+  --input: oklch(0.2900 0.0300 240);
+  --ring: oklch(0.8600 0.0700 220);
+  --chart-1: oklch(0.8600 0.0700 220);
+  --chart-2: oklch(0.9500 0.0100 225);
+  --chart-3: oklch(0.7000 0.0250 232);
+  --chart-4: oklch(0.2900 0.0300 240);
+  --chart-5: oklch(0.2900 0.0300 240);
+  --sidebar: oklch(0.1700 0.0220 242);
+  --sidebar-foreground: oklch(0.9500 0.0100 225);
+  --sidebar-primary: oklch(0.8600 0.0700 220);
+  --sidebar-primary-foreground: oklch(0.2000 0.0220 242);
+  --sidebar-accent: oklch(0.3200 0.0350 238);
+  --sidebar-accent-foreground: oklch(0.9500 0.0100 225);
+  --sidebar-border: oklch(0.2900 0.0300 240);
+  --sidebar-ring: oklch(0.8600 0.0700 220);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow-md: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 2px 4px -1px hsl(0 0% 0% / 0.3);
+  --shadow-lg: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 4px 6px -1px hsl(0 0% 0% / 0.3);
+  --shadow-xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 8px 10px -1px hsl(0 0% 0% / 0.3);
+  --shadow-2xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.75);
+}
+
+:root[data-theme="desert"] {
+  --background: oklch(0.9150 0.0280 68);
+  --foreground: oklch(0.2500 0.0220 50);
+  --card: oklch(0.9520 0.0200 75);
+  --card-foreground: oklch(0.2500 0.0220 50);
+  --popover: oklch(0.9520 0.0200 75);
+  --popover-foreground: oklch(0.2500 0.0220 50);
+  --primary: oklch(0.5200 0.1250 42);
+  --primary-foreground: oklch(0.9520 0.0200 75);
+  --secondary: oklch(0.8825 0.0350 68);
+  --secondary-foreground: oklch(0.2500 0.0220 50);
+  --muted: oklch(0.8500 0.0350 68);
+  --muted-foreground: oklch(0.5000 0.0300 55);
+  --accent: oklch(0.9050 0.0350 72);
+  --accent-foreground: oklch(0.2500 0.0220 50);
+  --destructive: oklch(0.5771 0.2152 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.8450 0.0350 68);
+  --input: oklch(0.8450 0.0350 68);
+  --ring: oklch(0.5200 0.1250 42);
+  --chart-1: oklch(0.5200 0.1250 42);
+  --chart-2: oklch(0.2500 0.0220 50);
+  --chart-3: oklch(0.5000 0.0300 55);
+  --chart-4: oklch(0.8450 0.0350 68);
+  --chart-5: oklch(0.8500 0.0350 68);
+  --sidebar: oklch(0.8950 0.0280 68);
+  --sidebar-foreground: oklch(0.2500 0.0220 50);
+  --sidebar-primary: oklch(0.5200 0.1250 42);
+  --sidebar-primary-foreground: oklch(0.9520 0.0200 75);
+  --sidebar-accent: oklch(0.9050 0.0350 72);
+  --sidebar-accent-foreground: oklch(0.2500 0.0220 50);
+  --sidebar-border: oklch(0.8450 0.0350 68);
+  --sidebar-ring: oklch(0.5200 0.1250 42);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.1), 0px 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.25);
+  --tracking-normal: 0.01em;
+}
+
+:root[data-theme="desert"].dark {
+  --background: oklch(0.1850 0.0140 50);
+  --foreground: oklch(0.9250 0.0220 80);
+  --card: oklch(0.2220 0.0170 52);
+  --card-foreground: oklch(0.9250 0.0220 80);
+  --popover: oklch(0.2220 0.0170 52);
+  --popover-foreground: oklch(0.9250 0.0220 80);
+  --primary: oklch(0.7800 0.1050 55);
+  --primary-foreground: oklch(0.2000 0.0140 50);
+  --secondary: oklch(0.2325 0.0200 50);
+  --secondary-foreground: oklch(0.9250 0.0220 80);
+  --muted: oklch(0.2800 0.0200 50);
+  --muted-foreground: oklch(0.6600 0.0300 70);
+  --accent: oklch(0.3100 0.0250 50);
+  --accent-foreground: oklch(0.9250 0.0220 80);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.2850 0.0200 50);
+  --input: oklch(0.2850 0.0200 50);
+  --ring: oklch(0.7800 0.1050 55);
+  --chart-1: oklch(0.7800 0.1050 55);
+  --chart-2: oklch(0.9250 0.0220 80);
+  --chart-3: oklch(0.6600 0.0300 70);
+  --chart-4: oklch(0.2850 0.0200 50);
+  --chart-5: oklch(0.2800 0.0200 50);
+  --sidebar: oklch(0.1650 0.0140 50);
+  --sidebar-foreground: oklch(0.9250 0.0220 80);
+  --sidebar-primary: oklch(0.7800 0.1050 55);
+  --sidebar-primary-foreground: oklch(0.2000 0.0140 50);
+  --sidebar-accent: oklch(0.3100 0.0250 50);
+  --sidebar-accent-foreground: oklch(0.9250 0.0220 80);
+  --sidebar-border: oklch(0.2850 0.0200 50);
+  --sidebar-ring: oklch(0.7800 0.1050 55);
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display Variable", "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 6px 15px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --shadow-md: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 2px 4px -1px hsl(0 0% 0% / 0.3);
+  --shadow-lg: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 4px 6px -1px hsl(0 0% 0% / 0.3);
+  --shadow-xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.3), 0px 8px 10px -1px hsl(0 0% 0% / 0.3);
+  --shadow-2xl: 0px 6px 15px 0px hsl(0 0% 0% / 0.75);
+}
+
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -804,8 +1187,8 @@
 }
 
 @keyframes weather-star-twinkle {
-  0%, 100% { opacity: 0.3; }
-  50%       { opacity: 0.9; }
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1; }
 }
 
 @keyframes weather-fog-roll-fwd {
@@ -1125,46 +1508,61 @@
   padding-inline: clamp(0.75rem, 7cqw, 1.25rem);
 }
 
-/* .weather-location/-temp/-desc are invisible in the DOM — kept for
-   layout/accessibility/text-selection only. The visible glyphs are drawn by
-   VolumetricCloudscape's shader, which knocks out (inverts) its own pixels
-   at each text's position so it reacts live to the clouds/sun/moon actually
-   behind it. Font metrics here must stay in sync with the clamp()/weight/
-   letter-spacing math mirrored in VolumetricCloudscape.tsx's syncTextTexture(). */
+/* Current conditions: crisp white type over the sky with a soft shadow
+   for legibility on bright clouds. */
 .weather-location {
-  color: transparent;
-  font-size: clamp(1.1rem, 9.8cqh, 1.5rem);
-  line-height: 1.1;
-  letter-spacing: 0.12em;
+  color: white;
+  font-size: clamp(0.62rem, 5.6cqh, 0.75rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  opacity: 0.88;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
 }
 
 .weather-temp {
-  color: transparent;
-  margin-top: clamp(0.0625rem, 1cqh, 0.25rem);
-  font-size: clamp(1.45rem, 18cqh, 2.25rem);
+  color: white;
+  margin-top: clamp(0.05rem, 1cqh, 0.2rem);
+  font-size: clamp(1.9rem, 24cqh, 3.25rem);
+  font-weight: 300;
   line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.18);
 }
 
 .weather-desc {
-  color: transparent;
-  max-width: min(46cqw, 9.5rem);
-  font-size: clamp(1.1rem, 9.8cqh, 1.5rem);
-  line-height: 1.15;
+  color: white;
+  max-width: min(48cqw, 11rem);
+  font-size: clamp(0.72rem, 6.4cqh, 0.875rem);
+  font-weight: 500;
+  line-height: 1.25;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
 }
 
+/* Unit and data source: only on hover, so the tile stays clean. */
 .weather-meta {
-  color: white;
-  mix-blend-mode: difference;
-  font-size: clamp(0.45rem, 3.6cqh, 0.625rem);
+  margin-top: 0.15rem;
+  color: rgb(255 255 255 / 0.75);
+  font-size: clamp(0.55rem, 4.2cqh, 0.6875rem);
   line-height: 1.1;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.weather-widget:hover .weather-meta {
+  opacity: 1;
 }
 
 .weather-forecast {
   position: relative;
   align-items: stretch;
   min-height: clamp(3rem, 36cqh, 4.55rem);
-  padding: clamp(0.35rem, 3.2cqh, 0.7rem) clamp(0.45rem, 3.4cqw, 0.8rem);
+  padding: clamp(0.5rem, 4.5cqh, 0.9rem) clamp(0.45rem, 3.4cqw, 0.8rem) clamp(0.35rem, 3.2cqh, 0.6rem);
   color: white;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  /* A soft shade behind the forecast so it reads on any sky. */
+  background: linear-gradient(to top, rgb(0 0 0 / 0.22), rgb(0 0 0 / 0.08) 65%, transparent);
 }
 
 .weather-forecast-day {
@@ -1182,20 +1580,30 @@
   cursor: pointer;
   font: inherit;
   padding: clamp(0.1rem, 1cqh, 0.2rem);
-  transition: background 0.18s ease;
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
-.weather-forecast-day:hover,
+.weather-forecast-day:not(:disabled):hover,
 .weather-forecast-day:focus-visible,
-.weather-forecast-day[aria-expanded="true"] {
+.weather-forecast-day[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.1);
   outline: none;
 }
 
+.weather-forecast-day[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+/* Nothing to show another day on (no frosted card): the days are just a forecast. */
+.weather-forecast-day:disabled {
+  cursor: default;
+}
+
 .weather-forecast-name {
   color: white;
-  mix-blend-mode: difference;
-  font-size: clamp(0.55rem, 4.2cqh, 0.75rem);
+  opacity: 0.9;
+  font-size: clamp(0.6rem, 4.4cqh, 0.75rem);
   line-height: 1.1;
 }
 
@@ -1209,11 +1617,9 @@
   line-height: 1.1;
 }
 
-/* Both the low and high temp are plain text nodes in child spans — blend
-   each span individually since mix-blend-mode isn't inherited. */
 .weather-forecast-temp > span {
   color: white;
-  mix-blend-mode: difference;
+  font-variant-numeric: tabular-nums;
 }
 
 .weather-forecast-low {
@@ -1224,8 +1630,7 @@
 
 .weather-forecast-precip {
   min-height: 1.05em;
-  color: white;
-  mix-blend-mode: difference;
+  color: rgb(186 230 253);
   font-size: clamp(0.52rem, 3.8cqh, 0.66rem);
   line-height: 1.05;
 }
@@ -1261,7 +1666,6 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: inherit;
   background: rgb(15 23 42);
   color: white;
@@ -1273,32 +1677,93 @@
   z-index: 0;
 }
 
+/* A soft shade over the sky so the numbers read on bright or busy clouds. */
+.weather-detail-shader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.28), rgb(0 0 0 / 0.08) 40%, rgb(0 0 0 / 0.22));
+}
+
 .weather-detail-content {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: clamp(0.6rem, 4cqh, 1.1rem);
-  gap: clamp(0.5rem, 3.5cqh, 0.9rem);
-  text-align: center;
+  /* Bottom padding clears a stack's switcher. */
+  padding: clamp(0.8rem, 5cqh, 1.25rem) clamp(0.9rem, 4cqw, 1.4rem) clamp(2.2rem, 12cqh, 2.8rem);
+  gap: clamp(0.6rem, 4cqh, 1rem);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
 }
 
-/* Hourly columns: icon/temp/bar/value all stacked and centered per hour,
-   so each hour's chart bar sits directly under that hour's condition —
-   one aligned grid instead of separate hour-label and chart sections. */
-/* 24 hourly cells, 12 per row (2 rows) — real data comes in 3h steps, the
-   rest are interpolated (see buildHourlySeries + [data-interpolated]). */
+.weather-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.weather-detail-day {
+  font-size: clamp(0.62rem, 4cqh, 0.72rem);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.weather-detail-summary {
+  margin-top: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(0.8rem, 5cqh, 0.95rem);
+  font-weight: 500;
+}
+
+/* Metric switcher: a compact segmented control in the header. */
+.weather-detail-metric-tabs {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.125rem;
+  padding: 0.15rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.12);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.2);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.weather-detail-metric-tab {
+  border-radius: 9999px;
+  padding: clamp(0.18rem, 1.3cqh, 0.28rem) clamp(0.5rem, 2.4cqw, 0.7rem);
+  color: rgb(255 255 255 / 0.72);
+  font-size: clamp(0.58rem, 3.6cqh, 0.6875rem);
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: none;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.weather-detail-metric-tab:hover {
+  color: white;
+}
+
+.weather-detail-metric-tab[data-active="true"] {
+  background: rgb(255 255 255 / 0.9);
+  color: rgb(15 23 42);
+}
+
+/* One row of twelve two-hourly columns: time, condition, temperature, the
+   selected metric's bar and value, aligned per hour. */
 .weather-detail-hours {
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: end;
-  align-content: center;
-  gap: clamp(0.15rem, 1cqw, 0.35rem) clamp(0.1rem, 0.8cqw, 0.3rem);
+  align-items: stretch;
+  gap: clamp(0.1rem, 0.8cqw, 0.3rem);
   width: 100%;
   min-height: 0;
 }
@@ -1307,66 +1772,70 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(0.15rem, 1.1cqh, 0.3rem);
+  justify-content: space-between;
+  gap: clamp(0.2rem, 1.6cqh, 0.4rem);
   min-width: 0;
-  border: 1px solid transparent;
-  border-radius: 0.5rem;
-  padding: clamp(0.15rem, 1.1cqh, 0.3rem) clamp(0.05rem, 0.5cqw, 0.15rem);
-  background: transparent;
+  min-height: 0;
+  border-radius: 0.6rem;
+  padding: clamp(0.25rem, 1.6cqh, 0.4rem) 0;
   color: white;
-  font: inherit;
   cursor: pointer;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 0, 0, 0.3);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.weather-detail-hour-col:hover {
+  background: rgb(255 255 255 / 0.08);
 }
 
 .weather-detail-hour-col[data-active="true"] {
-  border-color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.14);
+  background: rgb(255 255 255 / 0.16);
 }
 
-
 .weather-detail-hour-label {
-  font-size: clamp(0.42rem, 2.7cqh, 0.54rem);
+  font-size: clamp(0.5rem, 3cqh, 0.625rem);
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgb(255 255 255 / 0.75);
+  white-space: nowrap;
 }
 
 .weather-detail-hour-icon {
-  width: clamp(0.85rem, 6cqh, 1.25rem);
-  height: clamp(0.85rem, 6cqh, 1.25rem);
+  width: clamp(0.9rem, 6cqh, 1.2rem);
+  height: clamp(0.9rem, 6cqh, 1.2rem);
+  opacity: 0.92;
 }
 
 .weather-detail-hour-temp {
-  font-size: clamp(0.56rem, 3.6cqh, 0.7rem);
-  font-weight: 700;
+  font-size: clamp(0.66rem, 4.4cqh, 0.85rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .weather-detail-hour-bar {
+  flex: 1 1 auto;
   display: flex;
   align-items: end;
   justify-content: center;
-  width: clamp(0.4rem, 1.8cqw, 0.6rem);
-  height: clamp(2rem, 14cqh, 3.4rem);
+  width: clamp(0.35rem, 1.5cqw, 0.5rem);
+  min-height: 1.5rem;
+  max-height: 5rem;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgb(255 255 255 / 0.16);
   overflow: hidden;
 }
 
-/* Wind: an arrow pointing where the wind is headed, instead of a bar. Sized
-   to its own content rather than matching .weather-detail-hour-bar's tall
-   box — that left a lot of empty space above/below the small glyph. */
+/* Wind: an arrow pointing where the wind is headed, instead of a bar. */
 .weather-detail-hour-wind {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .weather-detail-hour-wind-arrow {
-  width: clamp(1.3rem, 8cqh, 2rem);
-  height: clamp(1.3rem, 8cqh, 2rem);
-  color: rgba(255, 255, 255, 0.88);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  width: clamp(1.1rem, 7cqh, 1.6rem);
+  height: clamp(1.1rem, 7cqh, 1.6rem);
+  color: rgb(255 255 255 / 0.9);
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
 }
 
 .weather-detail-hour-bar-fill {
@@ -1376,36 +1845,11 @@
 }
 
 .weather-detail-hour-value {
-  font-size: clamp(0.44rem, 2.9cqh, 0.56rem);
+  font-size: clamp(0.5rem, 3cqh, 0.625rem);
   font-weight: 600;
-}
-
-/* Metric switcher — the very bottom of the panel. */
-.weather-detail-metric-tabs {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: clamp(0.25rem, 1.6cqw, 0.45rem);
-}
-
-.weather-detail-metric-tab {
-  flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 9999px;
-  padding: clamp(0.2rem, 1.4cqh, 0.32rem) clamp(0.5rem, 2.6cqw, 0.75rem);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: clamp(0.52rem, 3.6cqh, 0.64rem);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  color: rgb(255 255 255 / 0.85);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-.weather-detail-metric-tab[data-active="true"] {
-  border-color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.22);
-  color: white;
 }
 
 .weather-detail-empty {
@@ -1434,13 +1878,10 @@
   }
 }
 
-@container (max-height: 24rem) {
-  .weather-detail-content {
-    gap: 0.35rem;
-  }
-
-  .weather-detail-hour-bar {
-    height: clamp(1.8rem, 14cqh, 3rem);
+@container (max-height: 15rem) {
+  .weather-detail-hour-icon,
+  .weather-detail-hour-value {
+    display: none;
   }
 }
 
@@ -1610,20 +2051,37 @@
   flex-direction: column;
 }
 
-/* Vertical red line. Negative top/bottom insets (by exactly the card's own
-   padding) extend it past .clock-plain-inner's box to the true card edges,
-   while its horizontal position stays relative to .clock-plain-inner —
-   matching the dot's reference frame exactly. */
-.clock-plain-inner::before {
+/* The "now" line runs only through the empty spine between the date and
+   the time, so it never crosses text; a short tick marks the same moment on
+   the hour rule below. Both share .clock-plain-inner's width, so a given
+   --clock-now-x lands on the same pixel column as the dot. */
+.clock-plain-spine::before,
+.clock-plain-rule::after {
   content: "";
   position: absolute;
   left: var(--clock-now-x, 50%);
-  top: calc(-1 * var(--clock-pad));
-  bottom: calc(-1 * var(--clock-pad));
   width: 1px;
-  /* Same lighter red as the dot's own halo ring, for consistency. */
-  background: color-mix(in oklab, var(--destructive) 18%, transparent);
-  z-index: 0;
+  background: color-mix(in oklab, var(--destructive) 28%, transparent);
+  transform: translateX(-50%);
+}
+
+.clock-plain-spine::before {
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in oklab, var(--destructive) 45%, transparent) 25%,
+    color-mix(in oklab, var(--destructive) 45%, transparent) 75%,
+    transparent
+  );
+}
+
+.clock-plain-rule::after {
+  top: -3px;
+  height: 7px;
+  background: var(--destructive);
+  border-radius: 1px;
 }
 
 .clock-plain-top,
@@ -1644,19 +2102,26 @@
   gap: clamp(0.3rem, 2cqh, 0.5rem);
 }
 
+.clock-plain-weekday {
+  font-size: clamp(0.6rem, 4.8cqw, 0.6875rem);
+  line-height: 1.2;
+}
+
 .clock-plain-date {
-  font-weight: 700;
-  font-size: clamp(1rem, 11cqw, 1.5rem);
+  margin-top: 0.15em;
+  font-weight: 600;
+  font-size: clamp(0.95rem, 9.5cqw, 1.25rem);
   line-height: 1.15;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  font-variant-numeric: lining-nums;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .clock-plain-offset {
-  margin-top: 0.2em;
-  font-size: clamp(0.68rem, 5.5cqw, 0.85rem);
+  margin-top: 0.1em;
+  font-size: clamp(0.68rem, 5.5cqw, 0.8125rem);
   color: var(--muted-foreground);
 }
 
@@ -1668,7 +2133,7 @@
 .clock-plain-dot {
   position: absolute;
   left: var(--clock-now-x, 50%);
-  top: 38%;
+  top: 50%;
   width: clamp(0.5rem, 3.2cqw, 0.7rem);
   height: clamp(0.5rem, 3.2cqw, 0.7rem);
   border-radius: 9999px;
@@ -1684,20 +2149,21 @@
 }
 
 .clock-plain-time-value {
-  font-weight: 700;
-  font-size: clamp(1.6rem, 17cqw, 2.6rem);
+  font-weight: 600;
+  font-size: clamp(1.75rem, 19cqw, 2.85rem);
   line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
 }
 
 .clock-plain-time-meridiem {
-  font-weight: 600;
-  font-size: clamp(0.9rem, 9cqw, 1.3rem);
+  font-weight: 500;
+  font-size: clamp(0.75rem, 7cqw, 1rem);
+  letter-spacing: 0.02em;
   color: var(--muted-foreground);
 }
 
 .clock-plain-rule {
+  position: relative;
   height: 1px;
   background: color-mix(in oklab, var(--border) 75%, transparent);
 }
@@ -1712,6 +2178,20 @@
 .clock-plain-ticks span {
   flex: 1;
   text-align: center;
+}
+
+/* One row tall (1 x 1, 2 x 1): no room for the day's timeline under the
+   time, so it's just the date above the time. */
+@container (max-height: 10rem) {
+  .clock-plain-inner {
+    justify-content: space-between;
+  }
+
+  .clock-plain-spine,
+  .clock-plain-rule,
+  .clock-plain-ticks {
+    display: none;
+  }
 }
 
 .headlines-hero,
@@ -1911,31 +2391,98 @@
 }
 
 .search-inner {
-  width: min(82cqw, 15rem);
+  width: min(86cqw, 22rem);
 }
 
 .search-engines {
-  gap: clamp(0.5rem, 6cqw, 2rem);
-  padding-top: clamp(0.25rem, 7cqh, 2rem);
-  padding-bottom: clamp(0.375rem, 4cqh, 1rem);
+  gap: clamp(0.25rem, 3cqw, 0.75rem);
+  padding-bottom: clamp(0.5rem, 6cqh, 0.9rem);
 }
 
 .search-engine-button {
-  width: clamp(1.75rem, 18cqh, 2.5rem);
-  height: clamp(1.75rem, 18cqh, 2.5rem);
-  background-size: clamp(1rem, 10cqh, 1.75rem) clamp(1rem, 10cqh, 1.75rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(1.9rem, 20cqh, 2.4rem);
+  height: clamp(1.9rem, 20cqh, 2.4rem);
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.search-engine-button:hover {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.search-engine-button:active {
+  transform: scale(0.94);
+}
+
+.search-engine-button[aria-pressed="true"] {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 9%, transparent);
 }
 
 .search-engine-icon {
-  width: clamp(1rem, 10cqh, 1.75rem);
-  height: clamp(1rem, 10cqh, 1.75rem);
+  width: clamp(1rem, 10cqh, 1.25rem);
+  height: clamp(1rem, 10cqh, 1.25rem);
+}
+
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-field-icon {
+  position: absolute;
+  left: 0.85rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
 }
 
 .search-input {
   width: 100%;
-  height: clamp(1.8rem, 16cqh, 2.25rem);
-  padding-inline: clamp(0.5rem, 4cqw, 0.75rem);
-  font-size: clamp(0.7rem, 6cqh, 0.875rem);
+  height: clamp(2.1rem, 22cqh, 2.6rem);
+  padding: 0 1rem 0 2.35rem;
+  border-radius: 9999px;
+  border: var(--hairline-width) solid var(--hairline-strong);
+  background: color-mix(in oklab, var(--background) 65%, var(--card));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06);
+  color: var(--foreground);
+  font-size: clamp(0.8rem, 7cqh, 0.9375rem);
+  transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.search-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+/* What Enter will do, for anything other than a plain search: a bang, a
+   sum, or a site. Hangs under the field so the card doesn't shift. */
+.search-hint {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 1rem;
+  right: 1rem;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.search-input:focus {
+  outline: none;
+  background: var(--card);
+  border-color: color-mix(in oklab, var(--ring) 45%, transparent);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.04), 0 0 0 3px color-mix(in oklab, var(--ring) 14%, transparent);
 }
 
 .vault-nav-center {
@@ -1972,7 +2519,7 @@
   border-radius: 9999px;
   background: transparent;
   color: color-mix(in oklab, var(--foreground) 18%, transparent);
-  transition: color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: color var(--duration-base) var(--ease-out), opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
 }
 
 .vault-nav-button:hover {
@@ -2003,81 +2550,202 @@
 /* Header/toolbar chrome now reuses the shared .vg-header/.vg-toolbar/etc.
    classes (see the VaultGlassView block below) so Bookmarks and Vault look
    identical there — only the pill-cloud layout below is bespoke to Bookmarks. */
-.bookmark-vault-list {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.8rem 0.65rem;
-  padding-top: 1.25rem;
-}
 
 .bookmark-header {
   min-width: 0;
-  padding: clamp(0.35rem, 4cqh, 0.625rem) clamp(0.85rem, 9cqw, 1.35rem);
+  padding: clamp(0.6rem, 7cqh, 0.9rem) clamp(0.75rem, 8cqw, 1rem) clamp(0.25rem, 3cqh, 0.4rem);
 }
 
-.bookmark-title {
-  margin-top: 0;
+.bookmark-title-button {
+  display: block;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: clamp(0.62rem, 6cqh, 0.875rem);
+  border-radius: 0.375rem;
+  text-align: left;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.bookmark-title-button:hover .bookmark-title {
+  color: var(--foreground);
+}
+
+.bookmark-title-arrow {
+  opacity: 0;
+  transform: translate(-2px, 2px);
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.bookmark-title-button:hover .bookmark-title-arrow {
+  opacity: 1;
+  transform: none;
+}
+
+.bookmark-quick-add {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.bookmark-quick-add:hover {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.group\/tile:hover .bookmark-quick-add,
+.bookmark-quick-add:focus-visible {
+  opacity: 1;
 }
 
 .bookmark-list {
-  padding: clamp(0.25rem, 3cqh, 0.5rem) clamp(0.3rem, 3cqw, 0.5rem);
+  padding: 0 clamp(0.3rem, 3cqw, 0.45rem) clamp(0.3rem, 3cqh, 0.45rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.bookmark-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* More above or below: the list fades out at that edge. */
+.bookmark-list[data-fade-bottom] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.75rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.75rem), transparent);
+}
+
+.bookmark-list[data-fade-top] {
+  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 1.25rem), transparent);
+  mask-image: linear-gradient(to top, #000 calc(100% - 1.25rem), transparent);
+}
+
+.bookmark-list[data-fade-top][data-fade-bottom] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.25rem, #000 calc(100% - 1.75rem), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 1.25rem, #000 calc(100% - 1.75rem), transparent);
 }
 
 .bookmark-items {
   display: grid;
-  gap: clamp(0.0625rem, 1cqh, 0.25rem);
+  gap: 1px;
+}
+
+.bookmark-more {
+  display: block;
+  width: 100%;
+  padding: clamp(0.25rem, 2.6cqh, 0.4rem) clamp(0.4rem, 4cqw, 0.55rem);
+  border-radius: 0.6rem;
+  color: var(--muted-foreground);
+  font-size: clamp(0.68rem, 5.6cqh, 0.75rem);
+  font-weight: 500;
+  text-align: left;
+  transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+button.bookmark-more:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+  color: var(--foreground);
 }
 
 .bookmark-link {
-  gap: clamp(0.25rem, 3cqw, 0.5rem);
-  padding: clamp(0.2rem, 2.2cqh, 0.375rem) clamp(0.3rem, 3cqw, 0.5rem);
+  display: flex;
+  align-items: center;
+  gap: clamp(0.4rem, 4cqw, 0.6rem);
+  padding: clamp(0.25rem, 2.6cqh, 0.4rem) clamp(0.4rem, 4cqw, 0.55rem);
+  border-radius: 0.6rem;
+  color: var(--card-foreground);
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.bookmark-favicon {
-  width: clamp(0.625rem, 6cqh, 0.875rem);
-  height: clamp(0.625rem, 6cqh, 0.875rem);
+.bookmark-link:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
 }
 
-.bookmark-favicon-fallback {
+/* Favicons show as-is with rounded corners on light cards, so full-bleed
+   icons (Medium's black square) read as a clean tile instead of a square
+   floating inside a frame. Dark cards put them on a white chip, which dark
+   logos like GitHub's need to stay visible. */
+.bookmark-favicon-chip {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in oklab, var(--primary-foreground) 24%, transparent);
-  border-radius: 0.28rem;
-  background:
-    radial-gradient(circle at 30% 24%, color-mix(in oklab, var(--primary-foreground) 34%, transparent), transparent 36%),
-    linear-gradient(135deg, color-mix(in oklab, var(--primary) 88%, white), color-mix(in oklab, var(--accent) 72%, var(--primary)));
-  color: var(--primary-foreground);
-  font-size: clamp(0.42rem, 3.8cqh, 0.62rem);
-  font-weight: 800;
+  width: clamp(1.1rem, 10cqh, 1.3rem);
+  height: clamp(1.1rem, 10cqh, 1.3rem);
+  border-radius: 0.35rem;
+  overflow: hidden;
+}
+
+.bookmark-favicon-chip > img {
+  border-radius: inherit;
+}
+
+.dark .bookmark-favicon-chip {
+  width: clamp(1.25rem, 11cqh, 1.5rem);
+  height: clamp(1.25rem, 11cqh, 1.5rem);
+  padding: 0.2rem;
+  border-radius: 0.45rem;
+  background: color-mix(in oklab, white 88%, var(--card));
+  box-shadow: 0 0 0 var(--hairline-width) var(--hairline), 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.dark .bookmark-favicon-chip > img {
+  border-radius: 0.2rem;
+}
+
+/* Self-hosted services show a status dot, which needs no chip. */
+.dark .bookmark-favicon-status {
+  background: transparent;
+  box-shadow: none;
+}
+
+.bookmark-favicon-letter,
+.dark .bookmark-favicon-letter {
+  padding: 0;
+  box-shadow: inset 0 0 0 var(--hairline-width) rgb(255 255 255 / 0.18);
+  background: linear-gradient(160deg, oklch(0.72 0.09 var(--letter-hue, 220)), oklch(0.58 0.1 var(--letter-hue, 220)));
+  color: white;
+  font-size: clamp(0.6rem, 6cqh, 0.75rem);
+  font-weight: 650;
   line-height: 1;
   text-transform: uppercase;
 }
 
-.bookmark-favicon-fallback[hidden] {
-  display: none;
+.dark .bookmark-favicon-letter {
+  background: linear-gradient(160deg, oklch(0.62 0.09 var(--letter-hue, 220)), oklch(0.48 0.1 var(--letter-hue, 220)));
 }
 
+/* Lettered stand-in on the Bookmarks page (pills and folder view). */
+
 .bookmark-name {
-  font-size: clamp(0.55rem, 5cqh, 0.75rem);
+  font-size: clamp(0.72rem, 6.6cqh, 0.8125rem);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
 }
 
 .bookmark-host {
-  margin-top: clamp(0rem, 0.8cqh, 0.125rem);
-  font-size: clamp(0.45rem, 3.6cqh, 0.625rem);
+  margin-top: 1px;
+  font-size: clamp(0.62rem, 5cqh, 0.6875rem);
+  line-height: 1.2;
+  color: var(--muted-foreground);
 }
 
-@container (max-height: 7.75rem) {
+/* Domains are secondary; drop them before rows start scrolling out of view. */
+@container (max-height: 14rem) {
   .bookmark-host {
     display: none;
   }
+}
 
+@container (max-height: 7.75rem) {
   .bookmark-link {
     padding-block: clamp(0.15rem, 1.7cqh, 0.25rem);
   }
@@ -2299,7 +2967,6 @@
   }
 }
 
-
 .timer-digit-roller {
   display: inline-block;
   overflow: hidden;
@@ -2399,223 +3066,15 @@
   pointer-events: none;
 }
 
-.vault-preview-stage {
-  position: relative;
-  z-index: 1;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3.5rem 1.5rem;
+/* Dim the painting at night so a dark card isn't set against a bright sky. */
+.dark .vault-preview-scrim {
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.62) 0%, rgba(4, 6, 12, 0.5) 40%, rgba(4, 6, 12, 0.7) 100%);
 }
 
-.vault-preview-paper {
-  position: relative;
-  isolation: isolate;
-  width: min(94vw, 72rem);
-  /* Fixed (not max-) height so the card doesn't resize as filtering/search
-     changes how many items are visible — empty space just stays empty. */
-  height: 86vh;
-  border-radius: 1rem;
-  overflow: hidden;
-  background: linear-gradient(
-    158deg,
-    color-mix(in oklab, var(--card) 92%, white 8%) 0%,
-    var(--card) 42%,
-    color-mix(in oklab, var(--card) 90%, black 10%) 100%
-  );
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 0 60px color-mix(in oklab, var(--foreground) 8%, transparent),
-    0 14px 30px -14px rgba(0, 0, 0, 0.35),
-    0 40px 80px -24px rgba(0, 0, 0, 0.5);
-  font-family: var(--font-sans);
-  color: var(--foreground);
-}
-
-.dark .vault-preview-paper {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 0 60px color-mix(in oklab, var(--foreground) 5%, transparent),
-    0 14px 32px -14px rgba(0, 0, 0, 0.55),
-    0 40px 90px -20px rgba(0, 0, 0, 0.75);
-}
-
-/* Actual paper fiber grain (feTurbulence + feDiffuseLighting, defined once
-   in ResourceVaultPage), not a flat tint — this is what reads as "paper"
-   rather than just a plain colored card. */
-.vault-preview-paper::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  filter: url(#vault-paper-fibers);
-  mix-blend-mode: multiply;
-  opacity: 0.22;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.vault-preview-paper::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  filter: url(#vault-paper-fibers-fine);
-  mix-blend-mode: multiply;
-  opacity: 0.14;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.dark .vault-preview-paper::before {
-  mix-blend-mode: soft-light;
-  opacity: 0.16;
-}
-
-.dark .vault-preview-paper::after {
-  mix-blend-mode: soft-light;
-  opacity: 0.1;
-}
-
-.vault-preview-paper-scroll {
-  position: relative;
-  z-index: 1;
-  height: 86vh;
-  overflow-y: auto;
-  padding: 2.25rem 2.5rem 2rem;
-}
-
-@media (max-width: 720px) {
-  .vault-preview-paper-scroll {
-    padding: 1.5rem 1.25rem 1.25rem;
-    height: 90vh;
-  }
-
-  .vault-preview-paper {
-    border-radius: 0.85rem;
-    height: 90vh;
-  }
-}
+/* The card starts below the floating header and leaves the same margin at
+   the bottom, so it never butts against the nav. */
 
 /* --- VaultGlassView: cleaned-up vault UI, grouped by date --- */
-
-.vg-view {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.vg-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
-}
-
-.vg-eyebrow {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-  margin-bottom: 0.2rem;
-}
-
-.vg-title {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: clamp(1.2rem, 2.4vw, 1.55rem);
-  line-height: 1.1;
-}
-
-.vg-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 auto;
-  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
-  border-radius: 9999px;
-  color: color-mix(in oklab, var(--card-foreground) 78%, transparent);
-  background: color-mix(in oklab, var(--card) 40%, transparent);
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.vg-back:hover {
-  background: color-mix(in oklab, var(--accent) 55%, transparent);
-  color: var(--card-foreground);
-}
-
-.vg-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.vg-search {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex: 1 1 12rem;
-  min-width: 0;
-  height: 2.15rem;
-  padding-inline: 0.7rem;
-  border-radius: 0.7rem;
-  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--card) 55%, transparent);
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-search input {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  color: var(--foreground);
-  font-size: 0.85rem;
-}
-
-.vg-search input::placeholder {
-  color: color-mix(in oklab, var(--muted-foreground) 80%, transparent);
-}
-
-.vg-search button {
-  display: inline-flex;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  height: 2.15rem;
-  padding-inline: 0.6rem;
-  border-radius: 0.7rem;
-  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--card) 55%, transparent);
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--card-foreground) 88%, transparent);
-  transition: background 0.15s ease, border-color 0.15s ease;
-  white-space: nowrap;
-}
-
-.vg-tool-btn:hover {
-  background: color-mix(in oklab, var(--accent) 55%, transparent);
-  border-color: color-mix(in oklab, var(--ring) 35%, var(--border));
-}
-
-.vg-tool-group {
-  display: inline-flex;
-  gap: 0.35rem;
-}
-
-.vg-tag-filter {
-  position: relative;
-}
 
 .vg-popover {
   position: absolute;
@@ -2652,39 +3111,6 @@
 .vg-popover-option-active {
   background: color-mix(in oklab, var(--accent) 75%, transparent);
   font-weight: 600;
-}
-
-.vg-count {
-  margin-left: auto;
-  font-size: 0.7rem;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-import-message {
-  margin-top: -0.6rem;
-  font-size: 0.75rem;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-add-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  align-self: flex-start;
-  height: 2.15rem;
-  padding-inline: 0.85rem;
-  border-radius: 0.7rem;
-  border: 1px dashed color-mix(in oklab, var(--border) 80%, transparent);
-  color: color-mix(in oklab, var(--card-foreground) 80%, transparent);
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.vg-add-trigger:hover {
-  background: color-mix(in oklab, var(--accent) 50%, transparent);
-  border-color: color-mix(in oklab, var(--ring) 35%, var(--border));
-  border-style: solid;
 }
 
 .vg-composer {
@@ -2809,200 +3235,13 @@
   background: color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
-.vg-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  align-self: flex-start;
-  padding: 0.2rem;
-  border-radius: 0.75rem;
-  background: color-mix(in oklab, var(--card) 45%, transparent);
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-}
-
-.vg-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 0.55rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-tab span {
-  font-size: 0.68rem;
-  padding: 0 0.35rem;
-  border-radius: 9999px;
-  background: color-mix(in oklab, var(--muted) 70%, transparent);
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-tab-active {
-  background: color-mix(in oklab, var(--background) 85%, transparent);
-  color: var(--foreground);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-.vg-tab-active span {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.vg-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.vg-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.vg-group-label {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
-
-.vg-group-label span {
-  font-size: 0.68rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-.vg-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.vg-item {
-  position: relative;
-  display: flex;
-  /* Single line by default — only an expanded description (see
-     .vg-item-expanded) is allowed to push onto its own line. */
-  flex-wrap: nowrap;
-  align-items: baseline;
-  gap: 0.55rem;
-  padding: 0.5rem 0.6rem 0.5rem 0.85rem;
-  border-radius: 0.6rem;
-  transition: background 0.15s ease;
-}
-
-.vg-item-expanded {
-  flex-wrap: wrap;
-}
-
-.vg-item:hover {
-  background: color-mix(in oklab, var(--accent) 42%, transparent);
-}
-
 /* Category color lives here now — a left-edge accent instead of a small dot,
    so the tag reads at a glance without adding another UI element. Falls
    back to a neutral tone for unknown tags. */
-.vg-item::before {
-  content: "";
-  position: absolute;
-  left: 0.15rem;
-  top: 0.4rem;
-  bottom: 0.4rem;
-  width: 3px;
-  border-radius: 9999px;
-  background: var(--read-tag-color, color-mix(in oklab, var(--muted-foreground) 45%, transparent));
-}
-
-.vg-item-check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: 9999px;
-  border: 1.5px solid color-mix(in oklab, var(--muted-foreground) 45%, transparent);
-  color: var(--primary-foreground);
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.vg-item-check:hover {
-  border-color: color-mix(in oklab, var(--ring) 50%, var(--border));
-}
-
-.vg-item-check-done {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.vg-item-main {
-  display: flex;
-  align-items: baseline;
-  /* Can shrink (and ellipsis-truncate via .vg-item-title) like everything
-     else on the row — the row always stays on one line; only an expanded
-     description is allowed to wrap (see .vg-item-expanded). */
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-.vg-item-rule {
-  content: "";
-  flex: 1 100 1rem;
-  min-width: 0.75rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 22%, transparent);
-  transform: translateY(-0.22rem);
-}
-
-.vg-item-title {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vg-item-description {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.82rem;
-  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
-  background: none;
-  border: none;
-  padding: 0;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.vg-item-description:hover {
-  color: color-mix(in oklab, var(--foreground) 85%, transparent);
-  text-decoration: underline dotted;
-}
 
 /* Clicked open: breaks onto its own full-width line below the compact row
    (flex-basis: 100% + .vg-item's flex-wrap forces the wrap) instead of
    trying to keep sharing the row with the tag/date/actions. */
-.vg-item-description-expanded {
-  flex-basis: 100%;
-  order: 5;
-  margin-top: 0.2rem;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  line-height: 1.4;
-  cursor: pointer;
-}
 
 /* Template/Code rows (VaultItemsSection) use a two-line card layout instead
    of the single-line row Links use: body content there is prose/code, not a
@@ -3011,20 +3250,6 @@
    almost nothing). Scoped to .vg-item-card so it doesn't touch the Links
    row (VaultGlassView), which shares the base .vg-item / .vg-item-title /
    etc. classes but keeps its original single-line layout. */
-.vg-item-card {
-  flex-direction: column;
-  align-items: stretch;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.vg-item-top {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: nowrap;
-  gap: 0.55rem;
-  min-width: 0;
-}
 
 /* Deliberately NOT flex-grow: the top row has no other flexible sibling to
    fight for space with anymore (body preview lives on its own line below),
@@ -3033,107 +3258,6 @@
    to content and only shrink-to-ellipsis if the row is genuinely too
    narrow — same as the base .vg-item-main rule; restated here for clarity
    since this selector is what actually applies inside .vg-item-card. */
-.vg-item-card .vg-item-main {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-.vg-item-title-btn {
-  display: inline-flex;
-  min-width: 0;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.vg-item-title-btn:hover .vg-item-title {
-  text-decoration: underline dotted;
-}
-
-.vg-item-card .vg-item-description {
-  flex: none;
-  width: 100%;
-}
-
-.vg-item-tag {
-  flex: 0 0 auto;
-  font-size: 0.7rem;
-  font-weight: 500;
-  /* --muted-foreground is a genuinely low-contrast gray by design — even at
-     near-full opacity it reads faint. Basing this on --foreground instead
-     (at partial opacity) keeps it visually secondary while staying legible
-     in both themes. */
-  color: color-mix(in oklab, var(--foreground) 62%, transparent);
-}
-
-.vg-item-date {
-  flex: 0 0 auto;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--foreground) 70%, transparent);
-}
-
-.vg-item-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.15rem;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.vg-item:hover .vg-item-actions,
-.vg-item:focus-within .vg-item-actions {
-  opacity: 1;
-}
-
-.vg-item-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 0.45rem;
-  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
-}
-
-.vg-item-action:hover {
-  background: color-mix(in oklab, var(--accent) 65%, transparent);
-  color: var(--card-foreground);
-}
-
-.vg-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 2.75rem 1rem;
-  text-align: center;
-}
-
-.vg-empty-icon {
-  width: 2.1rem;
-  height: 2.1rem;
-  margin-bottom: 0.4rem;
-  color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
-}
-
-.vg-empty-title {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.95rem;
-  color: color-mix(in oklab, var(--foreground) 80%, transparent);
-}
-
-.vg-empty-hint {
-  font-size: 0.78rem;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-}
 
 /* --- Undo-after-delete toast --- */
 
@@ -3199,41 +3323,12 @@
     flex-direction: column;
   }
 
-  .vg-item {
-    flex-wrap: wrap;
-  }
-
   /* Code/Template rows (.vg-item-card) pack title + meta chips + date +
      4 action buttons into one nowrap row (.vg-item-top) — on a narrow phone
      that fixed-width content alone can exceed the row, squeezing the title
      to near-zero. Wrapping the row and pushing actions onto their own
      full-width line keeps the title readable and gives the actions more
      breathing room as a dedicated tap row. */
-  .vg-item-top {
-    flex-wrap: wrap;
-  }
-
-  .vg-item-actions {
-    opacity: 1;
-    flex-basis: 100%;
-    justify-content: flex-end;
-    gap: 0.4rem;
-  }
-
-  .vg-item-action {
-    width: 2rem;
-    height: 2rem;
-  }
-
-  .vg-item-check {
-    width: 1.2rem;
-    height: 1.2rem;
-  }
-
-  .vg-back {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
 }
 
 /* --- Vault items: snippets/commands/templates/expansions/prompts/docs --- */
@@ -3362,174 +3457,114 @@
    the same .dark ancestor class the rest of the app's dark-mode overrides
    use. Token class names follow Prism's own convention, grouped exactly
    like every standard Prism theme (prism-okaidia.css etc.) groups them. */
-.vg-item-body-mono .token.comment,
 .vg-preview-code .token.comment,
-.vg-item-body-mono .token.prolog,
 .vg-preview-code .token.prolog,
-.vg-item-body-mono .token.doctype,
 .vg-preview-code .token.doctype,
-.vg-item-body-mono .token.cdata,
 .vg-preview-code .token.cdata {
   color: #a0a1a7;
   font-style: italic;
 }
 
-.vg-item-body-mono .token.punctuation,
 .vg-preview-code .token.punctuation {
   color: color-mix(in oklab, var(--foreground) 65%, transparent);
 }
 
-.vg-item-body-mono .token.property,
 .vg-preview-code .token.property,
-.vg-item-body-mono .token.tag,
 .vg-preview-code .token.tag,
-.vg-item-body-mono .token.boolean,
 .vg-preview-code .token.boolean,
-.vg-item-body-mono .token.number,
 .vg-preview-code .token.number,
-.vg-item-body-mono .token.constant,
 .vg-preview-code .token.constant,
-.vg-item-body-mono .token.symbol,
 .vg-preview-code .token.symbol,
-.vg-item-body-mono .token.deleted,
 .vg-preview-code .token.deleted {
   color: #986801;
 }
 
-.vg-item-body-mono .token.selector,
 .vg-preview-code .token.selector,
-.vg-item-body-mono .token.attr-name,
 .vg-preview-code .token.attr-name,
-.vg-item-body-mono .token.string,
 .vg-preview-code .token.string,
-.vg-item-body-mono .token.char,
 .vg-preview-code .token.char,
-.vg-item-body-mono .token.builtin,
 .vg-preview-code .token.builtin,
-.vg-item-body-mono .token.inserted,
 .vg-preview-code .token.inserted {
   color: #50a14f;
 }
 
-.vg-item-body-mono .token.operator,
 .vg-preview-code .token.operator,
-.vg-item-body-mono .token.entity,
 .vg-preview-code .token.entity,
-.vg-item-body-mono .token.url,
 .vg-preview-code .token.url,
-.vg-item-body-mono .token.attr-value,
 .vg-preview-code .token.attr-value {
   color: #0184bc;
 }
 
-.vg-item-body-mono .token.atrule,
 .vg-preview-code .token.atrule,
-.vg-item-body-mono .token.keyword,
 .vg-preview-code .token.keyword {
   color: #a626a4;
 }
 
-.vg-item-body-mono .token.function,
 .vg-preview-code .token.function,
-.vg-item-body-mono .token.class-name,
 .vg-preview-code .token.class-name {
   color: #4078f2;
 }
 
-.vg-item-body-mono .token.regex,
 .vg-preview-code .token.regex,
-.vg-item-body-mono .token.important,
 .vg-preview-code .token.important,
-.vg-item-body-mono .token.variable,
 .vg-preview-code .token.variable {
   color: #e45649;
 }
 
-.vg-item-body-mono .token.important,
 .vg-preview-code .token.important,
-.vg-item-body-mono .token.bold,
 .vg-preview-code .token.bold {
   font-weight: 700;
 }
 
-.vg-item-body-mono .token.italic,
 .vg-preview-code .token.italic {
   font-style: italic;
 }
 
-.dark .vg-item-body-mono .token.comment,
 .dark .vg-preview-code .token.comment,
-.dark .vg-item-body-mono .token.prolog,
 .dark .vg-preview-code .token.prolog,
-.dark .vg-item-body-mono .token.doctype,
 .dark .vg-preview-code .token.doctype,
-.dark .vg-item-body-mono .token.cdata,
 .dark .vg-preview-code .token.cdata {
   color: #5c6370;
 }
 
-.dark .vg-item-body-mono .token.property,
 .dark .vg-preview-code .token.property,
-.dark .vg-item-body-mono .token.tag,
 .dark .vg-preview-code .token.tag,
-.dark .vg-item-body-mono .token.boolean,
 .dark .vg-preview-code .token.boolean,
-.dark .vg-item-body-mono .token.number,
 .dark .vg-preview-code .token.number,
-.dark .vg-item-body-mono .token.constant,
 .dark .vg-preview-code .token.constant,
-.dark .vg-item-body-mono .token.symbol,
 .dark .vg-preview-code .token.symbol,
-.dark .vg-item-body-mono .token.deleted,
 .dark .vg-preview-code .token.deleted {
   color: #d19a66;
 }
 
-.dark .vg-item-body-mono .token.selector,
 .dark .vg-preview-code .token.selector,
-.dark .vg-item-body-mono .token.attr-name,
 .dark .vg-preview-code .token.attr-name,
-.dark .vg-item-body-mono .token.string,
 .dark .vg-preview-code .token.string,
-.dark .vg-item-body-mono .token.char,
 .dark .vg-preview-code .token.char,
-.dark .vg-item-body-mono .token.builtin,
 .dark .vg-preview-code .token.builtin,
-.dark .vg-item-body-mono .token.inserted,
 .dark .vg-preview-code .token.inserted {
   color: #98c379;
 }
 
-.dark .vg-item-body-mono .token.operator,
 .dark .vg-preview-code .token.operator,
-.dark .vg-item-body-mono .token.entity,
 .dark .vg-preview-code .token.entity,
-.dark .vg-item-body-mono .token.url,
 .dark .vg-preview-code .token.url,
-.dark .vg-item-body-mono .token.attr-value,
 .dark .vg-preview-code .token.attr-value {
   color: #56b6c2;
 }
 
-.dark .vg-item-body-mono .token.atrule,
 .dark .vg-preview-code .token.atrule,
-.dark .vg-item-body-mono .token.keyword,
 .dark .vg-preview-code .token.keyword {
   color: #c678dd;
 }
 
-.dark .vg-item-body-mono .token.function,
 .dark .vg-preview-code .token.function,
-.dark .vg-item-body-mono .token.class-name,
 .dark .vg-preview-code .token.class-name {
   color: #61afef;
 }
 
-.dark .vg-item-body-mono .token.regex,
 .dark .vg-preview-code .token.regex,
-.dark .vg-item-body-mono .token.important,
 .dark .vg-preview-code .token.important,
-.dark .vg-item-body-mono .token.variable,
 .dark .vg-preview-code .token.variable {
   color: #e06c75;
 }
@@ -3584,112 +3619,105 @@
   font-weight: 600;
 }
 
-.vg-item-body-mono {
-  font-family: var(--font-mono, ui-monospace, monospace);
-}
-
-.vg-section-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  padding-bottom: 0.9rem;
-  margin-bottom: 0.2rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
-}
-
-.vg-section-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--muted-foreground) 90%, transparent);
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.vg-section-tab:hover {
-  background: color-mix(in oklab, var(--accent) 50%, transparent);
-}
-
-.vg-section-tab-active {
-  background: color-mix(in oklab, var(--accent) 70%, transparent);
-  color: var(--foreground);
-}
-
 /* --- Vault launcher: homepage widget tile grid --- */
 
 .vault-launcher {
   display: flex;
-  height: 100%;
-  padding: 0.6rem;
-  border-radius: 1rem;
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-  background: color-mix(in oklab, var(--card) 92%, black 8%);
-}
-
-.vault-launcher-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: min-content;
-  gap: 0.4rem;
-  width: 100%;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.vault-launcher-tile {
-  display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0.45rem;
-  min-width: 0;
-  min-height: 3.6rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: 0.7rem;
-  background: color-mix(in oklab, var(--foreground) 6%, transparent);
-  color: color-mix(in oklab, var(--card-foreground) 92%, transparent);
-  transition: background 0.15s ease;
+  height: 100%;
+  padding: 0.6rem 0.45rem 0.45rem;
 }
 
-.vault-launcher-tile:hover {
-  background: color-mix(in oklab, var(--foreground) 12%, transparent);
+.vault-launcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.3rem 0.25rem 0.55rem;
 }
 
-.vault-launcher-tile-icon {
+.vault-launcher-actions {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.vault-launcher-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.625rem;
+  height: 1.625rem;
   border-radius: 9999px;
-  color: var(--read-tag-color, currentColor);
-  background: color-mix(in oklab, var(--read-tag-color, var(--muted-foreground)) 18%, transparent);
+  color: var(--muted-foreground);
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
-.vault-launcher-tile-label {
+.vault-launcher-action:hover,
+.vault-launcher-action[aria-expanded="true"] {
+  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--foreground) 7%, transparent);
+}
+
+.vault-launcher-list {
+  flex: 1 1 auto;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vault-launcher-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   width: 100%;
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1.15;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.6rem;
+  color: var(--card-foreground);
   text-align: left;
-  overflow-wrap: break-word;
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.vault-launcher-tile-accent {
+.vault-launcher-row:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.vault-launcher-row-icon {
+  display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  color: color-mix(in oklab, var(--card-foreground) 75%, transparent);
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.5rem;
+  color: var(--read-tag-color, currentColor);
+  background: color-mix(in oklab, var(--read-tag-color, var(--muted-foreground)) 15%, transparent);
+}
+
+.vault-launcher-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.vault-launcher-row-chevron {
+  color: var(--muted-foreground);
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.vault-launcher-row:hover .vault-launcher-row-chevron {
+  opacity: 1;
+  transform: none;
 }
 
 .vault-launcher-add {
   position: relative;
-}
-
-.vault-launcher-add .vault-launcher-tile {
-  width: 100%;
 }
 
 /* Anchored to the trigger's horizontal center (not left/right:0) since this
@@ -3699,8 +3727,7 @@
 .vault-launcher-popover {
   position: absolute;
   top: calc(100% + 0.4rem);
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -3716,12 +3743,13 @@
   box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.35);
 }
 
-/* ===== Weather V2 (frosted-glass hourly card) ===== */
+/* ===== Weather V2 (the frosted weather card): its glass and moving backdrop ===== */
 /* Inspired by "Frosted weather card design" (project root) — animated flat
    backgrounds keyed to 5 conditions, sitting under a blurred glass overlay.
    Ported positional animations use `left`/`top` percentages (relative to the
    containing block) rather than `transform: translate%` (relative to the
    element's own box) so they scale correctly at any widget size. */
+
 
 .weather-v2-card {
   container-type: size;
@@ -3745,35 +3773,6 @@
     rgba(130, 144, 140, 0.9) 100%
   );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.weather-v2-content {
-  padding: clamp(0.7rem, 5cqh, 1.4rem) clamp(0.8rem, 5cqw, 1.6rem);
-  gap: clamp(0.4rem, 2.4cqh, 0.9rem);
-}
-
-.weather-v2-headline {
-  max-width: 92%;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.16;
-  color: #fff;
-  font-size: clamp(0.82rem, 6.6cqh, 1.5rem);
-}
-
-.weather-v2-headline-icon {
-  display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
-  vertical-align: -0.12em;
-  margin: 0 0.05em;
-  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.25));
-}
-
-.weather-v2-rule {
-  flex: 0 0 auto;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.3);
 }
 
 /* --- Sunny --- */
@@ -3827,6 +3826,53 @@
 @keyframes weather-v2-glow-core {
   0%, 100% { transform: scale(0.94); opacity: 0.7; }
   50% { transform: scale(1.18); opacity: 1; }
+}
+
+/* --- Night ---
+   A clear night is its own sky: deep blue, a soft moon and faint stars. Every
+   other condition keeps its own look, darkened, under a night-tinted glass. */
+
+.weather-v2-bg-night-base {
+  background: radial-gradient(130% 140% at 80% -10%, #2b3a5c 0%, #18223a 46%, #0c1220 100%);
+}
+
+.weather-v2-bg-night-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 28% 64%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 44% 18%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 58% 48%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 66% 80%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 22% 86%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 52% 32%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 36% 42%, rgba(255, 255, 255, 0.6), transparent);
+}
+
+.weather-v2-bg-night-moon {
+  position: absolute;
+  right: 6%;
+  top: -18%;
+  width: 46%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(232, 238, 255, 0.55) 0%, rgba(176, 196, 240, 0.22) 40%, rgba(150, 170, 230, 0) 72%);
+  animation: weather-v2-glow-pulse 9s ease-in-out infinite;
+}
+
+.weather-v2-card[data-night]:not([data-category="sunny"]) .weather-v2-bg-layer {
+  filter: brightness(0.5) saturate(0.75);
+}
+
+.weather-v2-card[data-night] .weather-v2-glass {
+  background: linear-gradient(
+    180deg,
+    rgba(36, 46, 70, 0.4) 0%,
+    rgba(32, 42, 64, 0.55) 30%,
+    rgba(28, 38, 58, 0.7) 60%,
+    rgba(24, 32, 50, 0.78) 100%
+  );
 }
 
 /* --- Cloudy --- */
@@ -3935,116 +3981,235 @@
   100% { top: 110%; transform: translateX(-6px); opacity: 0; }
 }
 
-/* --- Temp row / ribbon / hour row --- */
+/* ===== The day card (frosted weather): a whole day as a blurred band ===== */
 
-.weather-v2-temp-row,
-.weather-v2-hour-row {
-  display: grid;
-  /* grid-template-columns is set inline per-render (column count varies with
-     hourSpan) — no fixed column count here. */
-  flex: 0 0 auto;
-  text-align: center;
+.day-card {
+  container-type: size;
 }
 
-.weather-v2-temp-row {
-  align-items: end;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: clamp(0.6rem, 3.2cqw, 1.05rem);
-}
-
-.weather-v2-temp-cell {
+.day-card-content {
+  position: relative;
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-
-.weather-v2-now-label {
-  font-size: clamp(0.42rem, 1.8cqw, 0.62rem);
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.weather-v2-temp-cell-now .weather-v2-temp-value {
+  height: 100%;
+  padding: clamp(0.55rem, 5cqh, 1.1rem) 0 clamp(0.4rem, 4cqh, 0.9rem);
   color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.day-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0 clamp(0.75rem, 5cqw, 1.4rem);
+}
+
+.day-card-headline {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+  font-size: clamp(0.8rem, 7cqh, 1.15rem);
+  letter-spacing: -0.01em;
+}
+
+.day-card-day {
   font-weight: 500;
-  line-height: 1;
-  font-size: clamp(0.9rem, 5.5cqw, 1.7rem);
-  text-shadow: 0 0 24px rgba(255, 255, 255, 0.45);
+  opacity: 0.8;
 }
 
-.weather-v2-ribbon {
+.day-card-range {
+  display: flex;
+  flex: none;
+  gap: 0.5em;
+  font-size: clamp(0.66rem, 5.5cqh, 0.85rem);
+  font-weight: 500;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-card-today {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1em 0.6em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: clamp(0.62rem, 5cqh, 0.8rem);
+  font-weight: 600;
+  text-shadow: none;
+  cursor: pointer;
+}
+
+.day-card-today:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.day-card-timeline {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: clamp(0.1rem, 1.5cqh, 0.35rem);
+}
+
+/* Temperatures above the band and hours below sit at their exact moment
+   across the card's full width, as the band does. */
+.day-card-temps,
+.day-card-hours {
   position: relative;
-  flex: 1 1 auto;
-  min-height: clamp(2.5rem, 20cqh, 5rem);
+  height: 1.25em;
+  font-variant-numeric: tabular-nums;
 }
 
-.weather-v2-ribbon-blur {
+.day-card-temps span,
+.day-card-hours span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.day-card-temps {
+  font-size: clamp(0.62rem, 5.2cqh, 0.82rem);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.day-card-temps span[data-past] {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.day-card-temps .day-card-now-temp {
+  top: -0.2em;
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #fff;
+}
+
+.day-card-hours {
+  font-size: clamp(0.56rem, 4.6cqh, 0.72rem);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.day-card-band {
+  position: relative;
+  height: clamp(1.7rem, 30cqh, 5rem);
+}
+
+/* The band: one frosted bar, edge to edge of the card. The colour field and
+   its quiet texture both sit behind the same blur, with nothing on top. The
+   box reaches above and below the band so the blur fades out there; the
+   frost reaches past the card's sides (the card clips it) so the colour
+   runs solid to its edges. */
+.day-bar {
+  --day-bar-bleed: 28px;
+  position: absolute;
+  inset: -30% 0;
+}
+
+/* A faint, soft track behind the band, so night hours still read on dark glass. */
+.day-bar::before {
+  content: "";
+  position: absolute;
+  inset: 34% 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  filter: blur(3px);
+}
+
+.day-bar-frost {
+  position: absolute;
+  inset: 31% calc(-1 * var(--day-bar-bleed));
+  filter: blur(clamp(6px, 4.5cqh, 12px)) saturate(1.15) brightness(1.05);
+}
+
+.day-bar-frost canvas {
   position: absolute;
   inset: 0;
-  filter: blur(clamp(8px, 2.5cqw, 16px));
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
+  width: 100%;
+  height: 100%;
 }
 
-.weather-v2-ribbon-blob {
+.day-bar-texture {
+  opacity: 0.5;
+}
+
+/* Now: a bright line through the band. */
+.day-card-now {
   position: absolute;
-  top: 20%;
-  bottom: 20%;
-  border-radius: 999px;
-  animation: weather-v2-bar-breathe 6s ease-in-out infinite;
-}
-
-@keyframes weather-v2-bar-breathe {
-  0%, 100% { opacity: 0.9; }
-  50% { opacity: 1; }
-}
-
-.weather-v2-ribbon-marker {
-  position: absolute;
-  left: 50%;
-  top: -14%;
-  bottom: -14%;
+  top: -12%;
+  bottom: -12%;
   width: 2px;
   margin-left: -1px;
   border-radius: 2px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 20%, rgba(255, 255, 255, 0.9) 80%, rgba(255, 255, 255, 0) 100%);
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.8);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 22%, #fff 78%, rgba(255, 255, 255, 0) 100%);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
-.weather-v2-ribbon-dot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin-left: -7px;
-  margin-top: -7px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.28), 0 0 22px rgba(255, 255, 255, 0.9);
+/* Reading a moment: a softer line than now's, following the pointer. */
+.day-card-timeline {
+  cursor: crosshair;
+  touch-action: pan-y;
+  outline: none;
 }
 
-.weather-v2-hour-row {
-  align-items: center;
-  color: rgba(255, 255, 255, 0.65);
-  font-size: clamp(0.52rem, 2.4cqw, 0.92rem);
-}
-
-.weather-v2-hour-cell {
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-}
-
-.weather-v2-hour-pill {
-  padding: 0.2em 0.7em 0.25em;
+.day-card-timeline:focus-visible .day-card-band {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
   border-radius: 999px;
-  background: #fff;
-  color: #20262a;
-  font-weight: 500;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+.day-card-scrub {
+  position: absolute;
+  top: -8%;
+  bottom: -8%;
+  width: 1.5px;
+  margin-left: -0.75px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.75) 25%, rgba(255, 255, 255, 0.75) 75%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+.day-card-head[data-scrubbing] .day-card-range {
+  opacity: 1;
+}
+
+.day-card-moment-temp {
+  font-weight: 700;
+}
+
+/* Bigger cards: the headline may wrap, and the timeline sits in the middle. */
+@container (min-height: 14rem) {
+  .day-card-head {
+    align-items: flex-start;
+  }
+
+  .day-card-headline {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+
+  .day-card-timeline {
+    justify-content: center;
+  }
+}
+
+/* The day-bar gallery's swatches (dev only): a slice of band on the card's glass. */
+.day-bar-swatch {
+  position: relative;
+  width: 9rem;
+  height: 2.6rem;
+  border-radius: 0.6rem;
+  background: #7d8a87;
+  overflow: hidden;
 }
 
 /* --- Loading / error states --- */
@@ -4066,14 +4231,5 @@
   to { transform: rotate(360deg); }
 }
 
-.weather-v2-state-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #fff;
-}
 
-.weather-v2-state-hint {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.65);
-}
 

@@ -2,14 +2,10 @@ import { useEffect } from "react";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useAuthStore } from "@/features/auth/stores";
 import { useSettingsStore } from "@/features/settings/stores";
-import { syncSettingsFromCloud } from "@/lib/settings";
+import { startBackgroundSync, subscribeToRemoteChanges, syncNow } from "@/lib/cloudSync";
 
 // Same-origin by default; self-hosters can point at a remote API.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
-
-// Module-level guard: sync once per user per page load, even across
-// StrictMode double-mounts and subscription-status refreshes.
-let lastSyncedUserId: string | null = null;
 
 export default function AuthBridge() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -51,22 +47,21 @@ export default function AuthBridge() {
     })();
   }, [isLoaded, isSignedIn, getToken, setSubscriptionStatus]);
 
-  // Once the session and subscription status resolve, reconcile local settings
-  // with the cloud copy. This runs here (not at app boot) because window.Clerk
-  // doesn't exist until ClerkProvider has mounted.
+  // Once the session and subscription status resolve, keep settings synced:
+  // now, after local edits (scheduled by writeSettings), and in the
+  // background (focus, reconnect, interval). Runs here rather than at boot
+  // because window.Clerk doesn't exist until ClerkProvider has mounted.
+  const canSync = isLoaded && Boolean(user?.id) && subscriptionStatus !== "loading" && hasSyncAccess();
   useEffect(() => {
-    if (!isLoaded || !user?.id) return;
-    if (subscriptionStatus === "loading" || !hasSyncAccess()) return;
-    if (lastSyncedUserId === user.id) return;
-    lastSyncedUserId = user.id;
-
-    void (async () => {
-      const applied = await syncSettingsFromCloud();
-      if (applied) {
-        useSettingsStore.getState().reloadSettings();
-      }
-    })();
-  }, [isLoaded, user?.id, subscriptionStatus, hasSyncAccess]);
+    if (!canSync) return undefined;
+    const unsubscribe = subscribeToRemoteChanges(() => useSettingsStore.getState().reloadSettings());
+    const stopBackgroundSync = startBackgroundSync();
+    void syncNow();
+    return () => {
+      unsubscribe();
+      stopBackgroundSync();
+    };
+  }, [canSync, user?.id]);
 
   return null;
 }

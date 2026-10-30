@@ -1,4 +1,6 @@
 import { json, errorResponse, HttpError } from "./_lib/http.js";
+import { getCurrentUser } from "./_lib/auth.js";
+import { safeFetch } from "./_lib/safeFetch.js";
 
 // Most pages put <title>/og: meta tags in the first few KB, but some (e.g.
 // YouTube stuffs ~680KB of inline script/JSON before </head> even closes)
@@ -7,11 +9,9 @@ import { json, errorResponse, HttpError } from "./_lib/http.js";
 const MAX_HTML_BYTES = 2_000_000;
 const FETCH_TIMEOUT_MS = 6000;
 
-// Casual SSRF guard: reject the obvious ways to point this at internal
-// infrastructure (localhost, private/link-local ranges, cloud metadata
-// endpoints). This is a hostname-string check, not DNS-rebinding-proof —
-// proportionate for a personal link-preview convenience, not a hardened
-// multi-tenant proxy.
+// Cheap first-pass rejection of obviously internal hostnames, before any DNS
+// lookup. The real SSRF guard is safeFetch, which checks the resolved
+// address of every hop.
 const BLOCKED_HOSTNAME_PATTERNS = [
   /^localhost$/i,
   /^127\./,
@@ -49,7 +49,7 @@ export function isYoutubeUrl(url: URL): boolean {
 // oEmbed itself fails.
 export async function fetchYoutubeOembed(
   target: URL,
-): Promise<{ title: string | null; description: string | null } | null> {
+): Promise<{ title: string | null; description: string | null; image: string | null } | null> {
   try {
     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(target.toString())}&format=json`;
     const response = await fetch(oembedUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
@@ -59,6 +59,7 @@ export async function fetchYoutubeOembed(
     return {
       title: data.title,
       description: data.author_name ? `Video by ${data.author_name}` : null,
+      image: typeof data.thumbnail_url === "string" && /^https:\/\//.test(data.thumbnail_url) ? data.thumbnail_url : null,
     };
   } catch {
     return null;
@@ -136,14 +137,16 @@ export function suggestTag(target: URL, ogType?: string | null): string | null {
   return null;
 }
 
+const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
+// One pass, so "&amp;lt;" stays "&lt;" rather than becoming "<". Numeric
+// entities (&#39;, &#x27;, &#8217;) are decoded as well as the common named ones.
 export function decodeEntities(value: string): string {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&nbsp;/g, " ");
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body: string) => {
+    if (body[0] !== "#") return NAMED_ENTITIES[body.toLowerCase()] ?? entity;
+    const code = body[1] === "x" || body[1] === "X" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+  });
 }
 
 export function extractTitle(html: string): string | null {
@@ -182,6 +185,23 @@ export function extractDescription(html: string): string | null {
   return null;
 }
 
+// The page's share image (og:image, then twitter:image), made absolute
+// against the page URL. Only http(s) images are returned.
+export function extractImage(html: string, base: URL): string | null {
+  const match =
+    html.match(/<meta[^>]+property=["']og:image(?::url)?["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::url)?["']/i) ||
+    html.match(/<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i);
+  if (!match) return null;
+  try {
+    const image = new URL(decodeEntities(match[1].trim()), base);
+    return image.protocol === "https:" || image.protocol === "http:" ? image.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function extractOgType(html: string): string | null {
   const match =
     html.match(/<meta[^>]+property=["']og:type["'][^>]+content=["']([^"']+)["']/i) ||
@@ -191,6 +211,9 @@ export function extractOgType(html: string): string | null {
 
 export async function GET(request: Request): Promise<Response> {
   try {
+    // Signed-in users only, so this can't be used as an open proxy.
+    await getCurrentUser(request);
+
     const rawUrl = new URL(request.url).searchParams.get("url");
     if (!rawUrl) {
       throw new HttpError(422, "Missing url parameter");
@@ -216,6 +239,7 @@ export async function GET(request: Request): Promise<Response> {
         return json({
           title: oembed.title,
           description: oembed.description,
+          image: oembed.image,
           faviconUrl: faviconUrlFor(target),
           tag: suggestTag(target),
         });
@@ -224,8 +248,7 @@ export async function GET(request: Request): Promise<Response> {
       // through to the generic scrape below, same as any other site.
     }
 
-    const response = await fetch(target.toString(), {
-      redirect: "follow",
+    const response = await safeFetch(target, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; StartupPageLinkPreview/1.0)",
         Accept: "text/html,application/xhtml+xml",
@@ -239,7 +262,7 @@ export async function GET(request: Request): Promise<Response> {
 
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("html")) {
-      return json({ title: null, description: null, faviconUrl: faviconUrlFor(target), tag: suggestTag(target) });
+      return json({ title: null, description: null, image: null, faviconUrl: faviconUrlFor(target), tag: suggestTag(target) });
     }
 
     // Stop as soon as </head> shows up — nothing we look for lives past it —
@@ -265,6 +288,7 @@ export async function GET(request: Request): Promise<Response> {
     return json({
       title: extractTitle(html),
       description: extractDescription(html),
+      image: extractImage(html, target),
       faviconUrl: faviconUrlFor(target),
       tag: suggestTag(target, extractOgType(html)),
     });

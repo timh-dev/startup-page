@@ -1,65 +1,78 @@
 import React, { Component } from "react";
-import axios from "axios";
 import FilteredImageShader from "./FilteredImageShader";
 import { getEnabledImageFilterKeys } from "@/lib/image-filters";
-import { readSettings } from '@/lib/settings';
-
-const settings = readSettings();
+import { useSettingsStore } from "@/features/settings/stores";
+import { useCredentialsStore } from "@/lib/credentials";
 
 // ---------------------------------------------------------------------------
 // Two-level photo cache
 //
-// Level 1 — localStorage  (sync): search terms → last-fetched URL
+// Level 1 — localStorage  (sync): search terms → last-fetched photo (URL,
+//                                  placeholder colour, credit)
 // Level 2 — Cache API     (async): URL → image binary stored as a Response
 //
 // Load flow:
-//   cached URL + cached image → blob URL shown instantly, background refresh
-//   cached URL, image evicted → re-cache image, show it, background refresh
-//   no cache                  → fetch URL + image, show, write both levels
+//   cached photo + cached image → blob URL shown instantly, background refresh
+//   cached photo, image evicted → re-cache image, show it, background refresh
+//   no cache                    → fetch photo + image, show, write both levels
 //
 // Background refresh updates both levels but never swaps the displayed image
 // mid-session. The fresh photo appears on the next page load.
+//
+// Photos are requested at the tile's size times the screen's pixel density
+// (capped at 3×), so they stay sharp on high-density screens without
+// downloading more than the tile can show.
 // ---------------------------------------------------------------------------
 
 const PHOTO_CACHE_NAME = "startup-page-photos-v1";
 const URL_STORE_KEY = "startup-page.photo-urls";
+const PHOTO_TTL_MS = 60 * 60 * 1000; // 1 hour
+const UNSPLASH_UTM = "utm_source=startup_page&utm_medium=referral";
 
-function buildCacheKey(searchTerms) {
+interface PhotoCredit {
+  name: string;
+  url: string;
+  source: "Unsplash" | "Wikimedia Commons";
+}
+
+interface StoredPhoto {
+  url: string;
+  cachedAt: number;
+  color?: string | null;
+  credit?: PhotoCredit | null;
+}
+
+function buildCacheKey(searchTerms: string[]) {
   return [...searchTerms].sort().join(",");
 }
 
-function getUrlFromStore(searchTerms) {
+function readStore(): Record<string, StoredPhoto> {
+  try {
+    return JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function getPhotoFromStore(searchTerms: string[]): StoredPhoto | null {
   if (!searchTerms?.length) return null;
-  try {
-    const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
-    return store[buildCacheKey(searchTerms)]?.url ?? null;
-  } catch {
-    return null;
-  }
+  return readStore()[buildCacheKey(searchTerms)] ?? null;
 }
 
-const PHOTO_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-function isCacheStale(searchTerms) {
-  if (!searchTerms?.length) return true;
-  try {
-    const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
-    const cachedAt = store[buildCacheKey(searchTerms)]?.cachedAt;
-    return !cachedAt || Date.now() - cachedAt > PHOTO_TTL_MS;
-  } catch {
-    return true;
-  }
+function isCacheStale(photo: StoredPhoto | null) {
+  return !photo?.cachedAt || Date.now() - photo.cachedAt > PHOTO_TTL_MS;
 }
 
-function saveUrlToStore(searchTerms, url) {
+function savePhotoToStore(searchTerms: string[], photo: Omit<StoredPhoto, "cachedAt">) {
+  if (!searchTerms?.length) return;
   try {
-    const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
-    store[buildCacheKey(searchTerms)] = { url, cachedAt: Date.now() };
+    const store = readStore();
+    store[buildCacheKey(searchTerms)] = { ...photo, cachedAt: Date.now() };
     localStorage.setItem(URL_STORE_KEY, JSON.stringify(store));
   } catch {}
 }
 
-async function getCachedBlobUrl(imageUrl) {
+async function getCachedBlobUrl(imageUrl: string): Promise<string | null> {
   if (!("caches" in window)) return null;
   try {
     const cache = await caches.open(PHOTO_CACHE_NAME);
@@ -71,7 +84,7 @@ async function getCachedBlobUrl(imageUrl) {
   }
 }
 
-async function fetchAndCacheImage(imageUrl) {
+async function fetchAndCacheImage(imageUrl: string): Promise<string | null> {
   if (!("caches" in window)) return null;
   try {
     const response = await fetch(imageUrl, { mode: "cors" });
@@ -84,17 +97,17 @@ async function fetchAndCacheImage(imageUrl) {
   }
 }
 
-// Drops this tile's cached URL (localStorage) and cached image bytes (Cache
+// Drops this tile's cached photo (localStorage) and cached image bytes (Cache
 // API) so its next mount fetches a fresh photo instead of reusing the old
 // one. Scoped to these exact search terms — clearing one photo tile's cache
 // doesn't touch any other tile's.
-export async function clearPhotoCache(searchTerms) {
+export async function clearPhotoCache(searchTerms: string[]) {
   if (!searchTerms?.length) return;
   const key = buildCacheKey(searchTerms);
-  let cachedUrl = null;
+  let cachedUrl: string | null = null;
 
   try {
-    const store = JSON.parse(localStorage.getItem(URL_STORE_KEY) || "{}");
+    const store = readStore();
     cachedUrl = store[key]?.url ?? null;
     delete store[key];
     localStorage.setItem(URL_STORE_KEY, JSON.stringify(store));
@@ -108,19 +121,57 @@ export async function clearPhotoCache(searchTerms) {
   }
 }
 
+/** Pixel size to request: the tile's CSS size × density, rounded up to a 200px step so near-identical tiles share cache entries. */
+function targetSize(element: HTMLElement | null): { width: number; height: number } {
+  const rect = element?.getBoundingClientRect();
+  const density = Math.min(window.devicePixelRatio || 1, 3);
+  const step = (value: number) => Math.max(400, Math.ceil((value * density) / 200) * 200);
+  return { width: step(rect?.width || 400), height: step(rect?.height || 400) };
+}
+
 // ---------------------------------------------------------------------------
 
-class Unsplash extends Component {
-  constructor(props) {
+interface UnsplashProps {
+  search?: string[];
+  cardClass?: string;
+}
+
+interface UnsplashState {
+  photos: string | null;
+  category: string;
+  loaded: boolean;
+  filterKey: string | null;
+  imageReady: boolean;
+  color: string | null;
+  credit: PhotoCredit | null;
+}
+
+interface UnsplashResult {
+  urls: { raw: string; regular: string };
+  color?: string | null;
+  user?: { name?: string; links?: { html?: string } };
+}
+
+interface WikimediaPage {
+  title?: string;
+  imageinfo?: Array<{ thumburl?: string; url?: string; descriptionurl?: string; width?: number; height?: number }>;
+}
+
+class Unsplash extends Component<UnsplashProps, UnsplashState> {
+  _mounted = false;
+  _blobUrl: string | null = null;
+  _rootRef = React.createRef<HTMLDivElement>();
+
+  constructor(props: UnsplashProps) {
     super(props);
-    this._mounted = false;
-    this._blobUrl = null;
     this.state = {
       photos: null,
       category: "",
       loaded: false,
       filterKey: null,
       imageReady: false,
+      color: null,
+      credit: null,
     };
   }
 
@@ -143,7 +194,7 @@ class Unsplash extends Component {
 
   // Show a photo URL (may be a blob: URL or a plain https: URL as fallback).
   // Tracks and revokes any previous blob URL to avoid memory leaks.
-  _show(url, category) {
+  _show(url: string, category: string, details: Pick<StoredPhoto, "color" | "credit"> = {}) {
     if (!this._mounted) return;
     this._revokeBlobUrl();
     if (url?.startsWith("blob:")) this._blobUrl = url;
@@ -153,28 +204,30 @@ class Unsplash extends Component {
       loaded: false,
       filterKey: this.pickFilterKey(),
       imageReady: false,
+      color: details.color ?? null,
+      credit: details.credit ?? null,
     });
   }
 
   async _loadPhoto() {
     const category = this.getRandomCategory();
     const searchTerms = this.props.search || [];
-    const cachedUrl = getUrlFromStore(searchTerms);
+    const cached = getPhotoFromStore(searchTerms);
 
-    if (cachedUrl) {
-      const blobUrl = await getCachedBlobUrl(cachedUrl);
+    if (cached) {
+      const blobUrl = await getCachedBlobUrl(cached.url);
 
       // Show immediately — use raw URL if blob was evicted from Cache API.
-      this._show(blobUrl || cachedUrl, category);
+      this._show(blobUrl || cached.url, category, cached);
 
       if (!blobUrl) {
         // Re-cache the image in background so next load gets a blob URL.
-        void fetchAndCacheImage(cachedUrl);
+        void fetchAndCacheImage(cached.url);
       }
 
       // Only do a network refresh if the photo is older than 1 hour.
-      if (isCacheStale(searchTerms)) {
-        void this._refreshInBackground(category, searchTerms);
+      if (isCacheStale(cached)) {
+        void this._fetchDisplayAndCache(category, searchTerms, false);
       }
       return;
     }
@@ -183,12 +236,17 @@ class Unsplash extends Component {
     await this._fetchDisplayAndCache(category, searchTerms, true);
   }
 
-  async _refreshInBackground(category, searchTerms) {
-    await this._fetchDisplayAndCache(category, searchTerms, false);
+  async _useFoundPhoto(photo: Omit<StoredPhoto, "cachedAt">, category: string, searchTerms: string[], updateDisplay: boolean) {
+    savePhotoToStore(searchTerms, photo);
+    const blobUrl = await fetchAndCacheImage(photo.url);
+    if (updateDisplay) {
+      this._show(blobUrl || photo.url, category, photo);
+    }
   }
 
-  async _fetchDisplayAndCache(category, searchTerms, updateDisplay) {
-    const accessKey = (settings.unsplashCredential || "").trim();
+  async _fetchDisplayAndCache(category: string, searchTerms: string[], updateDisplay: boolean) {
+    // Read at call time so a key entered in a photo widget applies without a reload.
+    const accessKey = (useCredentialsStore.getState().unsplash || "").trim();
 
     if (!accessKey) {
       await this._fetchFallback(category, searchTerms, updateDisplay);
@@ -196,71 +254,115 @@ class Unsplash extends Component {
     }
 
     try {
-      const res = await axios.get("https://api.unsplash.com/search/photos", {
-        params: { query: category, per_page: 100 },
+      const params = new URLSearchParams({ query: category, per_page: "30", orientation: this.orientation(), content_filter: "high" });
+      const res = await fetch(`https://api.unsplash.com/search/photos?${params}`, {
         headers: { Authorization: "Client-ID " + accessKey },
       });
+      if (!res.ok) throw new Error(`Unsplash responded with ${res.status}`);
 
-      const results = res.data.results;
+      const results: UnsplashResult[] = (await res.json()).results;
       if (!results?.length) {
         await this._fetchFallback(category, searchTerms, updateDisplay);
         return;
       }
 
-      const url = results[Math.floor(Math.random() * results.length)].urls.regular;
-      saveUrlToStore(searchTerms, url);
-      const blobUrl = await fetchAndCacheImage(url);
-
-      if (updateDisplay) {
-        this._show(blobUrl || url, category);
-      }
+      const result = results[Math.floor(Math.random() * results.length)];
+      const { width, height } = targetSize(this._rootRef.current);
+      // Unsplash's image CDN resizes and crops on request; WebP keeps the
+      // larger, sharper image small.
+      const url = `${result.urls.raw}&w=${width}&h=${height}&fit=crop&crop=entropy&fm=webp&q=82`;
+      const credit: PhotoCredit | null = result.user?.name
+        ? { name: result.user.name, url: `${result.user.links?.html ?? "https://unsplash.com"}?${UNSPLASH_UTM}`, source: "Unsplash" }
+        : null;
+      await this._useFoundPhoto({ url, color: result.color ?? null, credit }, category, searchTerms, updateDisplay);
     } catch {
       await this._fetchFallback(category, searchTerms, updateDisplay);
     }
   }
 
-  async _fetchFallback(category, searchTerms, updateDisplay) {
-    const searchTerm = `${category} filetype:bitmap`;
+  orientation(): "portrait" | "landscape" | "squarish" {
+    const rect = this._rootRef.current?.getBoundingClientRect();
+    if (!rect?.width || !rect.height) return "squarish";
+    const ratio = rect.width / rect.height;
+    return ratio > 1.3 ? "landscape" : ratio < 0.77 ? "portrait" : "squarish";
+  }
+
+  // Without an Unsplash key: Wikimedia Commons' Featured Pictures. The search
+  // term (as a phrase) is tried across all of them first, so topics like
+  // "nebula" or "coral reef" find their pictures, then the card's other
+  // topics; then the term within the scenic
+  // categories; then any scenic picture (the general Featured set also holds
+  // historical photos and engravings, and Quality Images turned up product
+  // shots, so a topic-less pick stays scenic); then a curated set. Only
+  // high-resolution files whose shape suits the tile are used, so a crop
+  // never leaves a sliver of a panorama.
+  async _fetchFallback(category: string, searchTerms: string[], updateDisplay: boolean) {
+    const root = this._rootRef.current?.getBoundingClientRect();
+    const tileRatio = root?.width && root.height ? root.width / root.height : 1;
+    const { width } = targetSize(this._rootRef.current);
+    const scenic = [
+      "Featured_pictures_of_landscapes",
+      "Featured_pictures_of_mountains",
+      "Featured_pictures_of_lakes",
+      "Featured_pictures_of_waterfalls",
+      "Featured_pictures_of_forests",
+      "Featured_pictures_of_cityscapes",
+    ].join("|");
+    const phrase = (term: string) => (term.includes(" ") ? `"${term.replace(/"/g, "")}"` : term);
+    // This card's other topics come next if the picked one finds nothing
+    // that fits, before any off-topic scenic picture.
+    const others = searchTerms.filter((term) => term !== category).sort(() => Math.random() - 0.5).slice(0, 2);
+    // Topic searches start at the top (the best matches, often fewer than
+    // 50); only the topic-less one jumps to a random page for variety.
+    const queries = [
+      ...[category, ...others].map((term) => ({ query: `${phrase(term)} filetype:bitmap incategory:Featured_pictures_on_Wikimedia_Commons`, offset: 0 })),
+      { query: `${phrase(category)} filetype:bitmap incategory:${scenic}`, offset: 0 },
+      { query: `filetype:bitmap incategory:${scenic}`, offset: Math.floor(Math.random() * 4) * 50 },
+    ];
+
+    for (const { query, offset } of queries) {
+      try {
+        const response = await fetch(
+          `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}` +
+            `&gsrnamespace=6&gsrlimit=50&gsroffset=${offset}` +
+            `&prop=imageinfo&iiprop=url|size&iiurlwidth=${width}&format=json&origin=*`,
+        );
+        const data = await response.json();
+        const pages = (Object.values(data.query?.pages || {}) as WikimediaPage[]).filter((page) => {
+          const info = page.imageinfo?.[0];
+          if (!info?.width || !info.height || !(info.thumburl || info.url)) return false;
+          // At least as wide as the tile needs, and an aspect ratio within
+          // about 1.6x of the tile's.
+          const fit = info.width / info.height / tileRatio;
+          return info.width >= Math.min(width, 1600) && fit > 0.62 && fit < 1.6;
+        });
+        if (!pages.length) continue;
+
+        const page = pages[Math.floor(Math.random() * pages.length)];
+        const info = page.imageinfo![0];
+        const credit: PhotoCredit = { name: "Wikimedia Commons", url: info.descriptionurl || "https://commons.wikimedia.org", source: "Wikimedia Commons" };
+        await this._useFoundPhoto({ url: (info.thumburl || info.url)!, color: null, credit }, category, searchTerms, updateDisplay);
+        return;
+      } catch {
+        // Try the next query.
+      }
+    }
+
     const fallbackImage = this.buildFallbackImageUrl(category);
-
-    try {
-      const response = await fetch(
-        `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
-          searchTerm
-        )}&gsrnamespace=6&gsrlimit=20&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`
-      );
-      const data = await response.json();
-      const pages = Object.values(data.query?.pages || {});
-      const imageUrls = pages
-        .map((page) => page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url)
-        .filter(Boolean);
-
-      const url = imageUrls.length
-        ? imageUrls[Math.floor(Math.random() * imageUrls.length)]
-        : fallbackImage;
-
-      saveUrlToStore(searchTerms, url);
-      const blobUrl = await fetchAndCacheImage(url);
-
-      if (updateDisplay) {
-        this._show(blobUrl || url, category);
-      }
-    } catch {
-      saveUrlToStore(searchTerms, fallbackImage);
-      if (updateDisplay) {
-        this._show(fallbackImage, category);
-      }
+    savePhotoToStore(searchTerms, { url: fallbackImage });
+    if (updateDisplay) {
+      this._show(fallbackImage, category);
     }
   }
 
-  getRandomCategory() {
+  getRandomCategory(): string {
     const categoryArray = this.props.search || [];
     if (categoryArray.length === 0) return "landscape";
     return categoryArray[Math.floor(Math.random() * categoryArray.length)];
   }
 
-  buildFallbackImageUrl(category) {
-    const curatedFallbacks = {
+  buildFallbackImageUrl(category: string): string {
+    const curatedFallbacks: Record<string, string> = {
       mountains: "https://upload.wikimedia.org/wikipedia/commons/4/4f/Matterhorn_from_Domhütte_-_2.jpg",
       city: "https://upload.wikimedia.org/wikipedia/commons/0/06/Lower_Manhattan_skyline_-_June_2017.jpg",
       bridge: "https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg",
@@ -276,30 +378,33 @@ class Unsplash extends Component {
     return curatedFallbacks[match || "default"];
   }
 
-  pickFilterKey() {
-    const enabledFilterKeys = getEnabledImageFilterKeys(settings.ui?.imageEffects);
+  pickFilterKey(): string | null {
+    const enabledFilterKeys = getEnabledImageFilterKeys(useSettingsStore.getState().settings.ui?.imageEffects);
     if (enabledFilterKeys.length === 0) return null;
     return enabledFilterKeys[Math.floor(Math.random() * enabledFilterKeys.length)];
   }
 
   render() {
+    const settings = useSettingsStore.getState().settings;
     const filterSettings =
-      settings.ui?.imageEffects?.filterSettings?.[this.state.filterKey] || null;
+      (this.state.filterKey && settings.ui?.imageEffects?.filterSettings?.[this.state.filterKey]) || null;
     const shouldUseShader = Boolean(this.state.filterKey && filterSettings && this.state.photos);
+    const { credit, color } = this.state;
 
     return (
-      <div className={this.props.cardClass || "relative rounded-xl overflow-hidden h-full bg-center bg-no-repeat border-0 dark:border-4 dark:border-off-white2"}>
-        {!this.state.loaded && (
-          <div className="absolute inset-0 flex items-end bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-accent)_55%,transparent),transparent_45%),linear-gradient(135deg,color-mix(in_oklab,var(--color-card)_96%,black_4%),color-mix(in_oklab,var(--color-secondary)_24%,var(--color-card)))] p-3">
-            <span className="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-foreground shadow-sm">
-              {this.state.category || "Loading image"}
-            </span>
-          </div>
-        )}
+      <div
+        ref={this._rootRef}
+        className={`group/photo ${this.props.cardClass || "relative h-full overflow-hidden rounded-xl"}`}
+        // The photo's own dominant colour (from Unsplash) while it loads.
+        style={color ? { backgroundColor: color } : undefined}
+      >
+        {!this.state.loaded && !color && <div className="skeleton absolute inset-0" aria-hidden="true" />}
         <img
-          className={shouldUseShader ? "hidden" : "min-w-full min-h-full object-cover"}
+          className={shouldUseShader ? "hidden" : "fade-in-image absolute inset-0 h-full w-full object-cover"}
+          data-loaded={this.state.loaded}
           src={this.state.photos || undefined}
-          alt={`Theme tile for ${this.state.category || "landscape"}`}
+          alt={`Photo of ${this.state.category || "a landscape"}`}
+          decoding="async"
           onLoad={() => this.setState({ loaded: true, imageReady: true })}
           onError={() => {
             const { photos, category } = this.state;
@@ -318,6 +423,17 @@ class Unsplash extends Component {
             className="pointer-events-none absolute inset-0 z-10 h-full w-full"
           />
         ) : null}
+        {credit && this.state.loaded && (
+          <a
+            href={credit.url}
+            target="_blank"
+            rel="noreferrer"
+            className="photo-credit"
+            title={`${credit.name} on ${credit.source}`}
+          >
+            {credit.source === "Unsplash" ? `${credit.name} · Unsplash` : credit.source}
+          </a>
+        )}
       </div>
     );
   }

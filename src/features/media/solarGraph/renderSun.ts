@@ -1,57 +1,49 @@
-import { sunElevation } from './solarMath';
+import type { SolarContext } from './solarMath';
+import { hourToDayFraction, sunElevation } from './solarMath';
 import { solarToCanvas } from './renderCurve';
 
-// Time-of-day atmosphere color.
-function getAtmosColor(lst, elev) {
-  let r, g, b;
+// Colour of the light around the sun. Low suns are golden in the morning
+// and a deeper red-orange in the evening; both cool to blue as it climbs.
+function getAtmosColor(morning: boolean, elev: number) {
+  const low = morning ? [255, 196, 104] : [255, 118, 76];
+  const dusk = morning ? [196, 120, 60] : [170, 60, 70];
+  const lerp = (from: number[], to: number[], t: number) => from.map((value, i) => Math.round(value + (to[i] - value) * t));
 
+  let rgb: number[];
   if (elev < -6) {
-    r = 80; g = 60; b = 50;
+    rgb = morning ? [90, 66, 48] : [80, 44, 60];
   } else if (elev < 2) {
-    const t = (elev + 6) / 8;
-    r = Math.round(180 + 75 * t);
-    g = Math.round(80 + 80 * t);
-    b = Math.round(30 + 10 * t);
+    rgb = lerp(dusk, low, (elev + 6) / 8);
   } else if (elev < 20) {
-    const t = (elev - 2) / 18;
-    r = Math.round(255 - 195 * t);
-    g = Math.round(160 - 10 * t);
-    b = Math.round(40 + 220 * t);
+    rgb = lerp(low, [60, 150, 255], (elev - 2) / 18);
   } else {
-    r = 60; g = 150; b = 255;
+    rgb = [60, 150, 255];
   }
 
+  const [r, g, b] = rgb;
   return { r, g, b };
 }
 
-// Draw an elliptical radial gradient layer
-function drawEllipseGlow(ctx, cx, cy, radius, scaleX, scaleY, stops) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scaleX, scaleY);
-
-  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+// One circular radial-gradient layer of glow.
+function drawGlow(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, stops: Array<[number, string]>) {
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
   for (const [pos, color] of stops) {
     grad.addColorStop(pos, color);
   }
-
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.restore();
+  ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
 }
 
-// Render the sun with elliptical atmospheric glow that reshapes with elevation.
-// At horizon: wide & flat bloom. High sun: narrow & taller bloom.
-export function renderSun(ctx, width, height, lst, solar, horizonY, elev) {
+// Render the sun: a bright core with circular glow layers that grow and
+// strengthen with elevation.
+export function renderSun(ctx: CanvasRenderingContext2D, width: number, height: number, lst: number, solar: SolarContext, horizonY: number, elev?: number) {
   if (elev === undefined) elev = sunElevation(solar.lat, solar.lng, lst, solar.doy);
   // Position comes from the fixed curve; the real elevation still drives
   // color temperature and glow shape below.
   const { x: sunX, y: sunY } = solarToCanvas(lst, width, height, solar);
 
   const isBelowHorizon = elev < 0;
-  const { r: ar, g: ag, b: ab } = getAtmosColor(lst, elev);
+  const { r: ar, g: ag, b: ab } = getAtmosColor(hourToDayFraction(lst, solar) < 0.5, elev);
 
   if (isBelowHorizon) {
     // Clip below-horizon glow to below the horizon line
@@ -70,53 +62,37 @@ export function renderSun(ctx, width, height, lst, solar, horizonY, elev) {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Subtle glow below horizon
-    const nearHorizon = Math.max(0, 1 - Math.abs(elev) / 18);
-    const belowRadius = 34 + nearHorizon * 120;
-    const belowAlpha = 0.08 + nearHorizon * 0.24;
-    ctx.beginPath();
-    const belowGlow = ctx.createRadialGradient(sunX, sunY, 2, sunX, sunY, belowRadius);
-    belowGlow.addColorStop(0, `rgba(${ar},${ag},${ab},${belowAlpha})`);
-    belowGlow.addColorStop(0.5, `rgba(${ar},${ag},${ab},${belowAlpha * 0.3})`);
-    belowGlow.addColorStop(1, `rgba(${ar},${ag},${ab},0)`);
-    ctx.fillStyle = belowGlow;
-    ctx.arc(sunX, sunY, belowRadius, 0, Math.PI * 2);
-    ctx.fill();
-
     ctx.restore();
     return;
   }
 
-  // How high the sun is (0 = horizon, 1 = peak)
+  // How high the sun is (0 = horizon, 1 = peak). Drives size and strength
+  // only: every layer stays a circle, so the sun and its halo keep their
+  // shape at any elevation. (The horizon's sideways spread of light is drawn
+  // by renderHorizonGlow, not by stretching the sun.)
   const elFactor = Math.min(1, elev / solar.maxElevation);
 
-  // Ellipse shape mirrors horizon glow:
-  // At horizon → wide & flat, high sun → narrower & taller
-  const scaleX = 2.5 - elFactor * 1.5;  // 2.5 → 1.0
-  const scaleY = 0.5 + elFactor * 0.5;  // 0.5 → 1.0
-
-  // Clip to above horizon
+  // Glow stays above the horizon; the core below is always drawn.
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, width, horizonY);
   ctx.clip();
-
   ctx.globalCompositeOperation = 'lighter';
 
   // Layer 0: very broad atmospheric veil.
-  const veilRadius = 160 + elFactor * 190;
-  const veilAlpha = 0.08 + elFactor * 0.12;
-  drawEllipseGlow(ctx, sunX, sunY, veilRadius, scaleX * 1.55, scaleY * 1.35, [
+  const veilRadius = 150 + elFactor * 170;
+  const veilAlpha = 0.07 + elFactor * 0.1;
+  drawGlow(ctx, sunX, sunY, veilRadius, [
     [0, `rgba(${ar},${ag},${ab},${veilAlpha})`],
     [0.28, `rgba(${ar},${ag},${ab},${veilAlpha * 0.45})`],
     [0.68, `rgba(${ar},${ag},${ab},${veilAlpha * 0.12})`],
     [1, `rgba(${ar},${ag},${ab},0)`],
   ]);
 
-  // Layer 1: Wide atmospheric bloom — elliptical, stronger at noon
-  const bloomRadius = 105 + elFactor * 155;
-  const bloomAlpha = 0.34 + elFactor * 0.3;
-  drawEllipseGlow(ctx, sunX, sunY, bloomRadius, scaleX, scaleY, [
+  // Layer 1: wide bloom, stronger at noon.
+  const bloomRadius = 90 + elFactor * 110;
+  const bloomAlpha = 0.3 + elFactor * 0.26;
+  drawGlow(ctx, sunX, sunY, bloomRadius, [
     [0, `rgba(${ar},${ag},${ab},${bloomAlpha})`],
     [0.1, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.68})`],
     [0.32, `rgba(${ar},${ag},${ab},${bloomAlpha * 0.24})`],
@@ -124,20 +100,21 @@ export function renderSun(ctx, width, height, lst, solar, horizonY, elev) {
     [1, `rgba(${ar},${ag},${ab},0)`],
   ]);
 
-  // Layer 2: Mid glow — slightly warmer
-  const midRadius = 54 + elFactor * 50;
-  drawEllipseGlow(ctx, sunX, sunY, midRadius, scaleX * 0.8, scaleY * 0.9, [
-    [0, `rgba(255,235,180,0.42)`],
-    [0.28, `rgba(${ar},${ag},${ab},0.17)`],
-    [0.72, `rgba(${ar},${ag},${ab},0.04)`],
+  // Layer 2: mid glow, slightly warmer.
+  const midRadius = 46 + elFactor * 34;
+  drawGlow(ctx, sunX, sunY, midRadius, [
+    [0, 'rgba(255,235,180,0.5)'],
+    [0.28, `rgba(${ar},${ag},${ab},0.2)`],
+    [0.72, `rgba(${ar},${ag},${ab},0.05)`],
     [1, `rgba(${ar},${ag},${ab},0)`],
   ]);
 
-  // Layer 3: Inner warm haze
-  const innerRadius = 22 + elFactor * 19;
-  drawEllipseGlow(ctx, sunX, sunY, innerRadius, scaleX * 0.6, scaleY * 0.8, [
-    [0, 'rgba(255, 245, 190, 0.62)'],
-    [0.38, 'rgba(255, 202, 82, 0.2)'],
+  // Layer 3: hot inner halo; with additive blending this clips toward white
+  // at the centre, which is what reads as HDR brightness.
+  const innerRadius = 18 + elFactor * 12;
+  drawGlow(ctx, sunX, sunY, innerRadius, [
+    [0, 'rgba(255, 250, 230, 0.9)'],
+    [0.35, 'rgba(255, 220, 140, 0.36)'],
     [1, 'rgba(255, 200, 80, 0)'],
   ]);
 

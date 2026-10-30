@@ -13,7 +13,8 @@ import type {
   ResolvedWeather,
   TimeKey,
   WeatherVisualProfile,
-} from "./types";
+} from "./types/weather";
+import { debugTimeZone, wallClock } from "@/lib/debug";
 
 export function getConditionCategory(weather: string): WeatherCondition {
   if (weather in CONDITION_GRADIENTS) return weather as WeatherCondition;
@@ -99,11 +100,12 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
 }
 
 function getAuroraIntensity(clockTime: number): number {
-  const date = new Date(clockTime);
-  const hour = date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
+  const wall = wallClock(new Date(clockTime), debugTimeZone());
+  const hour = wall.hours + wall.minutes / 60 + wall.seconds / 3600;
 
-  if (hour >= 21) return 0.72 + smoothstep(22, 22.5, hour) * 0.28;
-  if (hour <= 2) return 1 - smoothstep(1.5, 2, hour) * 0.28;
+  // Through the dark of the night, strongest around midnight.
+  if (hour >= 20) return 0.75 + smoothstep(20, 22.5, hour) * 0.25;
+  if (hour <= 4) return 1 - smoothstep(2, 4, hour) * 0.25;
   return 0;
 }
 
@@ -556,9 +558,9 @@ export function resolveWeather(
   const cloudFraction = getCloudFraction(ow?.id, data.current?.cloud_cover);
   const cloudDensity  = getCloudDensity(visual, cloudFraction);
   const windEffective = getEffectiveWind(visual, data.current?.wind_speed, data.unit);
-  const clockDate = new Date(clockTime);
-  const clockHour =
-    clockDate.getHours() + clockDate.getMinutes() / 60 + clockDate.getSeconds() / 3600;
+  // Local hour at the place shown (the debugger's place, else the browser's zone).
+  const clockWall = wallClock(new Date(clockTime), debugTimeZone());
+  const clockHour = clockWall.hours + clockWall.minutes / 60 + clockWall.seconds / 3600;
 
   const gradient     = CONDITION_GRADIENTS[condition]?.[timeKey] ?? CONDITION_GRADIENTS.Clouds.day;
   const skyGradient  = getSkyGradient(condition, timePhase);
@@ -569,9 +571,9 @@ export function resolveWeather(
   const shaderOpacity = condition === "Clear" && dayTime ? "opacity-[0.12]" : "opacity-[0.3]";
   const skyDarkness = getSkyDarkness(timePhase, condition);
   const horizonGlow = getHorizonGlow(timePhase);
-  const auroraIntensity = condition === "Clear" && coverage === "none" && !dayTime
-    ? getAuroraIntensity(clockTime)
-    : 0;
+  // The aurora comes out whenever it's dark, whatever the clouds: from
+  // sunset to sunrise, strongest around midnight.
+  const auroraIntensity = !dayTime ? Math.max(0.6, getAuroraIntensity(clockTime)) : 0;
   const showAurora = auroraIntensity > 0;
 
   // Dark text for bright daytime skies; light text at night and for dark-sky conditions
@@ -597,12 +599,16 @@ export function resolveWeather(
   const dailyIds     = data.daily?.weather_code ?? [];
   const dailyDescs   = data.daily?.description ?? [];
 
+  // Late in the evening the forecast can start tomorrow, so "Today" only
+  // labels a day that is today.
+  const today = new Date(clockTime).toDateString();
   const forecastDays: ForecastDay[] = dates.map((date, i) => {
     const weatherId = dailyIds[i] ?? 800;
     const condition = getOpenWeatherCondition(weatherId, "");
+    const day = new Date(date + "T00:00:00");
     return {
       date,
-      dayName: i === 0 ? "Today" : DAY_NAMES[new Date(date + "T00:00:00").getDay()],
+      dayName: i === 0 && day.toDateString() === today ? "Today" : DAY_NAMES[day.getDay()],
       high: Math.round(highs[i] ?? 0),
       low:  Math.round(lows[i]  ?? highs[i] ?? 0),
       precip: precips[i] ?? 0,

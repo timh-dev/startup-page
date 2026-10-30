@@ -1,41 +1,64 @@
+import { debugNow, debugTimeZone, wallClock } from "@/lib/debug";
 // Solar position math — NOAA Solar Calculator equations
 // Based on Meeus, "Astronomical Algorithms" (2nd ed.)
 // Reference: https://gml.noaa.gov/grad/solcalc/solareqns.PDF
 
+export interface TwilightEvent {
+  label: string;
+  hour: number;
+  elevation: number;
+  type: string;
+}
+
+export interface SolarContext {
+  lat: number;
+  lng: number;
+  doy: number;
+  sunrise: number;
+  sunset: number;
+  currentTime: number;
+  maxElevation: number;
+  minElevation: number;
+  curveHours: number[];
+  curveElevations: number[];
+  events: TwilightEvent[];
+}
+
 const TO_RAD = Math.PI / 180.0;
 const TO_DEG = 180.0 / Math.PI;
 
-export function linspace(start, stop, n) {
-  const arr = [];
+export function linspace(start: number, stop: number, n: number) {
+  const arr: number[] = [];
   const step = (stop - start) / (n - 1);
   for (let i = 0; i < n; i++) arr.push(start + step * i);
   return arr;
 }
 
+// "Now" and the time zone come from the debugger when it's set (another
+// time or place), else the real clock and the browser's zone.
 export function getDayOfYear() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const { year, month, day } = wallClock(debugNow(), debugTimeZone());
+  return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 0)) / 86_400_000);
 }
 
 function tzOffsetHours() {
-  return -new Date().getTimezoneOffset() / 60;
+  return wallClock(debugNow(), debugTimeZone()).offsetHours;
 }
 
 // Equation of time in minutes (Spencer 1971 / NOAA simplified form)
-function equationOfTime(doy) {
+function equationOfTime(doy: number) {
   const B = TO_RAD * (360 / 365 * (doy - 81));
   return 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
 }
 
 // Solar declination in degrees
-function solarDeclination(doy) {
+function solarDeclination(doy: number) {
   return 23.45 * Math.sin(TO_RAD * (360 / 365 * (doy - 81)));
 }
 
 // Sunrise and sunset as local decimal hours
 // lat/lng in degrees. Zenith 90.833° accounts for atmospheric refraction.
-export function solarTimes(lat, lng, doy) {
+export function solarTimes(lat: number, lng: number, doy: number): [number, number] {
   const decl = solarDeclination(doy);
   const latR = TO_RAD * lat;
   const decR = TO_RAD * decl;
@@ -52,7 +75,7 @@ export function solarTimes(lat, lng, doy) {
 
 // Sun elevation angle in degrees at a given local decimal hour
 // lat/lng in degrees
-export function sunElevation(lat, lng, localHour, doy) {
+export function sunElevation(lat: number, lng: number, localHour: number, doy: number) {
   const decl = solarDeclination(doy);
   const eot = equationOfTime(doy);
   const noonUtc = 12 - lng / 15 - eot / 60;
@@ -68,8 +91,8 @@ export function sunElevation(lat, lng, localHour, doy) {
 }
 
 export function getCurrentLst() {
-  const now = new Date();
-  return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const { hours, minutes, seconds } = wallClock(debugNow(), debugTimeZone());
+  return hours + minutes / 60 + seconds / 3600;
 }
 
 // ── Fixed-curve day mapping (Apple Watch Solar Graph style) ─────────────────
@@ -81,12 +104,12 @@ export function getCurrentLst() {
 // sunset times — low in summer (mostly daylight above it), high in winter
 // (a thin daylight sliver).
 
-function wrap24(h) {
+function wrap24(h: number) {
   return ((h % 24) + 24) % 24;
 }
 
 // Signed offset in hours, wrapped into [-12, 12)
-function wrapSigned12(d) {
+function wrapSigned12(d: number) {
   return ((((d + 12) % 24) + 24) % 24) - 12;
 }
 
@@ -95,7 +118,7 @@ function wrapSigned12(d) {
 // sunrise/sunset land outside 0–24h local time — behave correctly, and the
 // half-day clamp guards polar day/night where the sun never crosses the
 // horizon.
-export function solarDayAnchors(solar) {
+export function solarDayAnchors(solar: SolarContext) {
   const halfDay = Math.max(0.25, Math.min(11.75, (solar.sunset - solar.sunrise) / 2));
   const solarNoon = wrap24((solar.sunrise + solar.sunset) / 2);
   return { solarNoon, halfDay };
@@ -103,13 +126,13 @@ export function solarDayAnchors(solar) {
 
 // Local hour → normalized day position u ∈ [0, 1]: linear time from solar
 // midnight (u = 0) through solar noon (u = 0.5) back to solar midnight.
-export function hourToDayFraction(hour, solar) {
+export function hourToDayFraction(hour: number, solar: SolarContext) {
   const { solarNoon } = solarDayAnchors(solar);
   return (wrapSigned12(hour - solarNoon) + 12) / 24;
 }
 
 // Normalized day position u ∈ [0, 1] → local hour (inverse of the above)
-export function dayFractionToHour(u, solar) {
+export function dayFractionToHour(u: number, solar: SolarContext) {
   const { solarNoon } = solarDayAnchors(solar);
   const f = Math.max(0, Math.min(1, u));
   return wrap24(solarNoon + (f * 24 - 12));
@@ -117,12 +140,12 @@ export function dayFractionToHour(u, solar) {
 
 // The fixed curve: -1 at u = 0 and 1 (midnight troughs), 0 at 0.25 / 0.75
 // (horizon crossings), +1 at 0.5 (noon peak).
-export function normalizedElevation(u) {
+export function normalizedElevation(u: number) {
   return -Math.cos(2 * Math.PI * u);
 }
 
 // Format decimal hour (e.g. 5.683) to "5:41 AM"
-export function formatHour(decimalHour) {
+export function formatHour(decimalHour: number) {
   const h = ((decimalHour % 24) + 24) % 24; // wrap to 0–24
   const hours12 = Math.floor(h) % 12 || 12;
   const minutes = Math.round((h - Math.floor(h)) * 60);
@@ -132,7 +155,7 @@ export function formatHour(decimalHour) {
 
 // Scan the pre-computed curve for elevation crossings at specific thresholds
 // Returns sorted array of { label, hour, elevation, type }
-export function computeTwilightEvents(solar) {
+export function computeTwilightEvents(solar: SolarContext) {
   const { curveHours, curveElevations } = solar;
   const thresholds = [
     { elevation: 0, rising: 'Sunrise', setting: 'Sunset', type: 'horizon' },
@@ -141,7 +164,7 @@ export function computeTwilightEvents(solar) {
     { elevation: -18, rising: 'Astro dawn', setting: 'Astro dusk', type: 'astronomical' },
   ];
 
-  const events = [];
+  const events: TwilightEvent[] = [];
 
   for (const { elevation: thresh, rising, setting, type } of thresholds) {
     for (let i = 0; i < curveHours.length - 1; i++) {
@@ -170,7 +193,7 @@ export function computeTwilightEvents(solar) {
 
 // Compute full solar context for today (called once on mount)
 // lat/lng in degrees
-export function calculateSolarContext(lat, lng) {
+export function calculateSolarContext(lat: number, lng: number) {
   const doy = getDayOfYear();
   const [sunrise, sunset] = solarTimes(lat, lng, doy);
   const currentTime = getCurrentLst();
@@ -195,7 +218,7 @@ export function calculateSolarContext(lat, lng) {
   const curveHours = linspace(0, 24, 1440);
   const curveElevations = curveHours.map((h) => sunElevation(lat, lng, h, doy));
 
-  const context = {
+  const context: SolarContext = {
     lat,
     lng,
     doy,
@@ -206,7 +229,7 @@ export function calculateSolarContext(lat, lng) {
     minElevation,
     curveHours,
     curveElevations,
-    events: [] as ReturnType<typeof computeTwilightEvents>,
+    events: [],
   };
 
   context.events = computeTwilightEvents(context);

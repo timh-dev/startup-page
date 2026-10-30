@@ -3,9 +3,11 @@ import { WiDaySunny, WiCloud, WiRain, WiSprinkle, WiSnow, WiThunderstorm, WiFog 
 import VolumetricCloudscape from "@/features/media/components/VolumetricCloudscape";
 import { useWeatherStore, useWeatherInstance } from "@/features/weather/stores/weatherStore";
 import { useWeatherData, type WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
+import { WeatherStatus } from "./WeatherStatus";
 import { getOpenWeatherCondition, getOpenWeatherCoverage, getOpenWeatherVisualProfile, getCloudFraction, resolveWeather } from "@/features/weather/utils";
 import { sunElevation } from "@/features/media/solarGraph/solarMath";
 import type { HourlyForecastPoint } from "@/features/weather/types/weather";
+import { placeKey, useFocusedDay } from "@/features/weather/stores/dayFocusStore";
 
 // OpenWeather's free 3-hour forecast endpoint doesn't report UV at all, so
 // there's no real UV data to show. Estimate it instead from solar elevation
@@ -172,7 +174,9 @@ interface WeatherDayDetailProps {
 // own or opened from a compact WeatherBox's day-detail dialog.
 export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDetailProps): React.ReactElement {
   useWeatherData(instanceId, overrides);
-  const { data, selectedDay, lat, lon } = useWeatherInstance(instanceId);
+  const { data, error, lat, lon } = useWeatherInstance(instanceId);
+  // The day picked on a standard weather card for this place, else today.
+  const focused = useFocusedDay(placeKey(overrides));
   const clockTime = useWeatherStore((state) => state.clockTime);
   const tickClock = useWeatherStore((state) => state.tickClock);
   // Hooks must run unconditionally on every render, so these come before the
@@ -186,16 +190,13 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
   }, [tickClock]);
 
   if (!data) {
-    return (
-      <div className="weather-detail-panel">
-        <p className="weather-detail-empty">Loading weather…</p>
-      </div>
-    );
+    // Showed "Loading weather…" forever when there was an error (e.g. no API key).
+    return <WeatherStatus error={error} instanceId={instanceId} />;
   }
 
   const resolved = resolveWeather(data, clockTime);
   const unit: "imperial" | "metric" = resolved.unitLabel === "F" ? "imperial" : "metric";
-  const day = selectedDay?.day
+  const day = resolved.forecastDays.find((d) => d.date === focused)
     ?? resolved.forecastDays.find((d) => d.dayName === "Today")
     ?? resolved.forecastDays[0];
 
@@ -222,7 +223,7 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
     },
     {
       key: "uv",
-      label: "UV Index (est.)",
+      label: "UV",
       max: 11,
       getValue: (hour) => estimateUVIndex(uvLat, uvLon, hour),
       format: (hour) => `${Math.round(estimateUVIndex(uvLat, uvLon, hour))}`,
@@ -236,7 +237,7 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
     },
     {
       key: "precipitation",
-      label: "Precipitation",
+      label: "Rain",
       max: 100,
       getValue: (hour) => hour.precipitationProbability,
       format: (hour) => formatNumber(hour.precipitationProbability, "%"),
@@ -261,10 +262,36 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
         />
       </div>
       <div className="weather-detail-content">
+        <div className="weather-detail-header">
+          <div className="min-w-0">
+            <p className="weather-detail-day">{day.dayName}</p>
+            <p className="weather-detail-summary">
+              {day.description} · <span className="numeric">{day.high}° / {day.low}°</span>
+            </p>
+          </div>
+          {samples.length > 0 && (
+            <div className="weather-detail-metric-tabs" role="tablist" aria-label="Hourly detail">
+              {metrics.map((metric) => (
+                <button
+                  key={metric.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={metric.key === activeMetricKey}
+                  className="weather-detail-metric-tab"
+                  data-active={metric.key === activeMetricKey}
+                  onClick={() => setActiveMetricKey(metric.key)}
+                >
+                  {metric.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {samples.length > 0 ? (
           <>
             <div className="weather-detail-hours">
-              {samples.map((hour) => {
+              {/* Every other hour: twelve readable columns rather than 24. */}
+              {samples.filter((_hour, index) => index % 2 === 0).map((hour) => {
                 const value = activeMetric.getValue(hour);
                 const height = `${Math.max(6, Math.min(((value ?? 0) / activeMetric.max) * 100, 100))}%`;
                 const color = getScaleColor(activeMetric.key, value, activeMetric.max);
@@ -300,21 +327,6 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
                   </button>
                 );
               })}
-            </div>
-            <div className="weather-detail-metric-tabs" role="tablist">
-              {metrics.map((metric) => (
-                <button
-                  key={metric.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={metric.key === activeMetricKey}
-                  className="weather-detail-metric-tab"
-                  data-active={metric.key === activeMetricKey}
-                  onClick={() => setActiveMetricKey(metric.key)}
-                >
-                  {metric.label}
-                </button>
-              ))}
             </div>
           </>
         ) : (

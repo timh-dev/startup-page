@@ -1,10 +1,12 @@
 import React from "react";
+import { HiMagnifyingGlass } from "react-icons/hi2";
 
 import { useSettingsStore } from "@/features/settings/stores";
 import {
   getSearchEngineIcon,
   normalizeSearchEngines,
 } from "@/features/dashboard/searchEngines";
+import { describeIntent, openResult, resolveQuery } from "@/features/dashboard/searchQuery";
 
 interface SearchBoxProps {
   engines?: unknown;
@@ -27,36 +29,32 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
     }
   }, [engines, activeEngineId]);
 
+  const [query, setQuery] = React.useState("");
+  const activeEngine = engines.find((item) => item.id === activeEngineId) || engines[0];
+  // Same rules as the command palette: bangs, "= sums", sites, then a search.
+  const intent = resolveQuery(query, engines, activeEngine);
+  const hint = intent && intent.kind !== "search" ? describeIntent(intent) : null;
+
   const selectEngine = (engineId: string) => {
     setActiveEngineId(engineId);
-    if (inputRef.current) {
-      inputRef.current.value = "";
-      inputRef.current.focus();
-    }
+    setQuery("");
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") {
+    if (event.key === "Escape") {
+      setQuery("");
       return;
     }
-
-    const engine =
-      engines.find((item) => item.id === activeEngineId) || engines[0];
-    if (!engine) {
+    if (event.key !== "Enter" || !intent) return;
+    event.preventDefault();
+    if (intent.kind === "calc") {
+      void navigator.clipboard?.writeText(intent.result);
       return;
     }
-
-    const query = encodeURIComponent(event.currentTarget.value.trim());
-    if (!query) {
-      return;
-    }
-
-    window.open(`${engine.url}${query}`, "_blank", "noopener,noreferrer");
-    event.currentTarget.value = "";
+    openResult(intent.url, event.metaKey || event.ctrlKey || event.shiftKey);
+    setQuery("");
   };
-
-  const searchButtonClass =
-    "search-engine-button flex items-center justify-center rounded-full border border-border/60 bg-card/80 text-foreground shadow-sm outline-none transition hover:bg-accent/70 disabled:border-primary/40 disabled:bg-primary/14 disabled:opacity-100 opacity-75 cursor-pointer";
 
   return (
     <div className="search-widget flex h-full w-full items-center justify-center">
@@ -69,8 +67,8 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
               <button
                 key={engine.id}
                 type="button"
-                className={searchButtonClass}
-                disabled={isActive}
+                className="search-engine-button"
+                aria-pressed={isActive}
                 onClick={() => selectEngine(engine.id)}
                 aria-label={`Search with ${engine.name}`}
                 title={engine.name}
@@ -80,17 +78,26 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
             );
           })}
         </div>
-        <input
-          className="search-input items-center border border-input bg-input/45 text-foreground placeholder:text-muted-foreground rounded-xl shadow-sm transition focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
-          autoFocus
-          id="search-input"
-          type="text"
-          placeholder={
-            engines.find((item) => item.id === activeEngineId)?.name ?? "Search"
-          }
-          ref={inputRef}
-          onKeyDown={handleKeyDown}
-        />
+        <label className="search-field">
+          <HiMagnifyingGlass className="search-field-icon" aria-hidden="true" />
+          <input
+            className="search-input"
+            autoFocus
+            id="search-input"
+            type="text"
+            placeholder={`Search ${activeEngine?.name ?? "the web"}`}
+            ref={inputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={handleKeyDown}
+            aria-describedby={hint ? "search-hint" : undefined}
+          />
+          {hint && (
+            <span id="search-hint" className="search-hint" aria-live="polite">
+              {intent?.kind === "calc" ? `${hint} · Enter to copy` : hint}
+            </span>
+          )}
+        </label>
       </div>
     </div>
   );

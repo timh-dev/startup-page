@@ -1,14 +1,22 @@
 import React from "react";
 
-function timeAgo(dateStr) {
-  const s = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+interface GitHubEvent {
+  id: string;
+  type: string;
+  created_at: string;
+  repo?: { name?: string };
+  payload?: Record<string, any>;
+}
+
+function timeAgo(dateStr: string) {
+  const s = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-function describeEvent(event) {
+function describeEvent(event: GitHubEvent) {
   const p = event.payload || {};
   switch (event.type) {
     case "PushEvent": {
@@ -36,7 +44,7 @@ function describeEvent(event) {
 }
 
 export default function GitHubActivity({ username }: { username?: string | null }) {
-  const [events, setEvents] = React.useState([]);
+  const [events, setEvents] = React.useState<GitHubEvent[]>([]);
   const [status, setStatus] = React.useState("loading");
 
   React.useEffect(() => {
@@ -51,7 +59,7 @@ export default function GitHubActivity({ username }: { username?: string | null 
         if (cancelled) return;
         // Deduplicate: same repo + type + same hour
         const seen = new Set();
-        const filtered = data.filter((e) => {
+        const filtered = (data as GitHubEvent[]).filter((e) => {
           const key = `${e.repo?.name}:${e.type}:${e.created_at?.slice(0, 13)}`;
           if (seen.has(key)) return false;
           seen.add(key);

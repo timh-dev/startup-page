@@ -1,5 +1,5 @@
 import React from "react";
-import { useWeatherStore } from "@/features/weather/stores/weatherStore";
+import { useDayFocusStore, useFocusedDay } from "@/features/weather/stores/dayFocusStore";
 import type { ResolvedWeather } from "@/features/weather/types/weather";
 
 interface WeatherCurrentPanelProps {
@@ -7,7 +7,8 @@ interface WeatherCurrentPanelProps {
   location: string;
   source: string;
   condition: string;
-  instanceId: string;
+  /** The place this card shows (see placeKey). */
+  place: string;
 }
 
 export function WeatherCurrentPanel({
@@ -15,18 +16,19 @@ export function WeatherCurrentPanel({
   location,
   source,
   condition,
-  instanceId,
+  place,
 }: WeatherCurrentPanelProps): React.ReactElement {
   const { temperature, unitLabel, description } = resolved;
-  const openWeatherCard = useWeatherStore((state) => state.openWeatherCard);
+  // While the frosted card shows another day, this goes back to today.
+  const focused = useFocusedDay(place);
+  const setDay = useDayFocusStore((state) => state.setDay);
+  const Panel = focused ? "button" : "div";
 
   return (
-    <button
-      type="button"
+    <Panel
+      {...(focused ? { type: "button" as const, onClick: () => setDay(place, null), title: "Back to today", "aria-label": "Show today on the frosted weather card" } : {})}
       className="weather-current relative z-10 flex min-h-0 flex-1 flex-col justify-between"
       data-condition={condition}
-      onClick={() => openWeatherCard(instanceId, null)}
-      aria-label="Open weather details"
     >
       <div className="relative z-10 flex min-h-0 items-start justify-between gap-2">
         <div className="min-w-0">
@@ -46,6 +48,6 @@ export function WeatherCurrentPanel({
           </p>
         </div>
       </div>
-    </button>
+    </Panel>
   );
 }

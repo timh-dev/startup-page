@@ -11,6 +11,12 @@ interface ImportMetaEnv {
    * pulled locally still preview what a self-hosted/open-source user sees.
    */
   readonly VITE_LOCAL_ONLY?: string;
+  /**
+   * Open-Meteo API key (a paid plan). The free API is for non-commercial use,
+   * so the hosted site (accounts and a subscription) only calls Open-Meteo
+   * with one; self-hosted and local-only installs use the free API.
+   */
+  readonly VITE_OPEN_METEO_API_KEY?: string;
 }
 
 interface ImportMeta {

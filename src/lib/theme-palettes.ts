@@ -150,9 +150,93 @@ export const BUILT_IN_PALETTES = [
       },
     },
   },
+  {
+    value: "space",
+    title: "Space",
+    description: "Night-sky indigo with starlight highlights.",
+    swatches: {
+      light: {
+        background: "oklch(0.9250 0.0140 268)",
+        card: "oklch(0.9620 0.0100 268)",
+        primary: "oklch(0.3300 0.0750 272)",
+        accent: "oklch(0.9050 0.0220 268)",
+        muted: "oklch(0.8600 0.0200 268)",
+      },
+      dark: {
+        background: "oklch(0.1500 0.0300 268)",
+        card: "oklch(0.1920 0.0340 268)",
+        primary: "oklch(0.8300 0.0750 250)",
+        accent: "oklch(0.2900 0.0400 268)",
+        muted: "oklch(0.2550 0.0350 268)",
+      },
+    },
+  },
+  {
+    value: "ocean",
+    title: "Ocean",
+    description: "Sea-glass teal over sandy paper.",
+    swatches: {
+      light: {
+        background: "oklch(0.9300 0.0180 200)",
+        card: "oklch(0.9650 0.0120 195)",
+        primary: "oklch(0.4600 0.0950 218)",
+        accent: "oklch(0.9100 0.0300 190)",
+        muted: "oklch(0.8600 0.0300 200)",
+      },
+      dark: {
+        background: "oklch(0.1700 0.0320 228)",
+        card: "oklch(0.2080 0.0360 225)",
+        primary: "oklch(0.8000 0.0950 195)",
+        accent: "oklch(0.3000 0.0500 215)",
+        muted: "oklch(0.2700 0.0400 225)",
+      },
+    },
+  },
+  {
+    value: "arctic",
+    title: "Arctic",
+    description: "Ice-white surfaces with glacier blue.",
+    swatches: {
+      light: {
+        background: "oklch(0.9550 0.0120 232)",
+        card: "oklch(0.9880 0.0060 232)",
+        primary: "oklch(0.5000 0.1100 242)",
+        accent: "oklch(0.9300 0.0250 225)",
+        muted: "oklch(0.9000 0.0200 232)",
+      },
+      dark: {
+        background: "oklch(0.1900 0.0220 242)",
+        card: "oklch(0.2320 0.0240 240)",
+        primary: "oklch(0.8600 0.0700 220)",
+        accent: "oklch(0.3200 0.0350 238)",
+        muted: "oklch(0.2900 0.0300 240)",
+      },
+    },
+  },
+  {
+    value: "desert",
+    title: "Desert",
+    description: "Sandstone and terracotta, sun-warmed.",
+    swatches: {
+      light: {
+        background: "oklch(0.9150 0.0280 68)",
+        card: "oklch(0.9520 0.0200 75)",
+        primary: "oklch(0.5200 0.1250 42)",
+        accent: "oklch(0.9050 0.0350 72)",
+        muted: "oklch(0.8500 0.0350 68)",
+      },
+      dark: {
+        background: "oklch(0.1850 0.0140 50)",
+        card: "oklch(0.2220 0.0170 52)",
+        primary: "oklch(0.7800 0.1050 55)",
+        accent: "oklch(0.3100 0.0250 50)",
+        muted: "oklch(0.2800 0.0200 50)",
+      },
+    },
+  },
 ];
 
-export function isBuiltInPalette(value) {
+export function isBuiltInPalette(value: string) {
   return BUILT_IN_PALETTES.some((p) => p.value === value);
 }
 
@@ -162,9 +246,9 @@ const CSS_VAR_RE = /--([\w-]+)\s*:\s*([^;]+)/g;
  * Parse CSS text containing `:root { --var: val; }` and `.dark { --var: val; }` blocks.
  * Returns { light: { '--var': 'val', ... }, dark: { '--var': 'val', ... } }
  */
-export function parseCustomThemeCSS(cssText) {
-  const light = {};
-  const dark = {};
+export function parseCustomThemeCSS(cssText: string) {
+  const light: Record<string, string> = {};
+  const dark: Record<string, string> = {};
 
   const blockRe = /([^{]*)\{([^}]*)\}/g;
   let match;
@@ -207,9 +291,12 @@ const SWATCH_KEYS = ["--background", "--card", "--primary", "--accent", "--muted
 /**
  * Extract the 5 swatch colors from a stored custom theme for a given mode.
  */
-export function getSwatchesFromCustomTheme(customTheme, mode) {
+export function getSwatchesFromCustomTheme(
+  customTheme: { light: Record<string, string>; dark: Record<string, string> },
+  mode: "light" | "dark",
+) {
   const vars = mode === "dark" ? customTheme.dark : customTheme.light;
-  const result = {};
+  const result: Record<string, string> = {};
   for (const key of SWATCH_KEYS) {
     const shortKey = key.replace("--", "");
     result[shortKey] = vars[key] || "oklch(0.5 0 0)";

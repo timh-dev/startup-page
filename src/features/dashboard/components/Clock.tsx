@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
 
 import { useSettingsStore } from "@/features/settings/stores";
+import { debugNow, useDebugStore, wallClock, type DebugLocation } from "@/lib/debug";
 
-// e.g. "GMT+5:30" — derived from the browser's own local UTC offset. No
-// timezone picker exists yet, so this always reflects local time.
-function getGmtLabel(date) {
-  const totalMinutes = -date.getTimezoneOffset();
+// The browser's time zone as a place ("Chicago"), falling back to its UTC
+// offset ("GMT+5:30") when the zone has no city. With the debugger set to a
+// place, that place and its local time instead.
+function getPlaceLabel(offsetHours: number, place: DebugLocation | null) {
+  if (place) return place.label;
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  const city = zone.includes("/") ? zone.split("/").pop()!.replace(/_/g, " ") : "";
+  return city || getGmtLabel(offsetHours);
+}
+
+function getGmtLabel(offsetHours: number) {
+  const totalMinutes = Math.round(offsetHours * 60);
   const sign = totalMinutes >= 0 ? "+" : "-";
   const absMinutes = Math.abs(totalMinutes);
   const hours = Math.floor(absMinutes / 60);
@@ -13,11 +23,13 @@ function getGmtLabel(date) {
   return `GMT${sign}${hours}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}`;
 }
 
-function getClockParts(date, use24Hour) {
-  const hours24 = date.getHours();
+function getClockParts(date: Date, use24Hour: boolean, place: DebugLocation | null) {
+  const timeZone = place?.timeZone;
+  const wall = wallClock(date, timeZone);
+  const hours24 = wall.hours;
   const hours12 = hours24 % 12 || 12;
-  const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
+  const minutes = wall.minutes;
+  const seconds = wall.seconds;
   const displayHours = use24Hour ? String(hours24).padStart(2, "0") : String(hours12);
 
   // TICK_LABELS below lays out 5 equal flex columns spanning the row, so
@@ -32,8 +44,9 @@ function getClockParts(date, use24Hour) {
   return {
     time: `${displayHours}:${String(minutes).padStart(2, "0")}`,
     period: hours24 >= 12 ? "PM" : "AM",
-    dateLabel: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
-    gmtLabel: getGmtLabel(date),
+    weekday: date.toLocaleDateString(undefined, { weekday: "long", timeZone }),
+    dateLabel: date.toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone }),
+    placeLabel: getPlaceLabel(wall.offsetHours, place),
     hourDeg: ((hours12 % 12) + minutes / 60) * 30,
     minuteDeg: minutes * 6,
     secondDeg: seconds * 6,
@@ -49,7 +62,9 @@ const TICK_LABELS = [12, 6, 12, 6, 12];
 // theme variables so it recolors with whatever palette the user has
 // selected. The dot/line's horizontal position (--clock-now-x) is driven by
 // the actual time of day, not fixed.
-function PlainClock({ parts, showMeridiem }) {
+type ClockParts = ReturnType<typeof getClockParts>;
+
+function PlainClock({ parts, showMeridiem }: { parts: ClockParts; showMeridiem: boolean }) {
   return (
     <div className="clock-plain" aria-hidden="true" style={{ "--clock-now-x": `${parts.nowPercent}%` }}>
       {/* Single shared positioning reference for both the line and the dot —
@@ -58,8 +73,9 @@ function PlainClock({ parts, showMeridiem }) {
           positions for each. */}
       <div className="clock-plain-inner">
         <div className="clock-plain-top">
+          <div className="clock-plain-weekday eyebrow">{parts.weekday}</div>
           <div className="clock-plain-date">{parts.dateLabel}</div>
-          <div className="clock-plain-offset">{parts.gmtLabel}</div>
+          <div className="clock-plain-offset">{parts.placeLabel}</div>
         </div>
 
         <div className="clock-plain-spine">
@@ -68,7 +84,7 @@ function PlainClock({ parts, showMeridiem }) {
 
         <div className="clock-plain-bottom">
           <div className="clock-plain-time">
-            <span className="clock-plain-time-value">{parts.time}</span>
+            <span className="clock-plain-time-value numeric">{parts.time}</span>
             {showMeridiem && <span className="clock-plain-time-meridiem">{parts.period}</span>}
           </div>
           <div className="clock-plain-rule" />
@@ -83,7 +99,7 @@ function PlainClock({ parts, showMeridiem }) {
   );
 }
 
-function AnalogClock({ parts }) {
+function AnalogClock({ parts }: { parts: ClockParts }) {
   return (
     <div className="clock-underlay clock-analog-underlay" aria-hidden="true">
       <span className="clock-hand clock-hour-hand" style={{ "--clock-hand-angle": `${parts.hourDeg}deg` }} />
@@ -93,15 +109,15 @@ function AnalogClock({ parts }) {
   );
 }
 
-function isLeapYear(year) {
+function isLeapYear(year: number) {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
-function daysInMonth(year, month) {
+function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
-function dayOfYear(date) {
+function dayOfYear(date: Date) {
   const start = new Date(date.getFullYear(), 0, 0);
   return Math.floor((date.getTime() - start.getTime()) / 86400000);
 }
@@ -110,8 +126,8 @@ function dayOfYear(date) {
 // one dot per day. Drawn on canvas so every dot has the exact same radius
 // and spacing: DOM elements snap their boxes to device pixels individually,
 // which makes a ~4px dot grid look ragged; canvas doesn't snap.
-function YearClock({ now }) {
-  const canvasRef = useRef(null);
+function YearClock({ now }: { now: Date }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const year = now.getFullYear();
   const month = now.getMonth();
   const date = now.getDate();
@@ -120,20 +136,22 @@ function YearClock({ now }) {
   const percent = Math.round((today / totalDays) * 100);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-    const ctx = canvas.getContext("2d");
-    let frameId = null;
+    const canvasEl = canvasRef.current;
+    const context = canvasEl?.getContext("2d");
+    if (!canvasEl || !context) return undefined;
+    const canvas: HTMLCanvasElement = canvasEl;
+    const ctx: CanvasRenderingContext2D = context;
+    let frameId: number | null = null;
     let lastDraw = 0;
 
-    const draw = (timestamp) => {
+    const draw = (timestamp: number) => {
       frameId = requestAnimationFrame(draw);
       if (timestamp - lastDraw < 66) return; // ~15 fps is plenty for the pulse
       lastDraw = timestamp;
 
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      if (!w || !h) return;
+      if (!w || !h || !isOnScreen(canvas)) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
         canvas.width = Math.round(w * dpr);
@@ -167,6 +185,7 @@ function YearClock({ now }) {
     frameId = requestAnimationFrame(draw);
     return () => {
       if (frameId) cancelAnimationFrame(frameId);
+      forgetOnScreen(canvas);
     };
   }, [year, month, date]);
 
@@ -181,14 +200,17 @@ function YearClock({ now }) {
 export default function Clock() {
   const clockFormat = useSettingsStore((state) => state.settings.ui?.clockFormat) || "12h";
   const use24Hour = clockFormat === "24h";
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState(() => debugNow());
   const [mode, setMode] = useState("digital");
-  const parts = useMemo(() => getClockParts(now, use24Hour), [now, use24Hour]);
+  const place = useDebugStore((state) => state.location);
+  const timeOffset = useDebugStore((state) => state.timeOffsetMs);
+  const parts = useMemo(() => getClockParts(now, use24Hour, place), [now, use24Hour, place]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    setNow(debugNow());
+    const interval = window.setInterval(() => setNow(debugNow()), 1000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [timeOffset]);
 
   const nextMode = mode === "digital" ? "analog" : mode === "analog" ? "year" : "digital";
 

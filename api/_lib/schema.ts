@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  integer,
   jsonb,
   pgTable,
   timestamp,
@@ -40,6 +41,11 @@ function domainTable(name: string, dataDefault: "[]" | "{}") {
       .references(() => users.id, { onDelete: "cascade" })
       .unique(),
     data: jsonb("data").notNull().default(sql.raw(`'${dataDefault}'::jsonb`)),
+    // Incremented by the server on every write. A client sends the version
+    // its change is based on and the write only applies if it still matches,
+    // so a stale copy can't overwrite a newer one. Existing rows start at 1;
+    // 0 means "no row yet".
+    version: integer("version").notNull().default(1),
     clientUpdatedAt: timestamp("client_updated_at", { withTimezone: true }),
     serverUpdatedAt: timestamp("server_updated_at", { withTimezone: true })
       .notNull()

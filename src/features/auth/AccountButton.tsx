@@ -17,8 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/features/auth/stores";
-import { useSettingsStore } from "@/features/settings/stores";
-import { syncSettingsFromCloud } from "@/lib/settings";
+import { forceSyncNow } from "@/lib/cloudSync";
 import UpgradeModal from "@/features/auth/UpgradeModal";
 
 const PLAN_LABEL: Record<string, string> = {
@@ -61,6 +60,13 @@ const MERGE_KEY_LABELS: Record<string, string> = {
   ui: "your appearance settings",
   decorativeVideo: "your background video",
   layout: "your dashboard layout",
+  customThemes: "your custom themes",
+  units: "your units",
+  search: "your search engines",
+  news: "your headlines",
+  timer: "your timer",
+  unsplash: "your photo topics",
+  featurePanel: "your feature panel",
 };
 
 function formatMergeKeys(keys: string[]): string {
@@ -157,7 +163,7 @@ function StatusDot({ color, pulse, title }: { color: string; pulse: boolean; tit
   return (
     <span
       title={title}
-      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background ${color} ${pulse ? "animate-pulse" : ""}`}
+      className={`absolute bottom-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ring-card ${color} ${pulse ? "animate-pulse" : ""}`}
     />
   );
 }
@@ -198,7 +204,7 @@ export default function AccountButton() {
       <Dialog open={localInfoOpen} onOpenChange={setLocalInfoOpen}>
         <button
           type="button"
-          className="relative cursor-pointer text-2xl"
+          className="toolbar-button"
           onClick={() => setLocalInfoOpen(true)}
           title="Local mode — settings stored in this browser. Click for details."
         >
@@ -239,8 +245,8 @@ export default function AccountButton() {
     if (!canSyncNow) return;
     setManualSyncing(true);
     try {
-      const applied = await syncSettingsFromCloud();
-      if (applied) useSettingsStore.getState().reloadSettings();
+      // Changes it brings in reach the store through AuthBridge's subscription.
+      await forceSyncNow();
     } finally {
       setManualSyncing(false);
     }
@@ -251,11 +257,11 @@ export default function AccountButton() {
       <Dialog open={accountOpen} onOpenChange={setAccountOpen}>
         <button
           type="button"
-          className="relative cursor-pointer"
+          className="toolbar-button"
           onClick={() => setAccountOpen(true)}
           title={`Signed in as ${email} — ${presence.label}`}
         >
-          <Avatar imageUrl={user?.imageUrl} initials={initials} size="h-7 w-7" />
+          <Avatar imageUrl={user?.imageUrl} initials={initials} size="h-6 w-6" />
           <StatusDot color={presence.dotColor} pulse={presence.pulse} title={presence.label} />
         </button>
         <DialogContent className="w-[min(92vw,420px)] border-border/60 bg-background/98 p-6">
@@ -306,7 +312,7 @@ export default function AccountButton() {
               )}
               {hasAccess && syncStatus === "synced" && lastMergeKeys && lastMergeKeys.length > 0 && (
                 <p className="mt-2 text-xs text-amber-600">
-                  Another device changed {formatMergeKeys(lastMergeKeys)} at the same time — kept the most recent edit for {lastMergeKeys.length === 1 ? "it" : "each"}.
+                  Another device edited the same part of {formatMergeKeys(lastMergeKeys)} — everything else was merged, and where both changed the same thing the latest edit was kept.
                 </p>
               )}
             </div>

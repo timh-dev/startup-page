@@ -1,9 +1,12 @@
 import { useEffect } from "react";
+import { useCredentialsStore } from "@/lib/credentials";
 import { readSettings } from "@/lib/settings";
 import { getOrRequestLocation } from "@/lib/geolocation";
 import { useWeatherStore } from "@/features/weather/stores/weatherStore";
 import { getOpenWeatherCondition, formatWeatherDescription } from "@/features/weather/utils";
 import type { WeatherData } from "@/features/weather/types/weather";
+import { useDebugStore } from "@/lib/debug";
+import { useSettingsStore } from "@/features/settings/stores";
 
 const WEATHER_TTL_MS = 10 * 60 * 1000;
 
@@ -22,11 +25,15 @@ interface OWCurrentResponse {
 }
 
 interface OWForecastItem {
-  dt_txt: string;
+  /** Unix seconds. (The response's dt_txt is UTC, so it isn't used.) */
+  dt: number;
   main: { temp: number; temp_min: number; temp_max: number; humidity: number };
   weather: Array<{ id: number; main: string; description: string }>;
   wind: { speed: number; deg: number };
   pop: number;
+  /** "d" or "n": whether the slot is in daylight at the location. */
+  sys?: { pod?: "d" | "n" };
+  clouds?: { all: number };
   rain?: { "3h": number };
   snow?: { "3h": number };
 }
@@ -34,6 +41,17 @@ interface OWForecastItem {
 interface OWForecastResponse {
   cod: string;
   list: OWForecastItem[];
+}
+
+/**
+ * A moment as this browser's wall-clock time, "2026-10-29T19:00:00" — the
+ * form every forecast view parses (new Date() reads it as local time) and
+ * groups by day (its first 10 characters).
+ */
+export function localIsoTime(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 async function fetchWeather(
@@ -66,10 +84,12 @@ async function fetchWeather(
   const sunsetIso  = new Date(current.sys.sunset  * 1000).toISOString();
   const isDay      = current.dt >= current.sys.sunrise && current.dt < current.sys.sunset ? 1 : 0;
 
-  // Group 3h forecast slots by date
+  // Group 3h forecast slots by local date. OpenWeather's dt_txt is UTC, so
+  // reading it as local time put every slot hours late and split days at
+  // UTC midnight.
   const dayMap = new Map<string, OWForecastItem[]>();
   for (const item of forecast.list) {
-    const date = item.dt_txt.slice(0, 10);
+    const date = localIsoTime(item.dt * 1000).slice(0, 10);
     if (!dayMap.has(date)) dayMap.set(date, []);
     dayMap.get(date)!.push(item);
   }
@@ -112,9 +132,11 @@ async function fetchWeather(
   const hourlyWindDir:   number[] = [];
   const hourlyPrecipPct: number[] = [];
   const hourlyPrecip:    number[] = [];
+  const hourlyIsDay:     number[] = [];
+  const hourlyCloud:     number[] = [];
 
   for (const item of forecast.list) {
-    hourlyTime.push(item.dt_txt.replace(" ", "T"));
+    hourlyTime.push(localIsoTime(item.dt * 1000));
     hourlyTemp.push(item.main.temp);
     hourlyWeatherId.push(item.weather?.[0]?.id ?? 800);
     hourlyHumidity.push(item.main.humidity);
@@ -122,12 +144,15 @@ async function fetchWeather(
     hourlyWindDir.push(item.wind?.deg ?? 0);
     hourlyPrecipPct.push(Math.round(item.pop * 100));
     hourlyPrecip.push(item.rain?.["3h"] ?? item.snow?.["3h"] ?? 0);
+    hourlyIsDay.push(item.sys?.pod === "n" ? 0 : item.sys?.pod === "d" ? 1 : NaN);
+    hourlyCloud.push(item.clouds?.all ?? NaN);
   }
 
   const weatherData: WeatherData = {
     source: "OpenWeather",
     unit,
     current: {
+      time:             localIsoTime(current.dt * 1000),
       temperature_2m:   current.main.temp,
       weather_code:     w.id,
       is_day:           isDay,
@@ -157,6 +182,8 @@ async function fetchWeather(
       wind_direction_10m:        hourlyWindDir,
       precipitation_probability: hourlyPrecipPct,
       precipitation:             hourlyPrecip,
+      is_day:                    hourlyIsDay,
+      cloud_cover:               hourlyCloud,
     },
     openWeather: {
       id:          w.id,
@@ -169,11 +196,12 @@ async function fetchWeather(
   return { data: weatherData, location: current.name };
 }
 
+export const MISSING_API_KEY_MESSAGE = "Add your OpenWeather API key in this widget's settings";
+
 export interface WeatherOverrides {
   lat?: number | null;
   lon?: number | null;
   units?: "imperial" | "metric";
-  apiKey?: string | null;
 }
 
 export function useWeatherData(instanceId: string, overrides: WeatherOverrides = {}): void {
@@ -188,18 +216,33 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
   const overrideLat = overrides.lat;
   const overrideLon = overrides.lon;
   const overrideUnits = overrides.units;
-  const overrideApiKey = overrides.apiKey;
+  // Re-runs when the key is entered, so the widget loads without a reload.
+  const apiKey = useCredentialsStore((state) => state.openWeather);
+  // Settings changes apply live (no reload), so refetch when they change.
+  const settingsLat = useSettingsStore((state) => state.settings.latitude);
+  const settingsLon = useSettingsStore((state) => state.settings.longitude);
+  const settingsUnits = useSettingsStore((state) => state.settings.units);
+  // The debugger's place, when set, wins over everything else.
+  const debugPlace = useDebugStore((state) => state.location);
+  const debugLat = debugPlace?.latitude;
+  const debugLon = debugPlace?.longitude;
 
   useEffect(() => {
     const instance = useWeatherStore.getState().instances[instanceId];
-    if (instance?.lastFetchedAt && Date.now() - instance.lastFetchedAt < WEATHER_TTL_MS && instance.data) return;
+    const fresh = instance?.lastFetchedAt && Date.now() - instance.lastFetchedAt < WEATHER_TTL_MS && instance.data;
+    // A fresh fetch for another place doesn't count (the debugger moved).
+    const wantLat = debugLat ?? overrideLat ?? (settingsLat as number | undefined);
+    const wantLon = debugLon ?? overrideLon ?? (settingsLon as number | undefined);
+    const samePlace = wantLat == null || (instance?.lat === wantLat && instance?.lon === wantLon);
+    const sameUnits = !instance?.data || instance.data.unit === (overrideUnits || settingsUnits || instance.data.unit);
+    if (fresh && samePlace && sameUnits) return;
 
     const settings = readSettings() as Record<string, unknown>;
     const unit = overrideUnits || (settings.unit as string) || (settings.units as string) || "imperial";
-    const key = (overrideApiKey || (settings.openWeatherCredential as string) || "").trim();
+    const key = (apiKey || "").trim();
 
     if (!key) {
-      setError(instanceId, "Add your OpenWeather API key in this widget's settings");
+      setError(instanceId, MISSING_API_KEY_MESSAGE);
       return;
     }
 
@@ -215,8 +258,8 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
       }
     }
 
-    const lat = overrideLat ?? (settings.latitude as number | undefined);
-    const lon = overrideLon ?? (settings.longitude as number | undefined);
+    const lat = debugLat ?? overrideLat ?? (settings.latitude as number | undefined);
+    const lon = debugLon ?? overrideLon ?? (settings.longitude as number | undefined);
 
     if (lat && lon) {
       void load(lat, lon);
@@ -230,5 +273,5 @@ export function useWeatherData(instanceId: string, overrides: WeatherOverrides =
         setError(instanceId, "Location unavailable — set coordinates in this widget's settings");
       }
     });
-  }, [instanceId, overrideLat, overrideLon, overrideUnits, overrideApiKey, setData, setError, setLocation, setCoords, setLastFetchedAt]);
+  }, [instanceId, overrideLat, overrideLon, overrideUnits, apiKey, debugLat, debugLon, settingsLat, settingsLon, settingsUnits, setData, setError, setLocation, setCoords, setLastFetchedAt]);
 }

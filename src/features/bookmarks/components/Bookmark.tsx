@@ -1,7 +1,7 @@
 import React from "react";
-import { HiPlus } from "react-icons/hi2";
+import { HiArrowUpRight, HiPlus } from "react-icons/hi2";
 
-function getParsableUrl(url) {
+function getParsableUrl(url: string | null | undefined) {
   if (typeof url !== "string") {
     return "";
   }
@@ -14,7 +14,7 @@ function getParsableUrl(url) {
   return /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
 }
 
-export function getHostname(url) {
+export function getHostname(url: string | null | undefined) {
   try {
     return new URL(getParsableUrl(url)).hostname.replace(/^www\./, "");
   } catch (_error) {
@@ -22,12 +22,12 @@ export function getHostname(url) {
   }
 }
 
-export function faviconUrl(url, size = 64) {
+export function faviconUrl(url: string, size = 64) {
   const host = getHostname(url);
   return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${size}` : null;
 }
 
-export function faviconSrcSet(url) {
+export function faviconSrcSet(url: string) {
   const host = getHostname(url);
 
   if (!host) {
@@ -41,12 +41,12 @@ export function faviconSrcSet(url) {
   ].join(", ");
 }
 
-export function faviconFallbackLabel(name, url) {
+export function faviconFallbackLabel(name: string, url: string) {
   const source = String(name || getHostname(url) || "?").trim();
   return (source.match(/[a-z0-9]/i)?.[0] || "?").toUpperCase();
 }
 
-function isIPv4(host) {
+function isIPv4(host: string) {
 
   return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(
 
@@ -56,7 +56,7 @@ function isIPv4(host) {
 
 }
 
-function isIPv6(host) {
+function isIPv6(host: string) {
 
   // URL.hostname keeps the brackets around an IPv6 literal (e.g. "[::1]"),
   // which the bare address regex below doesn't account for.
@@ -66,7 +66,7 @@ function isIPv6(host) {
 
 }
 
-export function isSelfHostedUrl(url) {
+export function isSelfHostedUrl(url: string) {
 
   try {
 
@@ -94,7 +94,7 @@ export function isSelfHostedUrl(url) {
 
 }
 
-export function LocalServiceStatus({ url, className = "size-3.5" }) {
+export function LocalServiceStatus({ url, className = "size-3.5" }: { url: string; className?: string }) {
   const [online, setOnline] = React.useState(false);
 
   React.useEffect(() => {
@@ -146,20 +146,90 @@ export function LocalServiceStatus({ url, className = "size-3.5" }) {
   );
 }
 
-const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }) => {
-  const titleContent = (
-    <div className="bookmark-title truncate text-center font-semibold leading-none text-primary-foreground">
-      {title}
-    </div>
-  );
+interface BookmarkProps {
+  title: string;
+  content: Array<{ name: string; url: string }>;
+  cardClass?: string;
+  onTitleClick?: () => void;
+  onQuickAdd?: () => void;
+}
+
+// Google's favicon service answers unknown or icon-less sites with a generic
+// 16px globe, and many sites only publish 16px icons. Either looks blurry at
+// this size, so those get a lettered tile instead.
+const MIN_SHARP_FAVICON_PX = 32;
+
+function BookmarkFavicon({ name, url }: { name: string; url: string }) {
+  const [state, setState] = React.useState<"loading" | "ok" | "fallback">("loading");
+  const src = faviconUrl(url);
+
+  if (isSelfHostedUrl(url)) {
+    return (
+      <span className="bookmark-favicon-chip bookmark-favicon-status">
+        <LocalServiceStatus url={url} className="size-2 rounded-full" />
+      </span>
+    );
+  }
+
+  if (!src || state === "fallback") {
+    return (
+      <span className="bookmark-favicon-chip bookmark-favicon-letter" style={{ "--letter-hue": hueFor(getHostname(url) || name) }}>
+        {faviconFallbackLabel(name, url)}
+      </span>
+    );
+  }
 
   return (
-    <div
-      className={
-        cardClass ||
-        "bg-primary text-primary-foreground rounded-xl col-span-1 h-36 w-36 overflow-hidden border border-border/50 shadow-lg"
-      }
-    >
+    <span className="bookmark-favicon-chip">
+      <img
+        src={src}
+        srcSet={faviconSrcSet(url)}
+        alt=""
+        className="fade-in-image size-full object-contain"
+        data-loaded={state === "ok"}
+        onLoad={(event) => setState(event.currentTarget.naturalWidth < MIN_SHARP_FAVICON_PX ? "fallback" : "ok")}
+        onError={() => setState("fallback")}
+      />
+    </span>
+  );
+}
+
+/** A stable hue per site, so lettered tiles are distinguishable but calm. */
+function hueFor(text: string) {
+  let hash = 0;
+  for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) % 360;
+  return hash;
+}
+
+const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }: BookmarkProps) => {
+  const titleContent = (
+    <span className="bookmark-title eyebrow inline-flex max-w-full items-center gap-1">
+      <span className="truncate">{title}</span>
+      {onTitleClick && <HiArrowUpRight className="bookmark-title-arrow size-3 shrink-0" aria-hidden="true" />}
+    </span>
+  );
+
+  // Every bookmark, scrolling inside the card; the edges fade when there's
+  // more above or below.
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = React.useState({ top: false, bottom: false });
+  const measure = React.useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const next = { top: el.scrollTop > 1, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1 };
+    setEdges((prev) => (prev.top === next.top && prev.bottom === next.bottom ? prev : next));
+  }, []);
+  React.useLayoutEffect(() => {
+    measure();
+    const el = listRef.current;
+    if (!el) return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, content.length]);
+
+  return (
+    <div className={cardClass || "surface-tile col-span-1 h-36 w-36 overflow-hidden rounded-[1.125rem]"}>
       <div className="bookmark-widget group/tile relative flex h-full flex-col">
         {onQuickAdd ? (
           <button
@@ -168,20 +238,16 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }) => {
               event.stopPropagation();
               onQuickAdd();
             }}
-            className="absolute -right-1 -top-1 z-10 inline-flex size-6 items-center justify-center rounded-full border border-primary-foreground/30 bg-card text-card-foreground opacity-0 shadow-md transition hover:bg-accent hover:text-accent-foreground focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring group-hover/tile:opacity-100"
-            title="Quick add bookmark"
+            className="bookmark-quick-add"
+            title="Add a bookmark to this folder"
+            aria-label="Add a bookmark to this folder"
           >
             <HiPlus className="size-3.5" />
           </button>
         ) : null}
-        <div className="bookmark-header border-b border-primary-foreground/15">
+        <div className="bookmark-header">
           {onTitleClick ? (
-            <button
-              type="button"
-              onClick={onTitleClick}
-              className="block w-full min-w-0 text-center transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-foreground/45"
-              title="Open bookmark view"
-            >
+            <button type="button" onClick={onTitleClick} className="bookmark-title-button" title="Open in Bookmarks">
               {titleContent}
             </button>
           ) : (
@@ -189,42 +255,22 @@ const Bookmark = ({ title, content, cardClass, onTitleClick, onQuickAdd }) => {
           )}
         </div>
 
-        <div className="bookmark-list min-h-0 flex-1 overflow-y-auto">
+        <div
+          ref={listRef}
+          className="bookmark-list min-h-0 flex-1"
+          data-fade-top={edges.top || undefined}
+          data-fade-bottom={edges.bottom || undefined}
+          onScroll={measure}
+        >
           <ul className="bookmark-items">
             {content.map(({ name, url }, key) => (
               <li key={key}>
-                <a
-                  href={url}
-                  className="bookmark-link flex items-center rounded-lg transition hover:bg-primary-foreground/10"
-                  title={url}
-                >
-                  {isSelfHostedUrl(url) ? (
-                    <LocalServiceStatus url={url} className="bookmark-favicon inline-block shrink-0 rounded-full" />
-                  ) : faviconUrl(url) ? (
-                    <img
-                      src={faviconUrl(url)}
-                      srcSet={faviconSrcSet(url)}
-                      alt=""
-                      className="bookmark-favicon shrink-0 rounded-sm object-contain opacity-90"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                        e.currentTarget.nextElementSibling?.removeAttribute("hidden");
-                      }}
-                    />
-                  ) : null}
-                  {!isSelfHostedUrl(url) && (
-                    <span hidden className="bookmark-favicon-fallback bookmark-favicon shrink-0">
-                      {faviconFallbackLabel(name, url)}
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <div className="bookmark-name truncate font-medium leading-tight text-primary-foreground">
-                      {name}
-                    </div>
-                    <div className="bookmark-host truncate leading-none text-primary-foreground/65">
-                      {getHostname(url)}
-                    </div>
-                  </div>
+                <a href={url} className="bookmark-link" title={url}>
+                  <BookmarkFavicon name={name} url={url} />
+                  <span className="min-w-0">
+                    <span className="bookmark-name block truncate">{name}</span>
+                    <span className="bookmark-host block truncate">{getHostname(url)}</span>
+                  </span>
                 </a>
               </li>
             ))}

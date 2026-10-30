@@ -235,7 +235,7 @@ export default function BookmarkDialogs() {
         <DialogContent className="max-w-md gap-0 border-border/60 bg-background/98 text-foreground">
           <DialogHeader className="p-6 pb-0">
             <DialogTitle className="font-serif text-xl">
-              {bookmarkDialog?.mode === "edit" ? "Edit Bookmark" : "Add Bookmark"}
+              {bookmarkDialog?.mode === "edit" ? "Edit bookmark" : "Add bookmark"}
             </DialogTitle>
             <DialogDescription>Save a link into one of your bookmark folders.</DialogDescription>
           </DialogHeader>
@@ -247,7 +247,7 @@ export default function BookmarkDialogs() {
         <DialogContent className="max-w-md gap-0 border-border/60 bg-background/98 text-foreground">
           <DialogHeader className="p-6 pb-0">
             <DialogTitle className="font-serif text-xl">
-              {folderDialog?.mode === "edit" ? "Rename Folder" : "New Folder"}
+              {folderDialog?.mode === "edit" ? "Rename folder" : "New folder"}
             </DialogTitle>
             <DialogDescription>Folders organize your bookmarks and can be nested.</DialogDescription>
           </DialogHeader>

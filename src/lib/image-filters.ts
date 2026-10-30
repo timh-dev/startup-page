@@ -7,7 +7,23 @@ import {
   waterPresets,
 } from "@paper-design/shaders-react";
 
-export const IMAGE_FILTER_DEFINITIONS = [
+export type ImageFilterControl =
+  | { key: string; label: string; type?: "range"; min: number; max: number; step: number }
+  | { key: string; label: string; type: "boolean" };
+
+export interface ImageFilterPreset {
+  name: string;
+  params: object;
+}
+
+export interface ImageFilterDefinition {
+  key: string;
+  label: string;
+  presets: readonly ImageFilterPreset[];
+  controls: ImageFilterControl[];
+}
+
+export const IMAGE_FILTER_DEFINITIONS: ImageFilterDefinition[] = [
   {
     key: "paperTexture",
     label: "Paper texture",
@@ -99,7 +115,7 @@ export const IMAGE_FILTER_DEFAULTS = {
   ),
 };
 
-export function getEnabledImageFilterKeys(imageEffects) {
+export function getEnabledImageFilterKeys(imageEffects: { enabledFilters?: Record<string, boolean> } | null | undefined) {
   const enabledFilters = imageEffects?.enabledFilters || {};
   return IMAGE_FILTER_DEFINITIONS.filter((filter) => enabledFilters[filter.key]).map(
     (filter) => filter.key

@@ -1,4 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
+import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
+import { ambientFrameMs } from "@/lib/power";
+import { motionTime } from "@/lib/motion";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -109,9 +113,11 @@ void main() {
   vec2 p = vec2((uv.x - 0.5) * aspect + 0.5, uv.y);
 
   float t = u_time * 0.5;
-  float lowerFade = smoothstep(0.16, 0.3, uv.y);
-  float upperFade = 1.0 - smoothstep(0.95, 1.0, uv.y);
-  float sideFade = smoothstep(0.0, 0.05, uv.x) * (1.0 - smoothstep(0.95, 1.0, uv.x));
+  // Wide fades so the aurora dissolves into the sky rather than ending at
+  // the canvas edges.
+  float lowerFade = smoothstep(0.12, 0.32, uv.y);
+  float upperFade = 1.0 - smoothstep(0.7, 1.0, uv.y);
+  float sideFade = smoothstep(0.0, 0.12, uv.x) * (1.0 - smoothstep(0.88, 1.0, uv.x));
 
   // Foreground curtain + a dimmer, slower one behind it for depth
   vec4 front = curtain(p, t, 0.0, 1.0);
@@ -121,26 +127,32 @@ void main() {
   float veil = smoothstep(0.3, 0.9, fbm(vec2(p.x * 1.9 + t * 0.02, p.y * 2.2 + 31.0)))
              * smoothstep(0.3, 0.75, uv.y) * 0.18;
 
-  vec3 color = front.rgb + back.rgb * 0.45 + vec3(0.20, 0.80, 0.50) * veil;
-  float bright = front.a + back.a * 0.45 + veil;
+  vec3 color = front.rgb + back.rgb * 0.6 + vec3(0.20, 0.80, 0.50) * veil;
+  float bright = front.a + back.a * 0.6 + veil;
 
-  // Subtle cool ambient so the glow reads as light in a dark sky
-  color += vec3(0.07, 0.12, 0.22) * bright * 0.3;
-
-  float alpha = clamp(bright * 0.62, 0.0, 0.8) * lowerFade * upperFade * sideFade * u_intensity;
-  gl_FragColor = vec4(color, alpha);
+  // The canvas isn't premultiplied, so the colour is the curtain's hue and
+  // the alpha carries its brightness. (Colour scaled by brightness as well
+  // counted it twice: a curtain at 40% brightness showed at ~10%.)
+  vec3 hue = color / max(bright, 1e-3);
+  hue = mix(hue, vec3(0.62, 1.0, 0.78), smoothstep(0.7, 1.3, bright) * 0.35); // bright cores glow whiter
+  // Faint haze stays faint; curtains come up strongly.
+  float alpha = smoothstep(0.015, 0.6, bright) * 0.95;
+  alpha *= lowerFade * upperFade * sideFade * u_intensity;
+  gl_FragColor = vec4(hue, alpha);
 }
 `;
 
 // Compile and link without blocking status checks — status verified lazily in rAF.
-function createProgram(gl) {
+function createProgram(gl: WebGLRenderingContext) {
   const vs = gl.createShader(gl.VERTEX_SHADER);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  const program = gl.createProgram();
+  // All three are null only when the WebGL context has been lost.
+  if (!vs || !fs || !program) return null;
   gl.shaderSource(vs, VERTEX_SHADER);
   gl.compileShader(vs);
-  const fs = gl.createShader(gl.FRAGMENT_SHADER);
   gl.shaderSource(fs, FRAGMENT_SHADER);
   gl.compileShader(fs);
-  const program = gl.createProgram();
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
   gl.linkProgram(program);
@@ -160,28 +172,32 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
   intensityRef.current = intensity;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const gl = canvas?.getContext("webgl", {
+    const canvasEl = canvasRef.current;
+    const glContext = canvasEl?.getContext("webgl", {
       antialias: false,
       alpha: true,
       premultipliedAlpha: false,
       powerPreference: "low-power",
     });
 
-    if (!canvas || !gl) {
+    if (!canvasEl || !glContext) {
       setSupported(false);
       return undefined;
     }
+    // Re-bound as non-null consts so the nested render functions keep the narrowing.
+    const canvas: HTMLCanvasElement = canvasEl;
+    const gl: WebGLRenderingContext = glContext;
 
     let animationFrame = 0;
-    const program = createProgram(gl);
+    const linkedProgram = createProgram(gl);
+    if (!linkedProgram) { setSupported(false); return undefined; }
+    const program: WebGLProgram = linkedProgram;
     const khrParallel = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
 
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
 
-    const startedAt = performance.now();
 
     let glReady = false;
     let position = -1;
@@ -189,8 +205,12 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
     let time: WebGLUniformLocation | null = null;
     let intensityUniform: WebGLUniformLocation | null = null;
 
+    // Native density: the aurora is soft, so supersampling it costs GPU time
+    // without a visible gain.
+    const canvasResolution = createAdaptiveResolution();
+
     function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 1);
+      const dpr = canvasResolution.scale;
       const width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
       const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
 
@@ -211,7 +231,8 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
 
     function render(now: number) {
       animationFrame = requestAnimationFrame(render);
-      if (!canvas.clientWidth) return; // hidden (ancestor display:none) — skip GPU work
+      if (canvasResolution.sample(now)) resize();
+      if (!canvas.clientWidth || !isOnScreen(canvas)) return; // hidden or off screen: skip GPU work
 
       if (!glReady) {
         if (khrParallel && !gl.getProgramParameter(program, khrParallel.COMPLETION_STATUS_KHR)) return;
@@ -227,7 +248,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
         glReady = true;
       }
 
-      if (now - lastFrameTime < AURORA_FRAME_MS) return;
+      if (now - lastFrameTime < ambientFrameMs(AURORA_FRAME_MS)) return;
       lastFrameTime = now;
 
       gl.clearColor(0, 0, 0, 0);
@@ -237,7 +258,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform2f(resolution, canvas.width, canvas.height);
-      gl.uniform1f(time, (now - startedAt) / 1000);
+      gl.uniform1f(time, motionTime());
       gl.uniform1f(intensityUniform, Math.max(0, Math.min(intensityRef.current, 1)));
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
@@ -246,6 +267,7 @@ export default function AuroraLights({ intensity = 1 }: AuroraLightsProps): Reac
 
     return () => {
       cancelAnimationFrame(animationFrame);
+      forgetOnScreen(canvas);
       resizeObserver.disconnect();
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);

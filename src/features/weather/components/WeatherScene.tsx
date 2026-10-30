@@ -49,9 +49,11 @@ export function WeatherScene({ resolved, condition, locationLabel }: WeatherScen
           windSpeed={windEffective}
           lightningIntensity={showThunder ? visual.lightningIntensity : 0}
           hour={clockHour}
-          locationLabel={locationLabel}
-          temperatureLabel={`${resolved.temperature}°`}
-          conditionLabel={resolved.description}
+          // Text is real HTML on top (WeatherCurrentPanel), crisp at any
+          // resolution; the shader no longer knocks labels out of the sky.
+          locationLabel=""
+          temperatureLabel=""
+          conditionLabel=""
         />
       </div>
 

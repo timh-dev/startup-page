@@ -1,5 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
+import { forgetOnScreen, isOnScreen } from "@/lib/on-screen";
+import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { getFlashEnvelope } from "@/features/weather/lightning";
+import { ambientFrameMs } from "@/lib/power";
+import { debugNow, debugTimeZone, wallClock } from "@/lib/debug";
+import { motionTime } from "@/lib/motion";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -198,20 +203,22 @@ vec3 drawSun(vec2 uv, vec3 col) {
   // a coverage attenuation (scattered out before reaching the viewer).
   float block = clamp(u_coverage * (0.35 + u_density * 0.65), 0.0, 1.0);
 
-  float coR = mix(0.26, 0.44, smoothstep(0.0,1.0,u_phase));
-  float corona = pow(max(0.0, 1.0 - d / coR), 2.4) * vis * (1.0 - block * 0.75);
-  col += hue * corona * 0.52;
+  // Kept soft: a bright, wide sun washed out the sky around it and the
+  // clouds drifting past it.
+  float coR = mix(0.20, 0.36, smoothstep(0.0,1.0,u_phase));
+  float corona = pow(max(0.0, 1.0 - d / coR), 2.6) * vis * (1.0 - block * 0.8);
+  col += hue * corona * 0.24;
 
-  float glow = pow(max(0.0, 1.0 - d / 0.09), 3.8) * vis * (1.0 - block * 0.8);
-  col += hue * glow * 0.58;
+  float glow = pow(max(0.0, 1.0 - d / 0.07), 3.8) * vis * (1.0 - block * 0.85);
+  col += hue * glow * 0.28;
 
-  float disc = smoothstep(0.030, 0.020, d) * vis * (1.0 - block * 0.55);
-  col = mix(col, hue * 1.5, disc);
+  float disc = smoothstep(0.024, 0.016, d) * vis * (1.0 - block * 0.6);
+  col = mix(col, hue * 1.3, disc);
 
   float nearHorizon = smoothstep(0.28, 1.0, u_phase);
   if (nearHorizon > 0.01) {
     float hg = exp(-abs(uv.y - 0.13) * 6.5) * exp(-abs(uv.x - sp.x) * 1.6);
-    hg *= nearHorizon * (1.0 - block * 0.65) * 0.55;
+    hg *= nearHorizon * (1.0 - block * 0.65) * 0.38;
     vec3 hCol = mix(vec3(1.0,0.72,0.28), vec3(0.88,0.30,0.48), smoothstep(0.28,1.0,u_phase));
     col += hCol * hg;
   }
@@ -222,7 +229,7 @@ vec3 drawSun(vec2 uv, vec3 col) {
     float rayDir = atan(uv.y - sp.y, uv.x - sp.x);
     float rayDist = length(aspectCorrect(uv - sp));
     float rays = noise(vec3(rayDir * 3.2, u_time * 0.045, 0.5));
-    rays *= exp(-rayDist * 3.8) * gapRays * (1.3 - u_phase) * 0.13;
+    rays *= exp(-rayDist * 3.8) * gapRays * (1.3 - u_phase) * 0.06;
     col += hue * max(0.0, rays);
   }
   return col;
@@ -245,6 +252,153 @@ vec3 drawMoon(vec2 uv, vec3 col) {
   float disc = smoothstep(0.026, 0.017, d) * vis * clr;
   col = mix(col, vec3(0.88,0.92,0.97) * 1.12, disc);
   return col;
+}
+
+
+// ---- volumetric clouds ----
+uniform sampler2D u_noise; // 256x256: R = lattice value, G = R offset by (37, 239)
+
+const int CLOUD_STEPS = 44;
+const int LIGHT_STEPS = 4;
+// The camera sits at cloud level looking straight ahead (+z), so clouds
+// fill the frame side-on and drift across it, nearer ones faster. Clouds
+// occupy depths DEPTH_NEAR..DEPTH_FAR in front of it (units ~1 km).
+const float DEPTH_NEAR = 2.0;
+const float DEPTH_FAR = 12.0;
+const float MAX_DISTANCE_KM = 12.0;
+const float HAZE_KM = 7.0;
+const float TAN_HALF_FOV = 0.5; // vertical, ~53° field of view
+
+struct CloudLayer {
+  float base;       // km below (-) or above (+) the camera
+  float top;        // km
+  float scale;      // noise frequency per km
+  float threshold;  // density offset at full coverage
+  float stretch;    // vertical squash of the noise (flat decks < 1 < towers)
+  float extinction; // per km at full density
+  float billow;     // 0 = soft deck, 1 = cauliflower cumulus
+};
+
+CloudLayer cloudLayer() {
+  // 1 stratocumulus, 2 cumulus, 3 stratus, 4 nimbostratus, 5 cumulonimbus, 6 supercell
+  // base/top are the full vertical extent relative to the camera's height;
+  // cloudBands() places the layers within it. Looking along the layers the
+  // eye passes through kilometres of cloud, so broken clouds need higher
+  // thresholds than from below to keep gaps.
+  if (u_style < 1.5) return CloudLayer(-2.4, 2.1, 1.20, 0.40, 1.3, 22.0, 0.35);
+  if (u_style < 2.5) return CloudLayer(-2.2, 3.3, 1.00, 0.42, 1.0, 26.0, 1.0);
+  if (u_style < 3.5) return CloudLayer(-4.0, 4.0, 0.95, 0.28, 1.6, 16.0, 0.0);
+  if (u_style < 4.5) return CloudLayer(-4.5, 4.5, 0.85, 0.27, 1.3, 30.0, 0.2);
+  if (u_style < 5.5) return CloudLayer(-4.0, 7.0, 0.70, 0.30, 0.8, 34.0, 0.8);
+  return CloudLayer(-4.5, 8.0, 0.65, 0.28, 0.7, 38.0, 0.7);
+}
+
+// View direction for a screen position: a pinhole camera at cloud level
+// looking straight ahead along +z.
+vec3 viewRay(vec2 screen) {
+  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+  vec2 ndc = screen * 2.0 - 1.0;
+  return normalize(vec3(ndc.x * aspect * TAN_HALF_FOV, ndc.y * TAN_HALF_FOV, 1.0));
+}
+
+// Value noise from a 2D texture read as 3D: slice z is the texture offset by
+// (37, 239) * z, and G holds the next slice, so one fetch gives both.
+float tnoise(vec3 x) {
+  vec3 i = floor(x);
+  vec3 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  vec2 uv = i.xy + vec2(37.0, 239.0) * i.z + f.xy;
+  vec2 rg = texture2D(u_noise, (uv + 0.5) / 256.0).rg;
+  return mix(rg.x, rg.y, f.z);
+}
+
+const mat3 OCTAVE = mat3(0.00, 0.80, 0.60, -0.80, 0.36, -0.48, -0.60, -0.48, 0.64);
+
+float fbm4(vec3 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * tnoise(p); p = OCTAVE * p * 2.02; a *= 0.5; }
+  return v / 0.9375;
+}
+
+float fbm2(vec3 p) {
+  float v = 0.5 * tnoise(p);
+  p = OCTAVE * p * 2.02;
+  v += 0.25 * tnoise(p);
+  return v / 0.75;
+}
+
+// One layer between heights lo and hi: fades at both ends so clouds round
+// off instead of being cut flat; cumulus keeps a flatter base and a taller
+// dome.
+float band(float y, float lo, float hi, float billow) {
+  float h = (y - lo) / (hi - lo);
+  if (h < 0.0 || h > 1.0) return 0.0;
+  return smoothstep(0.0, mix(0.35, 0.2, billow), h) * (1.0 - smoothstep(mix(0.45, 0.3, billow), 1.0, h));
+}
+
+// How much cloud a height can hold. Broken skies have layers at different
+// altitudes (low, middle, and thin wisps high up), so clouds fill the frame
+// at several heights; overcast and storm decks are one deep layer that
+// fills it top to bottom.
+float cloudBands(float y, CloudLayer layer) {
+  if (u_style < 1.5) {
+    return max(max(band(y, -2.4, -0.9, 0.35), band(y, -1.2, 0.7, 0.35)), 0.65 * band(y, 1.0, 2.1, 0.1));
+  }
+  if (u_style < 2.5) {
+    return max(max(band(y, -2.2, -0.1, 1.0), band(y, -0.4, 1.9, 1.0)), 0.55 * band(y, 2.2, 3.3, 0.1));
+  }
+  float h = (y - layer.base) / (layer.top - layer.base);
+  if (h < 0.0 || h > 1.0) return 0.0;
+  return smoothstep(0.0, 0.1, h) * (1.0 - smoothstep(0.9, 1.0, h));
+}
+
+vec3 cloudCoords(vec3 pos, CloudLayer layer, float wt) {
+  vec3 q = pos * layer.scale;
+  q.y *= layer.stretch;
+  // Wind carries the clouds sideways across the view; they churn slowly.
+  return q + vec3(wt * 0.16, 0.0, u_time * 0.006);
+}
+
+float coverageThreshold(CloudLayer layer, float coverage) {
+  return mix(0.70, layer.threshold, pow(coverage, 0.75));
+}
+
+// Layer heights undulate: small rolls and lumps on bases and tops, and a
+// broad swell over kilometres, so no layer edge runs straight across the
+// frame (in perspective, flat layers converge into a seam at eye level).
+float undulate(vec3 q, float h) {
+  return h + (tnoise(q * 0.35 + vec3(5.2, 0.0, 1.3)) - 0.5) * 0.45
+           + (tnoise(q * 0.11 + vec3(3.1, 7.7, 1.9)) - 0.5) * 1.6;
+}
+
+float cloudDensity(vec3 pos, CloudLayer layer, float coverage, float wt, float h) {
+  if (h < 0.0 || h > 1.0) return 0.0;
+  vec3 q = cloudCoords(pos, layer, wt);
+  // The undulation shifts layer boundaries, so bases and tops aren't flat.
+  float y = pos.y + undulate(q, 0.0) * 1.3;
+  float shape = fbm4(q);
+  // Cauliflower billows: ridged noise mixed into cumulus.
+  shape = mix(shape, 1.0 - abs(shape * 2.0 - 1.0), layer.billow * 0.2);
+  return clamp((shape * cloudBands(y, layer) - coverageThreshold(layer, coverage)) * 3.0, 0.0, 1.0);
+}
+
+float cloudDensityCheap(vec3 pos, CloudLayer layer, float coverage, float wt, float h) {
+  if (h < 0.0 || h > 1.0) return 0.0;
+  vec3 q = cloudCoords(pos, layer, wt);
+  float y = pos.y + undulate(q, 0.0) * 1.3;
+  return clamp((fbm2(q) * cloudBands(y, layer) - coverageThreshold(layer, coverage)) * 3.0, 0.0, 1.0);
+}
+
+float henyeyGreenstein(float mu, float g) {
+  float gg = g * g;
+  return (1.0 - gg) / (12.566 * pow(max(1.0 + gg - 2.0 * g * mu, 1e-4), 1.5));
+}
+
+// A small random offset for each ray's start, enough to break up banding
+// between steps. Interleaved gradient noise was tried first, but its
+// regular pattern showed as hatching on the clouds at this resolution.
+float rayJitter(vec2 px) {
+  return fract(sin(dot(px, vec2(12.9898, 78.233))) * 43758.5453) * 0.35;
 }
 
 void main() {
@@ -276,219 +430,125 @@ void main() {
   dirStrength *= mix(1.0, 0.28, density);
   vec3 hueL = lightHue();
 
-  // ---- clouds ----
+  // ---- clouds: volumetric raymarching ----
+  // After Maxime Heckel's "Real-time dreamy Cloudscapes with Volumetric
+  // Raymarching": rays from a camera at cloud level march through a 3D cloud
+  // layer in front of it; density is fbm noise (sampled from a noise texture) shaped by
+  // coverage and a height profile; each sample marches toward the light for
+  // self-shadowing (Beer's law) and is lit with a two-lobe Henyey-Greenstein
+  // phase, so edges toward the sun glow; a small jitter on the ray start
+  // hides banding between steps.
+  CloudLayer layer = cloudLayer();
+  vec3 rd = viewRay(uv);
+  vec3 lightDir = viewRay(lp);
+
   float alpha  = 0.0;
   vec3  clouds = vec3(0.0);
+  float transmittance = 1.0;
 
-  // Interior density threshold: the macro masks own the covered-sky fraction,
-  // so this stays moderate — low coverage still yields solid, fluffy blobs.
-  float threshold = mix(0.74, 0.42, pow(coverage, 0.9));
-  if (u_style > 2.5 && u_style < 4.5) threshold -= 0.06;
-  if (u_style > 4.5) threshold -= 0.14;
-  if (u_phase > 1.5) threshold -= 0.06;
-
-  // Broken-cloud mode: stratocumulus(1) or cumulus(2) with visible coverage.
-  // Three independent depth layers with strong parallax: small slow puffs far
-  // back near the horizon, big fluffy clouds sweeping past in the foreground.
-  float brokenMode = step(u_style, 2.49) * step(0.05, coverage);
-  float isCumulus  = step(1.51, u_style) * step(u_style, 2.49);
-
-  // Macro coverage masks — one low-frequency field per depth layer, shared by
-  // every raymarch step of that layer. Without this, the union of 30+ shifted
-  // noise samples covers the whole sky and "scattered" renders as overcast.
-  // The masked-on fraction tracks u_coverage, and each mask drifts with its
-  // own layer so gaps travel with the clouds.
-  // Calibrated so the masked-on sky fraction roughly tracks u_coverage given
-  // fbm's value distribution (mean ~0.55): 40% cover → thr 0.59, 70% → 0.44.
-  float maskThr = mix(0.78, 0.30, coverage);
-  float mFar  = smoothstep(maskThr, maskThr + 0.15, fbm(vec3(p.x * 1.05 + wt * 0.006, p.y * 1.15, 3.0)));
-  float mMid  = smoothstep(maskThr, maskThr + 0.16, fbm(vec3(p.x * 0.85 + wt * 0.024, p.y * 0.95, 17.0)));
-  float mNear = smoothstep(maskThr, maskThr + 0.18, fbm(vec3(p.x * 0.48 + wt * 0.075, p.y * 0.62, 31.0)));
-
-  if (brokenMode > 0.5) {
-    float a1 = 0.0, a2 = 0.0, a3 = 0.0;
-    vec3  c1 = vec3(0.0), c2 = vec3(0.0), c3 = vec3(0.0);
-
-    // ---- FAR layer (10 steps) ----
-    // Small flattened puffs compressed toward the horizon, barely drifting,
-    // washed out by atmospheric perspective.
-    for (int i = 0; i < 10; i++) {
-      float t  = float(i) / 9.0;
-      float xf = 2.35, yf = mix(2.1, 2.5, isCumulus);
-      vec3 sp = vec3(
-        p.x * xf + wt * 0.006 + t * 0.34,
-        p.y * yf + wt * 0.002 - t * 0.07,
-        t * 2.4 + u_time * 0.008
-      );
-      // Band: distant clouds stack low-mid frame (toward the horizon line)
-      float shelf = smoothstep(-0.55, -0.18, p.y + t * 0.30)
-                  * (1.0 - smoothstep(0.28, 0.55, p.y + t * 0.12));
-      float broad    = fbm(sp * 1.0);
-      float detail   = fbm(sp * 3.6 + 6.0);
-      float cellular = ridge(fbm(sp * 1.9 + 24.0));
-      float shape = mix(broad * 0.74 + detail * 0.26,
-                        broad * 0.48 + detail * 0.22 + cellular * 0.38,
-                        isCumulus);
-      float thr = threshold + 0.06;
-      float d   = smoothstep(thr, thr + 0.06, shape) * shelf * mFar;
-      d = pow(d, 0.8) * mix(0.5, 1.0, coverage);
-
-      vec3 lOff = vec3(lDir * 0.4 * vec2(xf, yf), 0.0);
-      float direct = clamp(0.5 + (fbm3(sp) - fbm3(sp + lOff)) * 3.0, 0.0, 1.0) * dirStrength;
-      float hShade = smoothstep(0.60, 1.05, broad + detail * 0.44);
-      vec3 lit = mix(cloudShadow() * 0.9, cloudLight() * 0.85, clamp(hShade * 0.4 + direct * 0.6, 0.0, 1.0));
-      // Aerial perspective: distant clouds fade toward the sky colour
-      lit = mix(lit, skyColor(uv.y) * 1.06, 0.40);
-      lit += vec3(0.70,0.78,1.0) * u_flash * smoothstep(0.2, 0.7, shape) * 0.5;
-      float sA = d * 0.080 * (1.0 - a1);
-      c1 += lit * sA; a1 += sA;
-    }
-
-    // ---- MID layer (10 steps) ----
-    for (int i = 0; i < 10; i++) {
-      float t  = float(i) / 9.0;
-      float xf = 1.30, yf = mix(0.95, 1.40, isCumulus);
-      float sL = mix(-0.68, -0.46, isCumulus);
-      float sH = mix(-0.16,  0.08, isCumulus);
-      float tF = mix( 0.82,  1.08, isCumulus);
-      vec3 sp = vec3(
-        p.x * xf + wt * 0.024 + t * 0.44,
-        p.y * yf + wt * 0.007 - t * 0.11,
-        t * 3.0 + u_time * 0.018 + 14.0
-      );
-      float shelf = smoothstep(sL, sH, p.y + t * 0.62)
-                  * (1.0 - smoothstep(tF, tF + 0.22, p.y + t * 0.26));
-      float broad    = fbm(sp * 1.12);
-      float detail   = fbm(sp * 4.5 + 6.0);
-      float curl     = ridge(fbm(sp * 7.0 + 19.0));
-      float cellular = ridge(fbm(sp * 2.9 + 24.0));
-      float shape = mix(broad * 0.74 + detail * 0.32 + curl * 0.14,
-                        broad * 0.44 + detail * 0.28 + cellular * 0.44,
-                        isCumulus);
-      float d = smoothstep(threshold, threshold + 0.072, shape) * shelf * mMid;
-      d = pow(d, 0.72) * mix(0.68, 1.28, coverage);
-
-      vec3 lOff = vec3(lDir * 0.38 * vec2(xf, yf), 0.0);
-      float direct = clamp(0.5 + (fbm3(sp * 1.12) - fbm3(sp * 1.12 + lOff)) * 3.2, 0.0, 1.0) * dirStrength;
-      float hShade = smoothstep(0.68, 1.16, broad + detail * 0.5 + curl * 0.18);
-      vec3 lit = mix(cloudShadow(), cloudLight(), clamp(hShade * 0.4 + direct * 0.72, 0.0, 1.05));
-      // Silver lining on edges facing the light
-      float rim = smoothstep(threshold, threshold + 0.09, shape)
-                * (1.0 - smoothstep(threshold + 0.09, threshold + 0.26, shape));
-      lit += hueL * rim * lightProx * dirStrength * 0.55;
-      lit += vec3(0.70,0.78,1.0) * u_flash * smoothstep(0.2, 0.7, shape) * 0.7;
-      float sA = d * 0.090 * (1.0 - a2);
-      c2 += lit * sA; a2 += sA;
-    }
-
-    // ---- NEAR layer (12 steps) ----
-    // Huge fluffy clouds sweeping fast across the foreground: lowest noise
-    // frequency (large apparent size), ~12x the far layer's drift speed,
-    // brightest sunlit tops and deepest shaded bases.
-    for (int i = 0; i < 12; i++) {
-      float t  = float(i) / 11.0;
-      float xf = 0.55, yf = mix(0.72, 1.05, isCumulus);
-      float sL = mix(-0.95, -0.72, isCumulus);
-      float sH = mix(-0.30,  0.02, isCumulus);
-      float tF = mix( 1.05,  1.30, isCumulus);
-      vec3 sp = vec3(
-        p.x * xf + wt * 0.075 + t * 0.50,
-        p.y * yf + wt * 0.018 - t * 0.15,
-        t * 3.6 + u_time * 0.030 + 28.0
-      );
-      float shelf = smoothstep(sL, sH, p.y + t * 0.68)
-                  * (1.0 - smoothstep(tF, tF + 0.26, p.y + t * 0.30));
-      float broad    = fbm(sp * 0.78);
-      float detail   = fbm(sp * 3.4 + 6.0);
-      float curl     = ridge(fbm(sp * 6.4 + 19.0));
-      float cellular = ridge(fbm(sp * 2.4 + 24.0));
-      float shape = mix(broad * 0.66 + detail * 0.26 + curl * 0.20 + cellular * 0.18,
-                        broad * 0.36 + detail * 0.22 + cellular * 0.54 + curl * 0.22,
-                        isCumulus);
-      float thr = threshold - 0.06;
-      float d   = smoothstep(thr, thr + 0.078, shape) * shelf * mNear;
-      d = pow(d, 0.66) * mix(0.82, 1.52, coverage);
-
-      vec3 lOff = vec3(lDir * 0.34 * vec2(xf, yf), 0.0);
-      float direct = clamp(0.5 + (fbm3(sp * 0.78) - fbm3(sp * 0.78 + lOff)) * 3.6, 0.0, 1.1) * dirStrength;
-      float hShade = smoothstep(0.66, 1.14, broad + detail * 0.48 + curl * 0.20);
-      vec3 lit = mix(cloudShadow() * 1.05, cloudLight() * 1.18, clamp(hShade * 0.38 + direct * 0.8, 0.0, 1.1));
-      float rim = smoothstep(thr, thr + 0.10, shape)
-                * (1.0 - smoothstep(thr + 0.10, thr + 0.30, shape));
-      lit += hueL * rim * lightProx * dirStrength * 0.72;
-      lit += hueL * vec3(0.06, 0.04, 0.01) * dirStrength * (1.0 - smoothstep(0.8, 1.2, u_phase));
-      lit += vec3(0.72,0.80,1.0) * u_flash * smoothstep(0.18, 0.65, shape) * 0.9;
-      float sA = d * 0.098 * (1.0 - a3);
-      c3 += lit * sA; a3 += sA;
-    }
-
-    // Composite far → mid → near (premultiplied "over")
-    vec3  comp  = c1;
-    float compA = a1;
-    comp  = c2 + comp  * (1.0 - a2);
-    compA = a2 + compA * (1.0 - a2);
-    comp  = c3 + comp  * (1.0 - a3);
-    compA = a3 + compA * (1.0 - a3);
-
-    clouds = comp;
-    alpha  = clamp(compA, 0.0, 1.0);
-
-  } else {
-    // ---- LAYERED-DECK MODE (stratus / nimbostratus / cumulonimbus / supercell) ----
-    for (int i = 0; i < 28; i++) {
-      float t = float(i) / 27.0;
-      float verticalScale = 0.92;
-      float shelfLow = -0.78, shelfHigh = -0.28, topFade = 0.86;
-      if (u_style > 2.5 && u_style < 4.5) { verticalScale = 0.52; shelfLow = -0.96; shelfHigh = -0.56; topFade = 1.25; }
-      if (u_style > 4.5)                   { verticalScale = 1.55; shelfLow = -0.88; shelfHigh = -0.12; topFade = 1.12; }
-
-      vec3 sp = vec3(
-        p.x * 1.15 + wt * 0.030 + t * 0.46,
-        p.y * verticalScale + wt * 0.010 - t * 0.12,
-        t * 3.0 + u_time * 0.015
-      );
-      float shelf = smoothstep(shelfLow, shelfHigh, p.y + t * 0.64)
-                  * (1.0 - smoothstep(topFade, topFade + 0.22, p.y + t * 0.28));
-
-      float broad    = fbm(sp * 1.45);
-      float detail   = fbm(sp * 5.8 + 6.0);
-      float curl     = ridge(fbm(sp * 9.2 + 19.0));
-      float cellular = ridge(fbm(sp * 3.8 + 24.0));
-
-      float shape = broad * 0.74 + detail * 0.32 + curl * 0.14;
-      if (u_style > 2.5 && u_style < 3.5) shape = broad * 0.90 + detail * 0.14;
-      if (u_style > 3.5) shape = broad * 0.72 + detail * 0.28 + curl * 0.34 + cellular * 0.18;
-
-      float d = smoothstep(threshold, threshold + 0.075, shape) * shelf;
-      // Below ~95% cover the deck opens real thin spots / gaps along the mask
-      float gapsAllowed = smoothstep(1.0, 0.82, coverage);
-      d *= mix(1.0, mix(0.18, 1.0, mMid), gapsAllowed);
-      d = pow(d, 0.7) * mix(0.78, 1.45, coverage);
-
-      vec3 lOff = vec3(lDir * 0.36 * vec2(1.15, verticalScale), 0.0);
-      float direct = clamp(0.5 + (fbm3(sp * 1.45) - fbm3(sp * 1.45 + lOff)) * 3.0, 0.0, 1.0) * dirStrength;
-      float hShade = smoothstep(0.68, 1.16, broad + detail * 0.5 + curl * 0.18);
-      // Thin spots in a partial deck (coverage < 1) read brighter — light leaks through.
-      float thin = (1.0 - smoothstep(threshold + 0.05, threshold + 0.35, shape))
-                 * smoothstep(0.99, 0.85, coverage);
-      vec3 lit = mix(cloudShadow(), cloudLight(), clamp(hShade * 0.42 + direct * 0.6 + thin * 0.35, 0.0, 1.0));
-      // Storm decks churn: strong tonal variation so the base reads turbulent,
-      // with ragged bright tears between the darkest cells. Rain decks get a
-      // gentler version so nimbostratus isn't a featureless slab.
-      if (u_style > 4.5)      lit *= 0.62 + 0.72 * hShade + 0.34 * curl;
-      else if (u_style > 3.5) lit *= 0.78 + 0.38 * hShade + 0.18 * curl;
-      lit += vec3(0.72,0.80,1.0) * u_flash * smoothstep(0.18, 0.62, shape) * (u_style > 4.5 ? 1.0 : 0.55);
-
-      // Thick decks accumulate to near-full opacity; thin ones stay translucent.
-      float sA = d * (0.082 + 0.045 * density) * (1.0 - alpha);
-      clouds += lit * sA; alpha += sA;
-    }
-
-    // Bright smudge where the sun sits behind a translucent deck
-    float deckGlow = lightProx * (1.0 - smoothstep(0.55, 0.95, density))
-                   * alpha * clamp(1.6 - u_phase, 0.0, 1.0);
-    clouds += hueL * deckGlow * 0.16;
+  // The stretch of the ray inside the cloud volume: between the near and far
+  // depths, and within the layer's height band.
+  float tEnter = DEPTH_NEAR / rd.z;
+  float tExit = DEPTH_FAR / rd.z;
+  if (abs(rd.y) > 1e-4) {
+    float tA = layer.base / rd.y;
+    float tB = layer.top / rd.y;
+    tEnter = max(tEnter, min(tA, tB));
+    tExit = min(tExit, max(tA, tB));
+  } else if (layer.base > 0.0 || layer.top < 0.0) {
+    tExit = -1.0;
   }
+
+  if (coverage > 0.01) {
+    if (tEnter < tExit) {
+      float dt = (tExit - tEnter) / float(CLOUD_STEPS);
+      float t = tEnter + dt * rayJitter(gl_FragCoord.xy);
+
+      float mu = dot(rd, lightDir);
+      vec3 sunColor = cloudLight() * (0.78 * dirStrength) * hueL;
+      // At night clouds catch a little moonlight and city glow, so they
+      // read as slightly lighter than the sky instead of vanishing into it.
+      float night = smoothstep(1.3, 1.9, u_phase);
+      vec3 nightGlow = vec3(0.075, 0.085, 0.12) * night;
+      vec3 ambientLow = cloudShadow() + nightGlow * 0.7;
+      vec3 ambientHigh = mix(cloudShadow(), skyColor(0.9), 0.55) + nightGlow;
+      float extinction = layer.extinction * mix(0.75, 1.4, density);
+
+      for (int i = 0; i < CLOUD_STEPS; i++) {
+        vec3 pos = rd * t;
+        float heightFrac = (pos.y - layer.base) / (layer.top - layer.base);
+        // Far away, one pixel spans kilometres of noise; fade it out rather
+        // than let it alias.
+        // Far away, and where a ray grazes along a deck, one pixel spans
+        // kilometres of noise; fade it out rather than let it alias.
+        float grazing = smoothstep(0.02, 0.12, abs(rd.y)) + step(layer.base, 0.0) * step(0.0, layer.top);
+        float d = cloudDensity(pos, layer, coverage, wt, heightFrac)
+                * (1.0 - smoothstep(MAX_DISTANCE_KM * 0.45, MAX_DISTANCE_KM, t)) * min(grazing, 1.0);
+        if (d > 0.001) {
+          float lightDepth = 0.0;
+          float lightStep = 0.12;
+          vec3 lp3 = pos;
+          for (int j = 0; j < LIGHT_STEPS; j++) {
+            lp3 += lightDir * lightStep;
+            float hf = (lp3.y - layer.base) / (layer.top - layer.base);
+            lightDepth += cloudDensityCheap(lp3, layer, coverage, wt, hf) * lightStep;
+            lightStep *= 1.8;
+          }
+          // Multiple scattering, after Wrenninge (2013): each octave is
+          // dimmer, less absorbed and less directional, so light soaks
+          // through thin parts of a deck instead of Beer's law cutting it
+          // to zero everywhere, and the deck shows its texture.
+          float tau = lightDepth * extinction * 0.55;
+          float sunlight = 0.0;
+          float a = 1.0, b = 1.0, c = 1.0;
+          for (int k = 0; k < 3; k++) {
+            // Forward lobe kept moderate: a strong one blows out clouds in
+            // front of the sun.
+            float phase = min(mix(henyeyGreenstein(mu, -0.25 * c), henyeyGreenstein(mu, 0.38 * c), 0.7) * 12.566, 1.9);
+            sunlight += a * exp(-tau * b) * phase;
+            a *= 0.5; b *= 0.35; c *= 0.5;
+          }
+          // Beer-powder: darker edges on the side facing the viewer, the
+          // "fluffy" look (Schneider, Horizon Zero Dawn).
+          float powder = 1.0 - exp(-d * 6.0);
+          // Sky light reaches thin, high parts more than deep bases.
+          float skyLight = exp(-tau * 0.12);
+          vec3 luminance = mix(ambientLow * 0.75, ambientHigh, clamp(heightFrac * 0.6 + skyLight * 0.4, 0.0, 1.0))
+                         + sunColor * sunlight * mix(1.0, powder, 0.5)
+                         + vec3(0.72, 0.80, 1.0) * u_flash * 0.9;
+          // Overcast and storm decks are opaque within a step or two, so what
+          // shows is the surface where rays enter. Shade it by noise sampled
+          // where the ray hits, at two scales (broad rolls and the lumps
+          // within them), so it has texture in perspective.
+          vec3 q = cloudCoords(pos, layer, wt);
+          // Sampled in 3D: a plane would stay constant along depth and smear
+          // into streaks toward the vanishing point on a receding ceiling.
+          float rolls = fbm4(q * 2.6 + vec3(0.0, 3.7, 0.0)) * 0.6
+                      + fbm2(q * 7.0 + vec3(0.0, 9.1, 0.0)) * 0.4;
+          float deckShade = mix(0.32, 1.5, smoothstep(0.28, 0.72, rolls) * 0.85 + skyLight * 0.15);
+          luminance *= mix(1.0, deckShade, smoothstep(2.5, 3.5, u_style));
+          // Roll off highlights instead of clipping them to white.
+          luminance /= 1.0 + max(max(luminance.r, luminance.g), luminance.b) * 0.3;
+          float sampleT = exp(-d * extinction * dt);
+          // Energy-conserving integration over the step.
+          clouds += transmittance * (1.0 - sampleT) * luminance;
+          transmittance *= sampleT;
+          if (transmittance < 0.02) break;
+        }
+        t += dt;
+      }
+
+      // Aerial perspective: distant clouds fade into the sky near the horizon.
+      float haze = exp(-tEnter / HAZE_KM);
+      clouds = mix(skyColor(uv.y) * (1.0 - transmittance), clouds, haze);
+      alpha = (1.0 - transmittance) * mix(0.55, 1.0, haze);
+    }
+  }
+
+  // Bright smudge where the sun sits behind a translucent deck
+  float deckGlow = lightProx * (1.0 - smoothstep(0.55, 0.95, density))
+                 * alpha * clamp(1.6 - u_phase, 0.0, 1.0);
+  clouds += hueL * deckGlow * 0.06;
 
   // ---- fog ground bands ----
   if (u_fog > 0.01) {
@@ -531,17 +591,43 @@ void main() {
 }
 `;
 
+const NOISE_SIZE = 256;
+
+// 256x256 noise for tnoise(): a fixed random lattice in R, and in G the
+// lattice value 37 texels right and 239 down, which is the next slice of
+// the 3D noise. Seeded so the clouds look the same on every load.
+function createNoiseTexels() {
+  const values = new Uint8Array(NOISE_SIZE * NOISE_SIZE);
+  let seed = 0x2f6b9a1d;
+  for (let i = 0; i < values.length; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    values[i] = seed >>> 24;
+  }
+  const texels = new Uint8Array(NOISE_SIZE * NOISE_SIZE * 4);
+  for (let y = 0; y < NOISE_SIZE; y++) {
+    for (let x = 0; x < NOISE_SIZE; x++) {
+      const i = (y * NOISE_SIZE + x) * 4;
+      texels[i] = values[y * NOISE_SIZE + x];
+      texels[i + 1] = values[((y + 239) % NOISE_SIZE) * NOISE_SIZE + ((x + 37) % NOISE_SIZE)];
+      texels[i + 3] = 255;
+    }
+  }
+  return texels;
+}
+
 // Compile and link without blocking status checks. getShaderParameter/getProgramParameter
 // force a GPU pipeline stall (1–3 s on complex shaders). Status is checked lazily in the
 // first requestAnimationFrame callback, so React finishes painting before any GPU stall.
-function createProgram(gl) {
+function createProgram(gl: WebGLRenderingContext) {
   const vs = gl.createShader(gl.VERTEX_SHADER);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  const program = gl.createProgram();
+  // All three are null only when the WebGL context has been lost.
+  if (!vs || !fs || !program) return null;
   gl.shaderSource(vs, VERTEX_SHADER);
   gl.compileShader(vs);
-  const fs = gl.createShader(gl.FRAGMENT_SHADER);
   gl.shaderSource(fs, FRAGMENT_SHADER);
   gl.compileShader(fs);
-  const program = gl.createProgram();
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
   gl.linkProgram(program);
@@ -550,7 +636,7 @@ function createProgram(gl) {
   return program;
 }
 
-function getPhaseValue(phase) {
+function getPhaseValue(phase: VolumetricCloudscapeProps["phase"]) {
   if (typeof phase === "number") return Math.min(phase, 2);
   if (phase === "storm") return 0.4; // legacy alias — dark handled via style/density now
   if (phase === "night") return 2;
@@ -558,7 +644,7 @@ function getPhaseValue(phase) {
   return 0;
 }
 
-function getCoverageValue(coverage): number {
+function getCoverageValue(coverage: VolumetricCloudscapeProps["coverage"]): number {
   if (typeof coverage === "number") return Math.max(0, Math.min(coverage, 1));
   if (coverage === "storm") return 0.95;
   if (coverage === "full")  return 0.85;
@@ -566,7 +652,7 @@ function getCoverageValue(coverage): number {
   return 0;
 }
 
-function getStyleValue(cloudStyle) {
+function getStyleValue(cloudStyle: VolumetricCloudscapeProps["cloudStyle"]) {
   if (cloudStyle === "cumulus")       return 2;
   if (cloudStyle === "stratus")       return 3;
   if (cloudStyle === "nimbostratus")  return 4;
@@ -619,12 +705,19 @@ export default function VolumetricCloudscape({
   propsRef.current = { coverage, phase, cloudStyle, fogIntensity, density, windSpeed, lightningIntensity, hour, locationLabel, temperatureLabel, conditionLabel };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const gl = canvas?.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power" });
-    if (!canvas || !gl) { setSupported(false); return undefined; }
+    const canvasEl = canvasRef.current;
+    const glContext = canvasEl?.getContext("webgl", {
+      // Readable after drawing, so joined cards can sample the sky's edge colour.
+      preserveDrawingBuffer: true, antialias: false, alpha: false, powerPreference: "low-power" });
+    if (!canvasEl || !glContext) { setSupported(false); return undefined; }
+    // Re-bound as non-null consts so the nested render functions keep the narrowing.
+    const canvas: HTMLCanvasElement = canvasEl;
+    const gl: WebGLRenderingContext = glContext;
 
     let animationFrame = 0;
-    const program = createProgram(gl);
+    const linkedProgram = createProgram(gl);
+    if (!linkedProgram) { setSupported(false); return undefined; }
+    const program: WebGLProgram = linkedProgram;
     // KHR_parallel_shader_compile lets us poll completion without stalling the GPU pipeline.
     const khrParallel = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
 
@@ -646,6 +739,16 @@ export default function VolumetricCloudscape({
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
     let lastTextKey = "";
 
+    // Noise for the cloud volume, read as 3D in the shader (see tnoise()):
+    // R is a random lattice value and G is R at (+37, +239), the next z slice.
+    const noiseTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, NOISE_SIZE, NOISE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, createNoiseTexels());
+
     // Mirrors the .weather-current / .weather-location clamp() rules in
     // index.css — .weather-widget sets container-type: size, so cqh/cqw there
     // are fractions of this same canvas box, which is what cssW/cssH are here.
@@ -662,9 +765,9 @@ export default function VolumetricCloudscape({
       return text.slice(0, lo) + "…";
     }
 
-    // The main framebuffer is deliberately capped at 1x device-pixel-ratio
-    // (see resize()) to keep the cloud shader cheap — but that leaves text
-    // soft on Retina screens. Rasterize the text mask at real device
+    // The main framebuffer renders at an adaptive resolution (see resize())
+    // that drops toward 1x when the cloud shader can't keep up — which would
+    // leave text soft on Retina screens. Rasterize the text mask at real device
     // resolution regardless, independent of the main canvas's backing-store
     // size: it's just a texture sample in the shader, so oversampling it
     // costs nothing per-frame, only a slightly bigger one-off upload whenever
@@ -735,7 +838,6 @@ export default function VolumetricCloudscape({
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     }
 
-    const startedAt = performance.now();
 
     // Uniform/attrib locations populated lazily on the first frame after link completes.
     let glReady = false;
@@ -751,9 +853,16 @@ export default function VolumetricCloudscape({
     let uWind: WebGLUniformLocation | null = null;
     let uFlash: WebGLUniformLocation | null = null;
     let uTextTex: WebGLUniformLocation | null = null;
+    let uNoise: WebGLUniformLocation | null = null;
+
+    // One canvas pixel per CSS pixel, scaled up on high-density screens.
+    // Clouds are soft (the text over them is HTML), so this looks the same,
+    // and the raymarcher is costly per pixel: at 2x density it held the
+    // dashboard near 13 fps on an M1, and supersampled at 4x near 4 fps.
+    const resolution = createAdaptiveResolution({ max: 1 });
 
     function resize() {
-      const dpr   = Math.min(window.devicePixelRatio || 1, 1.0);
+      const dpr   = resolution.scale;
       const width  = Math.max(1, Math.floor(canvas.clientWidth  * dpr));
       const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
       if (canvas.width !== width || canvas.height !== height) {
@@ -772,7 +881,8 @@ export default function VolumetricCloudscape({
 
     function render(now: number) {
       animationFrame = requestAnimationFrame(render);
-      if (!canvas.clientWidth) return; // hidden (ancestor display:none) — skip GPU work
+      if (resolution.sample(now)) resize();
+      if (!canvas.clientWidth || !isOnScreen(canvas)) return; // hidden or off screen: skip GPU work
 
       if (!glReady) {
         // Non-blocking poll with KHR extension; one-time stall without it (but deferred from mount).
@@ -794,6 +904,7 @@ export default function VolumetricCloudscape({
         uWind     = gl.getUniformLocation(program, "u_wind");
         uFlash    = gl.getUniformLocation(program, "u_flash");
         uTextTex  = gl.getUniformLocation(program, "u_textTex");
+        uNoise    = gl.getUniformLocation(program, "u_noise");
         glReady = true;
       }
 
@@ -801,11 +912,12 @@ export default function VolumetricCloudscape({
       // crisply; otherwise stay at the power-saving cadence.
       const p = propsRef.current;
       const flash = p.lightningIntensity > 0 ? getFlashEnvelope(Date.now(), p.lightningIntensity) : 0;
-      if (flash < 0.01 && now - lastFrameTime < CLOUD_FRAME_MS) return;
+      if (flash < 0.01 && now - lastFrameTime < ambientFrameMs(CLOUD_FRAME_MS)) return;
       lastFrameTime = now;
 
-      const d = new Date();
-      const hourNow = p.hour ?? d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+      // The sky shows the time now (it doesn't replay the day on load).
+      const d = wallClock(debugNow(), debugTimeZone());
+      const hourNow = p.hour ?? d.hours + d.minutes / 60 + d.seconds / 3600;
       const coverageValue = getCoverageValue(p.coverage);
       // Default density follows coverage when not supplied (legacy callers)
       const densityValue = p.density ?? Math.min(1, 0.25 + coverageValue * 0.5);
@@ -815,7 +927,7 @@ export default function VolumetricCloudscape({
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
       gl.uniform2f(uRes,      canvas.width, canvas.height);
-      gl.uniform1f(uTime,     (now - startedAt) / 1000);
+      gl.uniform1f(uTime,     motionTime());
       gl.uniform1f(uPhase,    getPhaseValue(p.phase));
       gl.uniform1f(uCoverage, coverageValue);
       gl.uniform1f(uDensity,  Math.max(0, Math.min(densityValue, 1)));
@@ -829,6 +941,9 @@ export default function VolumetricCloudscape({
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, textTexture);
       gl.uniform1i(uTextTex, 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+      gl.uniform1i(uNoise, 1);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
@@ -836,9 +951,11 @@ export default function VolumetricCloudscape({
     animationFrame = requestAnimationFrame(render);
     return () => {
       cancelAnimationFrame(animationFrame);
+      forgetOnScreen(canvas);
       resizeObserver.disconnect();
       gl.deleteBuffer(buffer);
       gl.deleteTexture(textTexture);
+      gl.deleteTexture(noiseTexture);
       gl.deleteProgram(program);
     };
   }, []);

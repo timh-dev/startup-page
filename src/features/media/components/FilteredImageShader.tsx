@@ -8,7 +8,7 @@ import {
   Water,
 } from "@paper-design/shaders-react";
 
-const FILTER_COMPONENTS = {
+const FILTER_COMPONENTS: Record<string, React.ComponentType<any>> = {
   paperTexture: PaperTexture,
   flutedGlass: FlutedGlass,
   water: Water,
@@ -22,8 +22,13 @@ export default function FilteredImageShader({
   filterKey,
   filterSettings,
   className,
+}: {
+  image: string | null;
+  filterKey: string | null;
+  filterSettings: Record<string, unknown> | null;
+  className?: string;
 }) {
-  const ShaderComponent = FILTER_COMPONENTS[filterKey];
+  const ShaderComponent = filterKey ? FILTER_COMPONENTS[filterKey] : undefined;
 
   if (!ShaderComponent || !image || !filterSettings) {
     return null;

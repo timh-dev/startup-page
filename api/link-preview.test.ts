@@ -5,10 +5,25 @@
 // match production closely enough, so this file opts into the real `node`
 // environment instead of the project's default jsdom one.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpError } from "./_lib/http";
+
+// Auth and DNS are stubbed: every request is signed in unless a test says
+// otherwise, and every hostname resolves to a public address unless a test
+// maps it somewhere private.
+const { authMock, lookupMock } = vi.hoisted(() => ({ authMock: vi.fn(), lookupMock: vi.fn() }));
+vi.mock("./_lib/auth.js", () => ({ getCurrentUser: authMock }));
+vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));
+
+beforeEach(() => {
+  authMock.mockReset().mockResolvedValue({ id: "user-1" });
+  lookupMock.mockReset().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+});
+
 import {
   GET,
   decodeEntities,
   extractDescription,
+  extractImage,
   extractOgType,
   extractTitle,
   faviconUrlFor,
@@ -52,6 +67,12 @@ describe("extractTitle / extractDescription (pure regex extraction)", () => {
   it("handles content= appearing before property= in the same meta tag", () => {
     const html = `<meta content="Reordered OG Title" property="og:title">`;
     expect(extractTitle(html)).toBe("Reordered OG Title");
+  });
+
+  it("decodes numeric entities, once", () => {
+    expect(decodeEntities("I&#x27;m here &#8212; you&#39;ll see")).toBe("I'm here \u2014 you'll see");
+    expect(decodeEntities("&amp;lt;b&amp;gt;")).toBe("&lt;b&gt;");
+    expect(decodeEntities("&bogus; &#0;")).toBe("&bogus; &#0;");
   });
 
   it("decodes HTML entities in the extracted text", () => {
@@ -130,6 +151,21 @@ describe("suggestTag", () => {
   it("returns null when nothing matches", () => {
     expect(suggestTag(new URL("https://example.com/post"))).toBeNull();
     expect(suggestTag(new URL("https://example.com/post"), "website")).toBeNull();
+  });
+});
+
+describe("extractImage", () => {
+  const base = new URL("https://example.com/posts/a");
+
+  it("reads og:image, then twitter:image, made absolute", () => {
+    expect(extractImage('<meta property="og:image" content="/img/share.png">', base)).toBe("https://example.com/img/share.png");
+    expect(extractImage('<meta content="https://cdn.x.com/a.jpg" property="og:image">', base)).toBe("https://cdn.x.com/a.jpg");
+    expect(extractImage('<meta name="twitter:image" content="https://cdn.x.com/b.jpg">', base)).toBe("https://cdn.x.com/b.jpg");
+  });
+
+  it("ignores missing and non-http images", () => {
+    expect(extractImage("<title>x</title>", base)).toBeNull();
+    expect(extractImage('<meta property="og:image" content="javascript:alert(1)">', base)).toBeNull();
   });
 });
 
@@ -296,5 +332,49 @@ describe("GET /api/link-preview — popular real-world site shapes", () => {
     fetchMock.mockRejectedValueOnce(new Error("network error"));
     const result = await fetchYoutubeOembed(new URL("https://www.youtube.com/watch?v=2QmP_adcZEY"));
     expect(result).toBeNull();
+  });
+});
+
+describe("GET /api/link-preview — access and SSRF guards", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns 401 for signed-out requests without fetching anything", async () => {
+    authMock.mockRejectedValueOnce(new HttpError(401, "Missing bearer token"));
+    const res = await GET(requestFor("https://example.org/"));
+    expect(res.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a public hostname that resolves to a private address", async () => {
+    lookupMock.mockResolvedValueOnce([{ address: "10.0.0.7", family: 4 }]);
+    const res = await GET(requestFor("https://internal.example.org/"));
+    expect(res.status).toBe(422);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a redirect that lands on a private address", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data" } }));
+    const res = await GET(requestFor("https://example.org/redirect"));
+    expect(res.status).toBe(422);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("follows a redirect to another public page", async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 301, headers: { location: "/final" } }))
+      .mockResolvedValueOnce(htmlResponse("<html><head><title>Final page</title></head></html>"));
+    const res = await GET(requestFor("https://example.org/start"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).title).toBe("Final page");
+    expect(String(fetchMock.mock.calls[1][0])).toBe("https://example.org/final");
   });
 });

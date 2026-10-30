@@ -1,5 +1,5 @@
 import React from "react";
-import { useKBar, useRegisterActions, Priority } from "kbar";
+import { useKBar, useRegisterActions, Priority, type Action } from "kbar";
 import { ThemeContext } from "@/components/layout/ThemeContext";
 import { BUILT_IN_PALETTES } from "@/lib/theme-palettes";
 import {
@@ -10,32 +10,21 @@ import {
   createSettingsExportFilename,
 } from "@/lib/settings";
 import { useSettingsStore } from "@/features/settings/stores";
+import { useDebugStore } from "@/lib/debug";
+import { normalizeSearchEngines } from "@/features/dashboard/searchEngines";
+import { describeIntent, openResult, resolveQuery } from "@/features/dashboard/searchQuery";
 
-// Search-provider bangs: "!yt lofi beats" → YouTube search
-const SEARCH_BANGS = {
-  g: { label: "Google", url: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}` },
-  ddg: { label: "DuckDuckGo", url: (q) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}` },
-  yt: { label: "YouTube", url: (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` },
-  gh: { label: "GitHub", url: (q) => `https://github.com/search?q=${encodeURIComponent(q)}` },
-  w: { label: "Wikipedia", url: (q) => `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(q)}` },
-  r: { label: "Reddit", url: (q) => `https://www.reddit.com/search/?q=${encodeURIComponent(q)}` },
-  maps: { label: "Google Maps", url: (q) => `https://www.google.com/maps/search/${encodeURIComponent(q)}` },
-  npm: { label: "npm", url: (q) => `https://www.npmjs.com/search?q=${encodeURIComponent(q)}` },
-};
-
-// Inline calculator for "= 340*1.08" queries. The whitelist regex keeps
-// Function() safe: digits, operators, parens, and scientific notation only —
-// no letters (beyond e/E), brackets, or quotes ever reach evaluation.
-function safeCalculate(expression) {
-  const cleaned = expression.replace(/\^/g, "**").replace(/,/g, "");
-  if (!/^[\d\s+\-*/().%eE]*$/.test(cleaned) || !/\d/.test(cleaned)) return null;
-  try {
-    const value = Function(`"use strict"; return (${cleaned});`)();
-    if (typeof value !== "number" || !Number.isFinite(value)) return null;
-    return value;
-  } catch {
-    return null;
-  }
+// Whether the key that chose the last palette result held ⌘/Ctrl or Shift,
+// so a search can open in a new tab (kbar's perform() gets no event).
+let lastEnterWantsNewTab = false;
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Enter") lastEnterWantsNewTab = event.metaKey || event.ctrlKey || event.shiftKey;
+    },
+    true,
+  );
 }
 
 export default function useKBarActions() {
@@ -44,22 +33,23 @@ export default function useKBarActions() {
   const storeSettings = useSettingsStore((s) => s.settings);
 
   const actions = React.useMemo(() => {
-    const list = [];
+    const list: Action[] = [];
     const settings = storeSettings || readSettings();
     const customThemes = settings.customThemes || [];
 
     // --- Bookmarks: fuzzy-search every saved link ---
     const bookmarkGroups = Array.isArray(settings.bookmark) ? settings.bookmark : [];
     bookmarkGroups.forEach((group, groupIndex) => {
-      (group?.content || []).forEach((link, linkIndex) => {
+      (group?.content || []).forEach((link: { name?: string; url?: string }, linkIndex: number) => {
         if (!link?.url) return;
+        const url = link.url;
         list.push({
           id: `bookmark-${groupIndex}-${linkIndex}`,
           name: link.name || link.url,
           subtitle: link.url,
           keywords: `${link.url} ${group?.title || ""}`,
           section: "Bookmarks",
-          perform: () => window.location.assign(link.url),
+          perform: () => window.location.assign(url),
         });
       });
     });
@@ -116,7 +106,7 @@ export default function useKBarActions() {
     });
 
     // --- Theme: Palette (custom) ---
-    customThemes.forEach((ct) => {
+    customThemes.forEach((ct: { id: string; name: string; light: Record<string, string>; dark: Record<string, string> }) => {
       list.push({
         id: `palette-${ct.id}`,
         name: `${ct.name} Palette`,
@@ -139,6 +129,16 @@ export default function useKBarActions() {
         const input = document.getElementById("search-input");
         if (input) input.focus();
       },
+    });
+
+    // --- Debugger ---
+    list.push({
+      id: "open-debugger",
+      name: "Debugger: change the time or place",
+      shortcut: [],
+      keywords: "debug time travel location timezone sun",
+      section: "Settings",
+      perform: () => useDebugStore.getState().setPanelOpen(true),
     });
 
     // --- Settings ---
@@ -175,50 +175,42 @@ export default function useKBarActions() {
 
   useRegisterActions(actions, [actions]);
 
-  // ── Query-driven actions: calculator, web-search bangs, quick-add ─────────
+  // ── Query-driven actions: sums, searches and sites, quick-add ─────────────
   // These only exist while the query matches their trigger; setting the raw
   // query as `keywords` guarantees they pass kbar's fuzzy filter.
   const { searchQuery } = useKBar((state) => ({ searchQuery: state.searchQuery }));
+  const storedEngines = useSettingsStore((s) => s.settings.search?.engines);
+  const engines = React.useMemo(() => normalizeSearchEngines(storedEngines), [storedEngines]);
 
   const dynamicActions = React.useMemo(() => {
     const query = (searchQuery || "").trim();
-    const out = [];
+    const out: Action[] = [];
 
-    // Calculator: "= 340*1.08"
-    if (query.startsWith("=") && query.length > 1) {
-      const result = safeCalculate(query.slice(1));
-      if (result !== null) {
-        const pretty = Number.isInteger(result)
-          ? String(result)
-          : String(Math.round(result * 1e10) / 1e10);
-        out.push({
-          id: "calc-result",
-          name: `= ${pretty}`,
-          subtitle: "Press Enter to copy",
-          keywords: query,
-          section: "Calculator",
-          priority: Priority.HIGH,
-          perform: () => {
-            void navigator.clipboard?.writeText(pretty);
-          },
-        });
-      }
-    }
-
-    // Web search bangs: "!yt query", "!gh query", …
-    const bang = query.match(/^!(\w+)\s+(.+)$/);
-    if (bang) {
-      const provider = SEARCH_BANGS[bang[1].toLowerCase()];
-      if (provider) {
-        out.push({
-          id: `bang-${bang[1].toLowerCase()}`,
-          name: `Search ${provider.label} for “${bang[2]}”`,
-          keywords: query,
-          section: "Web Search",
-          priority: Priority.HIGH,
-          perform: () => window.location.assign(provider.url(bang[2])),
-        });
-      }
+    // Sums, bangs, sites and web searches: the same rules as the search card.
+    const intent = query.startsWith("+") ? null : resolveQuery(query, engines);
+    if (intent?.kind === "calc") {
+      out.push({
+        id: "calc-result",
+        name: describeIntent(intent),
+        subtitle: "Press Enter to copy",
+        keywords: query,
+        section: "Calculator",
+        priority: Priority.HIGH,
+        perform: () => {
+          void navigator.clipboard?.writeText(intent.result);
+        },
+      });
+    } else if (intent) {
+      // A plain search comes after any bookmark or link that matches.
+      out.push({
+        id: `web-${intent.kind}`,
+        name: describeIntent(intent),
+        subtitle: intent.kind === "url" ? undefined : "⌘ Enter for a new tab",
+        keywords: query,
+        section: "Web Search",
+        priority: intent.kind === "search" ? Priority.LOW : Priority.HIGH,
+        perform: () => openResult(intent.url, lastEnterWantsNewTab),
+      });
     }
 
     // Quick-add to Resource Vault: "+ https://example.com optional title"
@@ -264,7 +256,7 @@ export default function useKBarActions() {
     }
 
     return out;
-  }, [searchQuery]);
+  }, [searchQuery, engines]);
 
   useRegisterActions(dynamicActions, [dynamicActions]);
 }
