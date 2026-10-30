@@ -1,11 +1,13 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { HiChevronDown, HiChevronUp, HiLink } from "react-icons/hi2";
+import { useRegisterActions, type Action } from "kbar";
 
 import { useSettingsStore } from "@/features/settings/stores";
 import { useLayoutEditStore } from "@/features/dashboard/stores/layoutEditStore";
 import { useSidePanelStore } from "@/components/layout/sidePanelStore";
 import { getWidgetType } from "@/features/dashboard/widgetRegistry";
+import { persistDashboard, useActiveDashboard } from "@/features/dashboard/useDashboard";
 import { generateId } from "@/features/bookmarks/lib/tree";
 import { TILE_SIZE_OPTIONS, type TileSize, type WidgetInstance, type WidgetType } from "@/lib/dashboard-dimensions";
 import DashboardTile from "@/features/dashboard/components/DashboardTile";
@@ -111,7 +113,7 @@ const svgMask = (d: string, box: Rect) =>
  */
 export default function Index() {
   const settings = useSettingsStore((state) => state.settings);
-  const persistSettings = useSettingsStore((state) => state.persistSettings);
+  const dashboard = useActiveDashboard();
   const { editing, selectedId, select, pushHistory, popHistory, setEditing, setInsertAt } = useLayoutEditStore();
   const insertAt = useLayoutEditStore((state) => state.insertAt);
   const panel = useSidePanelStore((state) => state.panel);
@@ -124,10 +126,11 @@ export default function Index() {
   const gap = Math.round(rem * (ui.gridDensity === "compact" ? 1 : 1.5));
   const maxTile = Math.round((ui.tileSize || 9) * rem);
   const minTile = Math.round(maxTile * 0.75);
-  const columns = Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, Number(settings.layout?.columns) || DEFAULT_COLUMNS));
-  const widgets: WidgetInstance[] = React.useMemo(() => (Array.isArray(settings.widgets) ? settings.widgets : []), [settings.widgets]);
-  const joins: Join[] = React.useMemo(() => (Array.isArray(settings.layout?.joins) ? settings.layout.joins : []), [settings.layout?.joins]);
-  const pageRows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, Number(settings.layout?.rows) || PAGE_ROWS));
+  // The dashboard on screen (Home, Work…): its cards, page size and joins.
+  const columns = Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, Number(dashboard.columns) || DEFAULT_COLUMNS));
+  const widgets: WidgetInstance[] = dashboard.widgets;
+  const joins: Join[] = dashboard.joins;
+  const pageRows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, Number(dashboard.rows) || PAGE_ROWS));
   const base = React.useMemo(() => resolveLayout(widgets, columns, pageRows), [widgets, columns, pageRows]);
 
   // Fit a page (its rows) to the space left beside the side panel.
@@ -347,29 +350,29 @@ export default function Index() {
   };
 
   // Every change goes through here, so Undo can step back through it.
+  const dashboardId = dashboard.id;
   const commit = React.useCallback(
     (next: WidgetInstance[]) => {
       pushHistory(widgets);
-      void persistSettings((prev) => ({ ...prev, widgets: next }));
+      void persistDashboard(dashboardId, () => ({ widgets: next }));
     },
-    [persistSettings, pushHistory, widgets],
+    [dashboardId, pushHistory, widgets],
   );
 
   const undo = React.useCallback(() => {
     const previous = popHistory();
-    if (previous) void persistSettings((prev) => ({ ...prev, widgets: previous }));
-  }, [persistSettings, popHistory]);
+    if (previous) void persistDashboard(dashboardId, () => ({ widgets: previous }));
+  }, [dashboardId, popHistory]);
 
   /** Link two cards ("bridge": one shape; "window": shared media, gaps kept), or split them (null). */
   const setJoin = (a: string, b: string, mode: JoinMode | null) => {
     const key = joinKey(a, b);
-    void persistSettings((prev) => {
-      const current: Join[] = Array.isArray(prev.layout?.joins) ? prev.layout.joins : [];
-      const rest = current.filter(([x, y]) => joinKey(x, y) !== key);
+    void persistDashboard(dashboardId, (current) => {
+      const rest = current.joins.filter(([x, y]) => joinKey(x, y) !== key);
       const next: Join[] = mode === null ? rest : [...rest, mode === "bridge" ? [a, b] : [a, b, mode]];
       // Drop joins whose cards are gone.
-      const ids = new Set((prev.widgets as WidgetInstance[]).map((w) => w.id));
-      return { ...prev, layout: { ...(prev.layout || {}), joins: next.filter(([x, y]) => ids.has(x) && ids.has(y)) } };
+      const ids = new Set(current.widgets.map((w) => w.id));
+      return { joins: next.filter(([x, y]) => ids.has(x) && ids.has(y)) };
     });
   };
 
@@ -725,6 +728,33 @@ export default function Index() {
     const target = Math.max(0, Math.min(screens - 1, screen));
     scrollerRef.current?.scrollTo({ top: target * pageH, behavior: "smooth" });
   };
+  const goToScreenRef = React.useRef(goToScreen);
+  goToScreenRef.current = goToScreen;
+
+  // Number keys follow the pager: 1 is the first page, 2 the next, and so on
+  // (the Vault and Bookmarks sit after the first card page). On narrow
+  // screens the pages stack, so the keys scroll to each section instead.
+  const pageActions: Action[] = React.useMemo(() => {
+    const targets: Array<{ name: string; go: () => void }> = flow
+      ? [
+          { name: "Show Dashboard", go: () => navigate("/") },
+          ...specials.map((kind) => ({ name: `Open ${SPECIAL_LABELS[kind]}`, go: () => navigate(SPECIAL_PATHS[kind]) })),
+        ]
+      : Array.from({ length: screens }, (_, screen) => {
+          const cardPage = cardPageAt(screen);
+          const name = cardPage === null ? `Open ${SPECIAL_LABELS[specials[screen - 1]]}` : cardPage === 0 ? "Show Dashboard" : `Dashboard page ${cardPage + 1}`;
+          return { name, go: () => goToScreenRef.current(screen) };
+        });
+    return targets.map((target, index) => ({
+      id: `go-to-page-${index + 1}`,
+      name: target.name,
+      shortcut: index < 9 ? [String(index + 1)] : [],
+      section: "Navigation",
+      perform: target.go,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow, screens, specials, navigate]);
+  useRegisterActions(pageActions, [pageActions]);
 
   const onPagerScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const screen = Math.round(event.currentTarget.scrollTop / pageH);

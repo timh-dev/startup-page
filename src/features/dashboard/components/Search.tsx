@@ -6,6 +6,7 @@ import {
   getSearchEngineIcon,
   normalizeSearchEngines,
 } from "@/features/dashboard/searchEngines";
+import { describeIntent, openResult, resolveQuery } from "@/features/dashboard/searchQuery";
 
 interface SearchBoxProps {
   engines?: unknown;
@@ -28,34 +29,32 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
     }
   }, [engines, activeEngineId]);
 
+  const [query, setQuery] = React.useState("");
+  const activeEngine = engines.find((item) => item.id === activeEngineId) || engines[0];
+  // Same rules as the command palette: bangs, "= sums", sites, then a search.
+  const intent = resolveQuery(query, engines, activeEngine);
+  const hint = intent && intent.kind !== "search" ? describeIntent(intent) : null;
+
   const selectEngine = (engineId: string) => {
     setActiveEngineId(engineId);
-    if (inputRef.current) {
-      inputRef.current.value = "";
-      inputRef.current.focus();
-    }
+    setQuery("");
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") {
+    if (event.key === "Escape") {
+      setQuery("");
       return;
     }
-
-    const engine =
-      engines.find((item) => item.id === activeEngineId) || engines[0];
-    if (!engine) {
+    if (event.key !== "Enter" || !intent) return;
+    event.preventDefault();
+    if (intent.kind === "calc") {
+      void navigator.clipboard?.writeText(intent.result);
       return;
     }
-
-    const query = encodeURIComponent(event.currentTarget.value.trim());
-    if (!query) {
-      return;
-    }
-
-    window.open(`${engine.url}${query}`, "_blank", "noopener,noreferrer");
-    event.currentTarget.value = "";
+    openResult(intent.url, event.metaKey || event.ctrlKey || event.shiftKey);
+    setQuery("");
   };
-
 
   return (
     <div className="search-widget flex h-full w-full items-center justify-center">
@@ -86,10 +85,18 @@ export default function SearchBox({ engines: configEngines }: SearchBoxProps = {
             autoFocus
             id="search-input"
             type="text"
-            placeholder={`Search ${engines.find((item) => item.id === activeEngineId)?.name ?? "the web"}`}
+            placeholder={`Search ${activeEngine?.name ?? "the web"}`}
             ref={inputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
+            aria-describedby={hint ? "search-hint" : undefined}
           />
+          {hint && (
+            <span id="search-hint" className="search-hint" aria-live="polite">
+              {intent?.kind === "calc" ? `${hint} · Enter to copy` : hint}
+            </span>
+          )}
         </label>
       </div>
     </div>

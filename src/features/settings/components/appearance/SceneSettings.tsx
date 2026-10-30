@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { StartupSettings } from "@/features/settings/stores";
 import { SCENES, applyScene, getScene, type SceneApplyMode, type SceneId } from "@/features/scenes/scenes";
 import { BUILT_IN_PALETTES } from "@/lib/theme-palettes";
+import { useActiveDashboardId } from "@/features/dashboard/useDashboard";
 import type { SettingsSectionProps } from "./types";
 
 // Picking a theme: a large preview of each (its painting and colours), then
@@ -15,6 +16,8 @@ export default function SceneSettings({ settings, updateSettings }: SettingsSect
   const { setThemeMode, setThemePalette, setCustomThemeVars } = useContext(ThemeContext);
   const current = (settings.ui?.scene as SceneId | undefined) ?? null;
   const [picked, setPicked] = useState<SceneId | null>(null);
+  // Themes restyle (or replace) the dashboard on screen.
+  const dashboardId = useActiveDashboardId();
   const [applied, setApplied] = useState<{ name: string; previous: StartupSettings } | null>(null);
 
   const showTheme = (next: StartupSettings) => {
@@ -25,7 +28,7 @@ export default function SceneSettings({ settings, updateSettings }: SettingsSect
 
   const apply = (id: SceneId, mode: SceneApplyMode) => {
     const previous = settings;
-    const next = applyScene(settings, id, mode);
+    const next = applyScene(settings, id, mode, dashboardId);
     updateSettings(() => next);
     showTheme(next);
     setApplied({ name: getScene(id)!.name, previous });

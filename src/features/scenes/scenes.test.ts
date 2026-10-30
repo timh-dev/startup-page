@@ -1,18 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { SIZE_CELLS } from "@/features/dashboard/layout/grid";
+import type { WidgetInstance } from "@/lib/dashboard-dimensions";
 import { SCENES, applyScene, getScene, sceneWidgets } from "./scenes";
 
 const folders = ["f1", "f2", "f3", "f4", "f5"];
 
 describe("theme layouts", () => {
-  it.each(SCENES.map((scene) => [scene.id, scene] as const))("%s fits one 7x4 page with no overlaps", (_id, scene) => {
+  it.each(SCENES.map((scene) => [scene.id, scene] as const))("%s fits one page of its size with no overlaps", (_id, scene) => {
+    const { columns, rows } = scene.grid ?? { columns: 7, rows: 4 };
     const taken = new Set<string>();
     for (const widget of sceneWidgets(scene, folders)) {
       const { w, h } = SIZE_CELLS[widget.size];
       for (let x = widget.pos!.x; x < widget.pos!.x + w; x++) {
         for (let y = widget.pos!.y; y < widget.pos!.y + h; y++) {
-          expect(x).toBeLessThan(7);
-          expect(y).toBeLessThan(4);
+          expect(x).toBeLessThan(columns);
+          expect(y).toBeLessThan(rows);
           expect(taken.has(`${x},${y}`), `${scene.id}: ${widget.id} overlaps at ${x},${y}`).toBe(false);
           taken.add(`${x},${y}`);
         }
@@ -51,6 +53,17 @@ describe("applyScene", () => {
     expect(next.widgets[1].items![0].config.searchTerms).toEqual(getScene("ocean")!.photos[0]);
     expect(next.layout).toBe(settings.layout);
     expect(next.readItems).toBe(settings.readItems);
+  });
+
+  it("starts new installs on the desert layout: 8 x 5, its own media, joined cards", () => {
+    const next = applyScene(settings, "desert", "layout");
+    expect(next.layout).toMatchObject({ columns: 8, rows: 5, joins: [["desert-1", "desert-2", "window"], ["desert-8", "desert-13"]] });
+    const widgets = next.widgets as WidgetInstance[];
+    const byId = new Map(widgets.map((w) => [w.id, w]));
+    expect(byId.get("desert-1")?.config.url).toContain("51678");
+    expect(byId.get("desert-8")?.config.searchTerms).toEqual(["patagonia"]);
+    // One folder: the other bookmark cards are left out.
+    expect(widgets.filter((w) => w.type === "bookmark").map((w) => w.config.groupId)).toEqual(["g1"]);
   });
 
   it("replaces the cards and clears joins (layout), keeping everything else", () => {

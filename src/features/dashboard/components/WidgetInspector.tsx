@@ -5,12 +5,12 @@ import { PanelFrame } from "@/components/layout/SidePanel";
 import { useSidePanelStore } from "@/components/layout/sidePanelStore";
 import { Label } from "@/components/ui/label";
 import { generateId } from "@/features/bookmarks/lib/tree";
-import { useSettingsStore } from "@/features/settings/stores";
 import { SegmentedControl } from "@/features/settings/components/controls";
 import { WIDGET_TYPES, getWidgetType } from "@/features/dashboard/widgetRegistry";
 import { WIDGET_CATALOG } from "@/features/dashboard/widgetCatalog";
 import { useLayoutEditStore } from "@/features/dashboard/stores/layoutEditStore";
-import { DEFAULT_COLUMNS, SIZE_CELLS, applyLayout, cellsFor, placeTile, resolveLayout } from "@/features/dashboard/layout/grid";
+import { DEFAULT_COLUMNS, MAX_ROWS, MIN_ROWS, PAGE_ROWS, SIZE_CELLS, applyLayout, cellsFor, placeTile, resolveLayout } from "@/features/dashboard/layout/grid";
+import { persistDashboard, useActiveDashboard } from "@/features/dashboard/useDashboard";
 import { TILE_SIZE_OPTIONS, type TileSize, type WidgetInstance, type WidgetType } from "@/lib/dashboard-dimensions";
 
 const SAVE_DELAY_MS = 350;
@@ -21,9 +21,11 @@ const SAVE_DELAY_MS = 350;
  * steps back through them.
  */
 export default function WidgetInspector({ id }: { id: string }) {
-  const widgets: WidgetInstance[] = useSettingsStore((state) => (Array.isArray(state.settings.widgets) ? state.settings.widgets : []));
-  const columns = useSettingsStore((state) => Number(state.settings.layout?.columns) || DEFAULT_COLUMNS);
-  const persistSettings = useSettingsStore((state) => state.persistSettings);
+  const dashboard = useActiveDashboard();
+  const dashboardId = dashboard.id;
+  const widgets = dashboard.widgets;
+  const columns = Number(dashboard.columns) || DEFAULT_COLUMNS;
+  const pageRows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, Number(dashboard.rows) || PAGE_ROWS));
   const pushHistory = useLayoutEditStore((state) => state.pushHistory);
   const select = useLayoutEditStore((state) => state.select);
   const close = useSidePanelStore((state) => state.close);
@@ -45,20 +47,19 @@ export default function WidgetInspector({ id }: { id: string }) {
       setDraft(next);
       window.clearTimeout(timer.current);
       const write = () => {
-        void persistSettings((prev) => {
-          const list: WidgetInstance[] = Array.isArray(prev.widgets) ? prev.widgets : [];
+        void persistDashboard(dashboardId, ({ widgets: list }) => {
           // One undo step per inspector visit, not per keystroke.
           if (!recorded.current) {
             pushHistory(list);
             recorded.current = true;
           }
-          return { ...prev, widgets: list.map((widget) => (widget.id === next.id ? { ...next, pos: widget.pos } : widget)) };
+          return { widgets: list.map((widget) => (widget.id === next.id ? { ...next, pos: widget.pos } : widget)) };
         });
       };
       if (immediate) write();
       else timer.current = window.setTimeout(write, SAVE_DELAY_MS);
     },
-    [persistSettings, pushHistory],
+    [dashboardId, pushHistory],
   );
   React.useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -75,17 +76,17 @@ export default function WidgetInspector({ id }: { id: string }) {
   const allowed = def.allowedSizes ?? TILE_SIZE_OPTIONS.map((option) => option.key);
 
   const resize = (size: TileSize) => {
-    const base = resolveLayout(widgets, columns);
+    const base = resolveLayout(widgets, columns, pageRows);
     const from = base.get(id)!;
-    const layout = placeTile(base, id, from, cellsFor(size), columns);
+    const layout = placeTile(base, id, from, cellsFor(size), columns, pageRows);
     pushHistory(widgets);
     setDraft({ ...draft, size });
-    void persistSettings((prev) => ({ ...prev, widgets: applyLayout((prev.widgets as WidgetInstance[]).map((w) => (w.id === id ? { ...w, size } : w)), layout) }));
+    void persistDashboard(dashboardId, ({ widgets: list }) => ({ widgets: applyLayout(list.map((w) => (w.id === id ? { ...w, size } : w)), layout) }));
   };
 
   const remove = () => {
     pushHistory(widgets);
-    void persistSettings((prev) => ({ ...prev, widgets: (prev.widgets as WidgetInstance[]).filter((w) => w.id !== id) }));
+    void persistDashboard(dashboardId, ({ widgets: list }) => ({ widgets: list.filter((w) => w.id !== id) }));
     select(null);
     close();
   };

@@ -2170,6 +2170,20 @@
   text-align: center;
 }
 
+/* One row tall (1 x 1, 2 x 1): no room for the day's timeline under the
+   time, so it's just the date above the time. */
+@container (max-height: 10rem) {
+  .clock-plain-inner {
+    justify-content: space-between;
+  }
+
+  .clock-plain-spine,
+  .clock-plain-rule,
+  .clock-plain-ticks {
+    display: none;
+  }
+}
+
 .headlines-hero,
 .rss-feed {
   container-type: size;
@@ -2436,6 +2450,22 @@
 
 .search-input::placeholder {
   color: var(--muted-foreground);
+}
+
+/* What Enter will do, for anything other than a plain search: a bang, a
+   sum, or a site. Hangs under the field so the card doesn't shift. */
+.search-hint {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 1rem;
+  right: 1rem;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
 }
 
 .search-input:focus {

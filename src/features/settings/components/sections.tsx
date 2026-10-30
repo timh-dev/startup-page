@@ -10,6 +10,8 @@ import { DEFAULT_COLUMNS, MAX_COLUMNS, MAX_ROWS, MIN_COLUMNS, MIN_ROWS, PAGE_ROW
 import { useLayoutEditStore } from "@/features/dashboard/stores/layoutEditStore";
 import { RangeControl, SegmentedControl } from "./controls";
 import { setUiValue, type SettingsSectionProps } from "./appearance/types";
+import { readDashboard, writeDashboard } from "@/features/dashboard/dashboards";
+import { useActiveDashboardId } from "@/features/dashboard/useDashboard";
 
 function Row({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
@@ -144,17 +146,20 @@ export function GeneralSettings({ settings, updateSettings }: SettingsSectionPro
 /** How the dashboard is laid out and which pages show. */
 export function DashboardSettings({ settings, updateSettings }: SettingsSectionProps) {
   const ui = settings.ui || {};
-  const columns = Number(settings.layout?.columns) || DEFAULT_COLUMNS;
+  // Columns and rows belong to the dashboard on screen.
+  const dashboardId = useActiveDashboardId();
+  const dashboard = readDashboard(settings, dashboardId);
+  const columns = Number(dashboard.columns) || DEFAULT_COLUMNS;
   const setColumns = (next: number) =>
-    updateSettings((prev) => ({ ...prev, layout: { ...(prev.layout || {}), columns: Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, next)) } }));
-  const rows = Number(settings.layout?.rows) || PAGE_ROWS;
+    updateSettings((prev) => writeDashboard(prev, dashboardId, { columns: Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, next)) }));
+  const rows = Number(dashboard.rows) || PAGE_ROWS;
   // Cards keep their page and their row on it; ones that no longer fit move.
   const setRows = (next: number) =>
     updateSettings((prev) => {
-      const from = Number(prev.layout?.rows) || PAGE_ROWS;
+      const current = readDashboard(prev, dashboardId);
+      const from = Number(current.rows) || PAGE_ROWS;
       const to = Math.max(MIN_ROWS, Math.min(MAX_ROWS, next));
-      const widgets = Array.isArray(prev.widgets) ? reflowRows(prev.widgets, from, to) : prev.widgets;
-      return { ...prev, widgets, layout: { ...(prev.layout || {}), rows: to } };
+      return writeDashboard(prev, dashboardId, { widgets: reflowRows(current.widgets, from, to), rows: to });
     });
 
   // Settings opens with editing on; this turns it off or back on. Either way

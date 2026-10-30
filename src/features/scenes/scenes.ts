@@ -10,6 +10,8 @@
 // CORS so joined cards can read their colours). Paintings are public domain,
 // bundled under src/assets/media/themes.
 import type { TileSize, WidgetInstance, WidgetType } from "@/lib/dashboard-dimensions";
+import type { Join } from "@/features/dashboard/layout/joins";
+import { MAIN_DASHBOARD, readDashboard, writeDashboard } from "@/features/dashboard/dashboards";
 import arcticWallpaper from "@/assets/media/themes/arctic.jpg";
 import oceanWallpaper from "@/assets/media/themes/ocean.jpg";
 import spaceWallpaper from "@/assets/media/themes/space.jpg";
@@ -23,6 +25,7 @@ interface SceneCard {
   size: TileSize;
   x: number;
   y: number;
+  /** The card's settings. For a video or photo card, its own clip or topics instead of the theme's. */
   config?: Record<string, unknown>;
   /** For a bookmark card: which of the user's top-level folders (in order) it shows. */
   folder?: number;
@@ -42,6 +45,10 @@ export interface Scene {
   /** Search topics, used in order by photo cards (each card rotates through its list). */
   photos: string[][];
   cards: SceneCard[];
+  /** The page the cards are laid out on; 7 x 4 unless given. */
+  grid?: { columns: number; rows: number };
+  /** Cards joined into one shape (or one shared video/photo, "window"), by their index in `cards`. */
+  joins?: Array<[number, number] | [number, number, "window"]>;
 }
 
 const mixkit = (id: number) => `https://assets.mixkit.co/videos/${id}/${id}-720.mp4`;
@@ -64,24 +71,38 @@ export const SCENES: Scene[] = [
       ["joshua tree", "saguaro cactus", "desert bloom"],
       ["desert night sky", "camel caravan", "atacama desert"],
     ],
+    // The default layout for new installs.
+    grid: { columns: 8, rows: 5 },
     cards: [
-      card("video", "tall", 0, 0),
-      card("search", "wide", 1, 0),
-      card("clock", "small", 3, 0),
-      card("weather", "wide", 4, 0),
-      card("photo", "small", 6, 0),
-      card("bookmark", "small", 1, 1, { folder: 0 }),
-      card("bookmark", "small", 2, 1, { folder: 1 }),
-      card("vault", "small", 3, 1),
-      card("solarGraph", "large", 4, 1),
-      card("photo", "tall", 6, 1),
-      card("video", "large", 0, 2),
-      card("photo", "small", 2, 2),
-      card("bookmark", "small", 3, 2, { folder: 2 }),
-      card("bookmark", "wide", 2, 3, { folder: 3 }),
-      card("timer", "small", 4, 3),
-      card("airQuality", "small", 5, 3),
-      card("photo", "small", 6, 3),
+      card("video", "tall", 0, 0, { config: { url: mixkit(51678), zoom: 1, offsetX: 0, offsetY: 0 } }),
+      card("video", "small", 1, 0, { config: { url: "", zoom: 1.6, offsetX: 0, offsetY: 0 } }),
+      card("bookmark", "tall", 2, 0, { folder: 0 }),
+      card("search", "wide", 3, 0),
+      card("photo", "small", 5, 0, { config: { searchTerms: ["mountain"] } }),
+      card("weather", "wide", 6, 0),
+      card("bookmark", "small", 1, 1, { folder: 1 }),
+      card("photo", "wide", 3, 1, { config: { searchTerms: ["patagonia"] } }),
+      card("weatherV2", "wide", 5, 1),
+      card("photo", "small", 7, 1, { config: { searchTerms: ["glacier"] } }),
+      card("globe", "large", 0, 2, { config: { view: "limb" } }),
+      card("photo", "small", 2, 2, { config: { searchTerms: ["aurora"] } }),
+      card("photo", "small", 3, 2, { config: { searchTerms: ["patagonia"] } }),
+      card("iframe", "feature", 4, 2, { config: { preset: "windy", url: "" } }),
+      card("bookmark", "small", 7, 2, { folder: 2 }),
+      card("solarGraph", "large", 2, 3),
+      card("photo", "small", 7, 3, { config: { searchTerms: ["whitecap"] } }),
+      card("bookmark", "small", 0, 4, { folder: 3 }),
+      card("photo", "small", 1, 4, { config: { searchTerms: ["Parque Nacional Huascarán"] } }),
+      card("photo", "small", 4, 4, { config: { searchTerms: ["volcano"] } }),
+      card("vault", "small", 5, 4),
+      card("photo", "small", 6, 4, { config: { searchTerms: ["nepal"] } }),
+      card("clock", "small", 7, 4),
+    ],
+    // The tall video shares its clip with the card beside it; the two
+    // Patagonia photos join into one L-shaped photo.
+    joins: [
+      [0, 1, "window"],
+      [7, 12],
     ],
   },
   {
@@ -199,17 +220,20 @@ export function sceneWallpaper(id: unknown): string {
 
 const videoConfig = (url: string) => ({ url, zoom: 1, offsetX: 0, offsetY: 0 });
 
+/** A theme's card ids: stable, so its joins can name them. */
+const sceneCardId = (scene: Scene, index: number) => `${scene.id}-${index + 1}`;
+
 /** The theme's first page of cards, with bookmark cards pointed at `folderIds` (in order). */
 export function sceneWidgets(scene: Scene, folderIds: string[]): WidgetInstance[] {
   let video = 0;
   let photo = 0;
   const widgets: WidgetInstance[] = [];
   scene.cards.forEach((spec, index) => {
-    const base = { id: `${scene.id}-${index + 1}`, type: spec.type, size: spec.size, pos: { x: spec.x, y: spec.y } };
+    const base = { id: sceneCardId(scene, index), type: spec.type, size: spec.size, pos: { x: spec.x, y: spec.y } };
     if (spec.type === "video") {
-      widgets.push({ ...base, config: videoConfig(scene.videos[video++ % scene.videos.length]) });
+      widgets.push({ ...base, config: spec.config ? { ...spec.config } : videoConfig(scene.videos[video++ % scene.videos.length]) });
     } else if (spec.type === "photo") {
-      widgets.push({ ...base, config: { searchTerms: scene.photos[photo++ % scene.photos.length] } });
+      widgets.push({ ...base, config: spec.config ? { ...spec.config } : { searchTerms: scene.photos[photo++ % scene.photos.length] } });
     } else if (spec.type === "bookmark") {
       // No folder for this slot: leave the spot empty rather than repeat one.
       const groupId = folderIds[spec.folder ?? 0];
@@ -239,24 +263,31 @@ export type SceneApplyMode = "look" | "layout";
 
 type SettingsLike = Record<string, any>;
 
+/** The theme's page size and joins, for the cards `sceneWidgets` made (joins to a skipped card are dropped). */
+export function sceneLayout(scene: Scene, widgets: WidgetInstance[]): { columns: number; rows: number; joins: Join[] } {
+  const ids = new Set(widgets.map((widget) => widget.id));
+  const joins = (scene.joins ?? [])
+    .map(([a, b, mode]): Join => (mode ? [sceneCardId(scene, a), sceneCardId(scene, b), mode] : [sceneCardId(scene, a), sceneCardId(scene, b)]))
+    .filter(([a, b]) => ids.has(a) && ids.has(b));
+  return { columns: scene.grid?.columns ?? 7, rows: scene.grid?.rows ?? 4, joins };
+}
+
 /**
  * Settings with a theme applied. "look": palette, mode, painting, and the
  * theme's videos and photo topics on the cards already there. "layout": all
- * of that plus the theme's own cards and arrangement (joins cleared). Nothing
- * else changes.
+ * of that plus the theme's own cards, page size and joins. Either way it's
+ * the given dashboard's cards (main's unless said); nothing else changes.
  */
-export function applyScene<T extends SettingsLike>(settings: T, id: SceneId, mode: SceneApplyMode): T {
+export function applyScene<T extends SettingsLike>(settings: T, id: SceneId, mode: SceneApplyMode, dashboardId: string = MAIN_DASHBOARD): T {
   const scene = getScene(id);
   if (!scene) return settings;
   const ui = { ...(settings.ui || {}), scene: scene.id, themePalette: scene.palette, themeMode: scene.mode };
-  const current: WidgetInstance[] = Array.isArray(settings.widgets) ? settings.widgets : [];
-  if (mode === "look") return { ...settings, ui, widgets: restyleMedia(current, scene) };
+  const themed = { ...settings, ui };
+  if (mode === "look") {
+    const current = readDashboard(settings, dashboardId).widgets;
+    return writeDashboard(themed, dashboardId, { widgets: restyleMedia(current, scene) });
+  }
   const folderIds = (Array.isArray(settings.bookmark) ? settings.bookmark : []).map((group: { id?: string }) => group?.id).filter(Boolean) as string[];
-  return {
-    ...settings,
-    ui,
-    widgets: sceneWidgets(scene, folderIds),
-    // Theme layouts are designed for one 7 x 4 page.
-    layout: { ...(settings.layout || {}), columns: 7, rows: 4, joins: [] },
-  };
+  const widgets = sceneWidgets(scene, folderIds);
+  return writeDashboard(themed, dashboardId, { widgets, ...sceneLayout(scene, widgets) });
 }

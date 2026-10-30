@@ -1,6 +1,6 @@
 import { StrictMode, lazy, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import "@fontsource-variable/inter/opsz.css";
 import "@fontsource-variable/playfair-display/wght.css";
 import "@fontsource-variable/playfair-display/wght-italic.css";
@@ -17,7 +17,8 @@ import AppLayout from "@/components/layout/AppLayout";
 // navigation, so the dashboard shell isn't blocked downloading their code.
 const BookmarksPage = lazy(() => import("@/pages/BookmarksPage"));
 const ResourceVaultPage = lazy(() => import("@/pages/ResourceVaultPage"));
-const WeatherPreviewPage = lazy(() => import("@/pages/WeatherPreview"));
+// A dev tool for checking weather scenes; left out of production builds.
+const WeatherPreviewPage = import.meta.env.DEV ? lazy(() => import("@/pages/WeatherPreview")) : null;
 
 const LOCAL_ONLY = import.meta.env.VITE_LOCAL_ONLY === "true";
 // Forcing local-only ignores a real key so a dev with cloud creds pulled into
@@ -37,7 +38,9 @@ const routes = (
           <Route path="/bookmarks" element={<BookmarksPage />} />
           <Route path="/resources" element={<ResourceVaultPage />} />
         </Route>
-        <Route path="/weather-preview" element={<WeatherPreviewPage />} />
+        {WeatherPreviewPage && <Route path="/weather-preview" element={<WeatherPreviewPage />} />}
+        {/* Unknown links (including the preview in production) go home. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
   </HashRouter>

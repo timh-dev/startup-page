@@ -2,7 +2,7 @@ import React from "react";
 import { HiOutlineCloud, HiOutlineExclamationTriangle } from "react-icons/hi2";
 import { MISSING_API_KEY_MESSAGE } from "@/features/weather/hooks/useWeatherData";
 import { useSidePanelStore } from "@/components/layout/sidePanelStore";
-import { useSettingsStore } from "@/features/settings/stores";
+import { useActiveDashboard } from "@/features/dashboard/useDashboard";
 
 const WEATHER_TYPES = new Set(["weather", "weatherV2"]);
 
@@ -19,7 +19,7 @@ function isTopLevelWidget(widgets: WidgetLike[], id: string) {
  */
 export function WeatherStatus({ error, instanceId }: { error: string | null; instanceId?: string }): React.ReactElement {
   const openSettings = useSidePanelStore((state) => state.openSettings);
-  const rawWidgets = useSettingsStore((state) => state.settings.widgets);
+  const widgets: WidgetLike[] = useActiveDashboard().widgets;
 
   if (!error) {
     return (
@@ -34,7 +34,6 @@ export function WeatherStatus({ error, instanceId }: { error: string | null; ins
   }
 
   const needsKey = error === MISSING_API_KEY_MESSAGE;
-  const widgets: WidgetLike[] = Array.isArray(rawWidgets) ? rawWidgets : [];
   const topLevel = !!instanceId && isTopLevelWidget(widgets, instanceId);
   // Widgets inside a stack aren't individually editable from the dialog.
   const canConfigure = needsKey && topLevel;

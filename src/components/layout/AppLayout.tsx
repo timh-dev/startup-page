@@ -18,6 +18,7 @@ import DebugPanel from "@/components/layout/DebugPanel";
 import useKBarActions from "@/features/dashboard/hooks/useKBarActions";
 import DashboardPage from "@/features/dashboard/pages";
 import { useQuickAddStore } from "@/features/resourceVault/stores/quickAddStore";
+import { DashboardActions, DashboardDialogs, ToolbarDashboardMenu } from "@/features/dashboard/components/DashboardMenu";
 
 function KBarWrapper({ children }: { children: React.ReactNode }) {
   useKBarActions();
@@ -30,48 +31,29 @@ function KBarWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Page shortcuts (1, 2, 3…) live with the pager in the dashboard, which
+// knows the order the pages are in.
 function VaultNavigationActions() {
   const navigate = useNavigate();
   const vaultEnabled = useSettingsStore((state) => state.settings.ui?.vaultEnabled ?? true);
-  const bookmarksEnabled = useSettingsStore((state) => state.settings.ui?.bookmarksEnabled ?? true);
 
   const actions = React.useMemo(
-    () => [
-      ...(bookmarksEnabled ? [{
-        id: "open-bookmark-vault",
-        name: "Open Bookmark Vault",
-        shortcut: ["3"],
-        section: "Navigation",
-        perform: () => navigate("/bookmarks"),
-      }] : []),
-      ...(vaultEnabled ? [{
-        id: "open-resource-vault",
-        name: "Open Resource Vault",
-        shortcut: ["1"],
-        section: "Navigation",
-        perform: () => navigate("/resources"),
-      }] : []),
-      {
-        id: "show-dashboard",
-        name: "Show Dashboard",
-        shortcut: ["2"],
-        section: "Navigation",
-        perform: () => navigate("/"),
-      },
-      ...(vaultEnabled ? [{
-        id: "quick-add-resource",
-        name: "Add a Resource",
-        shortcut: ["a"],
-        section: "Navigation",
-        // Set the flag before navigating: the Vault (already mounted or about
-        // to mount) switches to the reading list and focuses its add field.
-        perform: () => {
-          useQuickAddStore.getState().requestQuickAdd();
-          navigate("/resources");
-        },
-      }] : []),
-    ],
-    [navigate, vaultEnabled, bookmarksEnabled],
+    () =>
+      vaultEnabled
+        ? [{
+            id: "quick-add-resource",
+            name: "Add a Resource",
+            shortcut: ["a"],
+            section: "Navigation",
+            // Set the flag before navigating: the Vault (already mounted or about
+            // to mount) switches to the reading list and focuses its add field.
+            perform: () => {
+              useQuickAddStore.getState().requestQuickAdd();
+              navigate("/resources");
+            },
+          }]
+        : [],
+    [navigate, vaultEnabled],
   );
 
   useRegisterActions(actions, [actions]);
@@ -153,33 +135,12 @@ function AppLayoutInner() {
       if (event.key === "Escape" && !isDashboard) {
         event.preventDefault();
         navigate("/");
-        return;
-      }
-
-      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
-        if (event.key === "1" && vaultEnabled) {
-          event.preventDefault();
-          navigate("/resources");
-          return;
-        }
-        if (event.key === "2") {
-          event.preventDefault();
-          navigate("/");
-          return;
-        }
-        if (event.key === "3" && bookmarksEnabled) {
-          event.preventDefault();
-          navigate("/bookmarks");
-          return;
-        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, isDashboard, vaultEnabled, bookmarksEnabled]);
-
-
+  }, [navigate, isDashboard]);
 
   return (
     <section
@@ -188,10 +149,13 @@ function AppLayoutInner() {
       <ThemeSync />
       {isClerkAvailable && <AuthBridge />}
       <VaultNavigationActions />
+      <DashboardActions />
+      <DashboardDialogs />
       <BookmarkDialogs />
       <SidePanel />
       <header className="app-header">
         <div className="app-toolbar surface-glass">
+          <ToolbarDashboardMenu />
           <Toggle />
           {isClerkAvailable && <AccountButton />}
           <SettingsButton />
