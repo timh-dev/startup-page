@@ -1,11 +1,6 @@
 import { create } from "zustand";
-import type { ForecastDay, WeatherData } from "@/features/weather/types/weather";
+import type { WeatherData } from "@/features/weather/types/weather";
 import { debugNowMs, useDebugStore } from "@/lib/debug";
-
-export interface SelectedWeatherDay {
-  day: ForecastDay;
-  unit: "imperial" | "metric";
-}
 
 export interface WeatherInstanceState {
   data: WeatherData | null;
@@ -14,9 +9,6 @@ export interface WeatherInstanceState {
   lat: number | null;
   lon: number | null;
   lastFetchedAt: number | null;
-  selectedDay: SelectedWeatherDay | null;
-  /** Drives the "day detail" Dialog opened from the compact WeatherBox. */
-  detailOpen: boolean;
 }
 
 const EMPTY_INSTANCE: WeatherInstanceState = {
@@ -26,8 +18,6 @@ const EMPTY_INSTANCE: WeatherInstanceState = {
   lat: null,
   lon: null,
   lastFetchedAt: null,
-  selectedDay: null,
-  detailOpen: false,
 };
 
 interface WeatherStore {
@@ -43,9 +33,6 @@ interface WeatherStore {
   setLocation: (id: string, location: string) => void;
   setCoords: (id: string, lat: number, lon: number) => void;
   setLastFetchedAt: (id: string, time: number) => void;
-  /** Sets which day to show (or null for "today") and opens the detail dialog. */
-  openWeatherCard: (id: string, selectedDay?: SelectedWeatherDay | null) => void;
-  closeWeatherCard: (id: string) => void;
   tickClock: () => void;
 }
 
@@ -70,9 +57,6 @@ export const useWeatherStore = create<WeatherStore>((set) => ({
   setLocation: (id, location) => set((state) => withInstance(state, id, { location })),
   setCoords: (id, lat, lon) => set((state) => withInstance(state, id, { lat, lon })),
   setLastFetchedAt: (id, time) => set((state) => withInstance(state, id, { lastFetchedAt: time })),
-  openWeatherCard: (id, selectedDay = null) =>
-    set((state) => withInstance(state, id, { selectedDay, detailOpen: true })),
-  closeWeatherCard: (id) => set((state) => withInstance(state, id, { detailOpen: false })),
   tickClock: () => set({ clockTime: debugNowMs() }),
 }));
 

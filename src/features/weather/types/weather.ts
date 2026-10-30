@@ -51,6 +51,8 @@ export interface WeatherData {
   source: "OpenWeather";
   unit: string;
   current?: {
+    /** When this reading was taken, as local time ("2026-10-29T19:40:00"). */
+    time?: string;
     temperature_2m?: number;
     weather_code?: number;
     is_day?: number;
@@ -85,6 +87,10 @@ export interface WeatherData {
     wind_direction_10m?: number[];
     precipitation_probability?: number[];
     precipitation?: number[];
+    /** 1 in daylight, 0 at night (NaN when the source didn't say). */
+    is_day?: number[];
+    /** Cloud cover, 0–100 (NaN when the source didn't say). */
+    cloud_cover?: number[];
   };
   openWeather?: OpenWeatherCurrent;
 }

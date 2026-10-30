@@ -63,8 +63,9 @@ make dev     # start the dev server and open the browser
 |---|---|
 | Clock | Time and date, with plain, analog and year-progress faces |
 | Search | Multi-engine search box with your own engines |
-| Weather / Weather (Frosted) | Current conditions and forecast from OpenWeather, with animated sky effects |
-| Air quality | US AQI, PM2.5 and PM10 from Open-Meteo |
+| Weather | Current conditions and a 5-day forecast from OpenWeather, with animated sky effects. Picking a day shows it on the frosted card. |
+| Weather (Frosted) | The whole day, midnight to midnight, as one frosted band of sky and weather, with temperatures every 3 hours; hover to read any hour |
+| Air quality | US AQI, PM2.5 and PM10 (Open-Meteo, or OpenWeather on the hosted site) |
 | Solar graph | Today's sun path, twilight bands and a hover scrubber |
 | Photo | Unsplash photos for your topics (Wikimedia when there's no key), with optional shader effects |
 | Video | A looping background video |
@@ -100,6 +101,12 @@ settings.
 
 Keys are stored in this browser only. They are never synced to other devices
 or included in exports, so enter them once on each device.
+
+[Open-Meteo](https://open-meteo.com) needs no key, but its free API is for
+non-commercial use only. Local-only and self-hosted installs use it for the
+frosted card's hourly day and for air quality. With accounts on (the hosted
+site, which has a subscription), the app only calls Open-Meteo when
+`VITE_OPEN_METEO_API_KEY` holds a paid key, and uses OpenWeather otherwise.
 
 ---
 

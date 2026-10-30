@@ -1,6 +1,9 @@
 import React from "react";
 import { useDebugStore } from "@/lib/debug";
 import { getOrRequestLocation } from "@/lib/geolocation";
+import { openMeteoUrl } from "@/lib/openMeteo";
+import { useCredentialsStore } from "@/lib/credentials";
+import { usAqi } from "@/features/weather/aqi";
 
 const AQI_LEVELS = [
   { max: 50,       label: "Good",                              color: "#22c55e", textClass: "text-green-400",  bgClass: "bg-green-500/15"  },
@@ -20,24 +23,39 @@ export default function AirQuality() {
   const [status, setStatus] = React.useState("loading");
   // The debugger's place, when set, instead of the browser's location.
   const debugPlace = useDebugStore((state) => state.location);
+  // Where Open-Meteo can't be used (the hosted site without a key), OpenWeather's air data instead.
+  const openWeatherKey = useCredentialsStore((state) => state.openWeather);
 
   React.useEffect(() => {
     let cancelled = false;
 
     async function load(lat: number, lon: number) {
       try {
-        const res = await fetch(
-          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
-          `&current=us_aqi,pm2_5,pm10,european_aqi&timezone=auto`
-        );
+        const openMeteo = openMeteoUrl("air-quality", { latitude: lat, longitude: lon, current: "us_aqi,pm2_5,pm10,european_aqi", timezone: "auto" });
+        if (openMeteo) {
+          const json = await (await fetch(openMeteo)).json();
+          if (cancelled) return;
+          setData({
+            aqi: json.current?.us_aqi ?? json.current?.european_aqi ?? 0,
+            pm25: json.current?.pm2_5?.toFixed(1) ?? "—",
+            pm10: json.current?.pm10?.toFixed(1) ?? "—",
+          });
+          setStatus("ready");
+          return;
+        }
+        const key = (openWeatherKey || "").trim();
+        if (!key) {
+          setStatus("no-key");
+          return;
+        }
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${key}`);
+        if (!res.ok) throw new Error(`Air quality request failed (${res.status})`);
         const json = await res.json();
         if (cancelled) return;
-        const aqi = json.current?.us_aqi ?? json.current?.european_aqi ?? 0;
-        setData({
-          aqi,
-          pm25: json.current?.pm2_5?.toFixed(1) ?? "—",
-          pm10: json.current?.pm10?.toFixed(1) ?? "—",
-        });
+        const components = json.list?.[0]?.components ?? {};
+        const pm25 = typeof components.pm2_5 === "number" ? components.pm2_5 : null;
+        const pm10 = typeof components.pm10 === "number" ? components.pm10 : null;
+        setData({ aqi: usAqi(pm25, pm10), pm25: pm25?.toFixed(1) ?? "—", pm10: pm10?.toFixed(1) ?? "—" });
         setStatus("ready");
       } catch {
         if (!cancelled) setStatus("error");
@@ -59,11 +77,12 @@ export default function AirQuality() {
     });
 
     return () => { cancelled = true; };
-  }, [debugPlace]);
+  }, [debugPlace, openWeatherKey]);
 
   if (status !== "ready" || !data) {
     const msg = status === "loading" ? "Loading air quality…"
       : status === "location-error" ? "Set coordinates in Settings."
+      : status === "no-key" ? "Add an OpenWeather key in Settings › Connections to see air quality."
       : "Air quality unavailable.";
     return (
       <div className="flex h-full w-full items-center justify-center rounded-[inherit] bg-card">

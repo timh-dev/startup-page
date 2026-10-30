@@ -17,8 +17,9 @@ import AppLayout from "@/components/layout/AppLayout";
 // navigation, so the dashboard shell isn't blocked downloading their code.
 const BookmarksPage = lazy(() => import("@/pages/BookmarksPage"));
 const ResourceVaultPage = lazy(() => import("@/pages/ResourceVaultPage"));
-// A dev tool for checking weather scenes; left out of production builds.
+// Dev tools for checking weather scenes and the day bar; left out of production builds.
 const WeatherPreviewPage = import.meta.env.DEV ? lazy(() => import("@/pages/WeatherPreview")) : null;
+const DayBarPreviewPage = import.meta.env.DEV ? lazy(() => import("@/pages/DayBarPreview")) : null;
 
 const LOCAL_ONLY = import.meta.env.VITE_LOCAL_ONLY === "true";
 // Forcing local-only ignores a real key so a dev with cloud creds pulled into
@@ -39,6 +40,7 @@ const routes = (
           <Route path="/resources" element={<ResourceVaultPage />} />
         </Route>
         {WeatherPreviewPage && <Route path="/weather-preview" element={<WeatherPreviewPage />} />}
+        {DayBarPreviewPage && <Route path="/day-bar-preview" element={<DayBarPreviewPage />} />}
         {/* Unknown links (including the preview in production) go home. */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

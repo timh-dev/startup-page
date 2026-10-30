@@ -2,12 +2,11 @@ import React, { useEffect } from "react";
 import { useWeatherStore, useWeatherInstance } from "@/features/weather/stores/weatherStore";
 import { useWeatherData, type WeatherOverrides } from "@/features/weather/hooks/useWeatherData";
 import { resolveWeather } from "@/features/weather/utils";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { WeatherScene } from "./WeatherScene";
 import { WeatherStatus } from "./WeatherStatus";
 import { WeatherCurrentPanel } from "./WeatherCurrentPanel";
 import { WeatherForecastPanel } from "./WeatherForecastPanel";
-import WeatherFrostedCard from "./WeatherFrostedCard";
+import { placeKey } from "@/features/weather/stores/dayFocusStore";
 import type { WeatherData } from "@/features/weather/types/weather";
 import { debugNowMs } from "@/lib/debug";
 
@@ -26,6 +25,8 @@ interface WeatherBoxContentProps {
   location: string;
   clockTime: number;
   instanceId?: string;
+  /** The place shown (see placeKey), linking the forecast to the frosted card. */
+  place: string;
 }
 
 function WeatherBoxContent({
@@ -34,6 +35,7 @@ function WeatherBoxContent({
   location,
   clockTime,
   instanceId,
+  place,
 }: WeatherBoxContentProps): React.ReactElement {
   if (error || !data) return <WeatherStatus error={error} instanceId={instanceId} />;
 
@@ -61,36 +63,24 @@ function WeatherBoxContent({
         }}
         aria-hidden="true"
       />
-      <WeatherCurrentPanel resolved={resolved} location={location} source={source} condition={condition} instanceId={instanceId ?? ""} />
-      <WeatherForecastPanel resolved={resolved} instanceId={instanceId ?? ""} />
+      <WeatherCurrentPanel resolved={resolved} location={location} source={source} condition={condition} place={place} />
+      <WeatherForecastPanel resolved={resolved} place={place} />
     </div>
   );
 }
 
 function LiveWeatherBox({ instanceId, overrides }: { instanceId: string; overrides?: WeatherOverrides }): React.ReactElement {
   useWeatherData(instanceId, overrides);
-  const { data, error, location, detailOpen } = useWeatherInstance(instanceId);
+  const { data, error, location } = useWeatherInstance(instanceId);
   const clockTime = useWeatherStore((state) => state.clockTime);
   const tickClock = useWeatherStore((state) => state.tickClock);
-  const closeWeatherCard = useWeatherStore((state) => state.closeWeatherCard);
 
   useEffect(() => {
     const timer = window.setInterval(tickClock, 10 * 60 * 1000);
     return () => window.clearInterval(timer);
   }, [tickClock]);
 
-  return (
-    <>
-      <WeatherBoxContent data={data} error={error} location={location} clockTime={clockTime} instanceId={instanceId} />
-      <Dialog open={detailOpen} onOpenChange={(open) => !open && closeWeatherCard(instanceId)}>
-        <DialogContent className="max-w-3xl">
-          <div className="h-[24rem] w-full overflow-hidden rounded-2xl">
-            <WeatherFrostedCard instanceId={instanceId} overrides={overrides} />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+  return <WeatherBoxContent data={data} error={error} location={location} clockTime={clockTime} instanceId={instanceId} place={placeKey(overrides)} />;
 }
 
 export function WeatherBox(props: WeatherBoxProps = {}): React.ReactElement {
@@ -103,6 +93,7 @@ export function WeatherBox(props: WeatherBoxProps = {}): React.ReactElement {
       location={props.location ?? "Weather"}
       clockTime={props.clockTime ?? debugNowMs()}
       instanceId={props.instanceId}
+      place={placeKey(props.overrides)}
     />
   );
 }

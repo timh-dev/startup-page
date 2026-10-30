@@ -25,11 +25,15 @@ interface OWCurrentResponse {
 }
 
 interface OWForecastItem {
-  dt_txt: string;
+  /** Unix seconds. (The response's dt_txt is UTC, so it isn't used.) */
+  dt: number;
   main: { temp: number; temp_min: number; temp_max: number; humidity: number };
   weather: Array<{ id: number; main: string; description: string }>;
   wind: { speed: number; deg: number };
   pop: number;
+  /** "d" or "n": whether the slot is in daylight at the location. */
+  sys?: { pod?: "d" | "n" };
+  clouds?: { all: number };
   rain?: { "3h": number };
   snow?: { "3h": number };
 }
@@ -37,6 +41,17 @@ interface OWForecastItem {
 interface OWForecastResponse {
   cod: string;
   list: OWForecastItem[];
+}
+
+/**
+ * A moment as this browser's wall-clock time, "2026-10-29T19:00:00" — the
+ * form every forecast view parses (new Date() reads it as local time) and
+ * groups by day (its first 10 characters).
+ */
+export function localIsoTime(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 async function fetchWeather(
@@ -69,10 +84,12 @@ async function fetchWeather(
   const sunsetIso  = new Date(current.sys.sunset  * 1000).toISOString();
   const isDay      = current.dt >= current.sys.sunrise && current.dt < current.sys.sunset ? 1 : 0;
 
-  // Group 3h forecast slots by date
+  // Group 3h forecast slots by local date. OpenWeather's dt_txt is UTC, so
+  // reading it as local time put every slot hours late and split days at
+  // UTC midnight.
   const dayMap = new Map<string, OWForecastItem[]>();
   for (const item of forecast.list) {
-    const date = item.dt_txt.slice(0, 10);
+    const date = localIsoTime(item.dt * 1000).slice(0, 10);
     if (!dayMap.has(date)) dayMap.set(date, []);
     dayMap.get(date)!.push(item);
   }
@@ -115,9 +132,11 @@ async function fetchWeather(
   const hourlyWindDir:   number[] = [];
   const hourlyPrecipPct: number[] = [];
   const hourlyPrecip:    number[] = [];
+  const hourlyIsDay:     number[] = [];
+  const hourlyCloud:     number[] = [];
 
   for (const item of forecast.list) {
-    hourlyTime.push(item.dt_txt.replace(" ", "T"));
+    hourlyTime.push(localIsoTime(item.dt * 1000));
     hourlyTemp.push(item.main.temp);
     hourlyWeatherId.push(item.weather?.[0]?.id ?? 800);
     hourlyHumidity.push(item.main.humidity);
@@ -125,12 +144,15 @@ async function fetchWeather(
     hourlyWindDir.push(item.wind?.deg ?? 0);
     hourlyPrecipPct.push(Math.round(item.pop * 100));
     hourlyPrecip.push(item.rain?.["3h"] ?? item.snow?.["3h"] ?? 0);
+    hourlyIsDay.push(item.sys?.pod === "n" ? 0 : item.sys?.pod === "d" ? 1 : NaN);
+    hourlyCloud.push(item.clouds?.all ?? NaN);
   }
 
   const weatherData: WeatherData = {
     source: "OpenWeather",
     unit,
     current: {
+      time:             localIsoTime(current.dt * 1000),
       temperature_2m:   current.main.temp,
       weather_code:     w.id,
       is_day:           isDay,
@@ -160,6 +182,8 @@ async function fetchWeather(
       wind_direction_10m:        hourlyWindDir,
       precipitation_probability: hourlyPrecipPct,
       precipitation:             hourlyPrecip,
+      is_day:                    hourlyIsDay,
+      cloud_cover:               hourlyCloud,
     },
     openWeather: {
       id:          w.id,

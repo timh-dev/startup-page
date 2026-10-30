@@ -7,6 +7,7 @@ import { WeatherStatus } from "./WeatherStatus";
 import { getOpenWeatherCondition, getOpenWeatherCoverage, getOpenWeatherVisualProfile, getCloudFraction, resolveWeather } from "@/features/weather/utils";
 import { sunElevation } from "@/features/media/solarGraph/solarMath";
 import type { HourlyForecastPoint } from "@/features/weather/types/weather";
+import { placeKey, useFocusedDay } from "@/features/weather/stores/dayFocusStore";
 
 // OpenWeather's free 3-hour forecast endpoint doesn't report UV at all, so
 // there's no real UV data to show. Estimate it instead from solar elevation
@@ -173,7 +174,9 @@ interface WeatherDayDetailProps {
 // own or opened from a compact WeatherBox's day-detail dialog.
 export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDetailProps): React.ReactElement {
   useWeatherData(instanceId, overrides);
-  const { data, error, selectedDay, lat, lon } = useWeatherInstance(instanceId);
+  const { data, error, lat, lon } = useWeatherInstance(instanceId);
+  // The day picked on a standard weather card for this place, else today.
+  const focused = useFocusedDay(placeKey(overrides));
   const clockTime = useWeatherStore((state) => state.clockTime);
   const tickClock = useWeatherStore((state) => state.tickClock);
   // Hooks must run unconditionally on every render, so these come before the
@@ -193,7 +196,7 @@ export default function WeatherDayDetail({ instanceId, overrides }: WeatherDayDe
 
   const resolved = resolveWeather(data, clockTime);
   const unit: "imperial" | "metric" = resolved.unitLabel === "F" ? "imperial" : "metric";
-  const day = selectedDay?.day
+  const day = resolved.forecastDays.find((d) => d.date === focused)
     ?? resolved.forecastDays.find((d) => d.dayName === "Today")
     ?? resolved.forecastDays[0];
 

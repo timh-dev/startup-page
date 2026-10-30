@@ -599,12 +599,16 @@ export function resolveWeather(
   const dailyIds     = data.daily?.weather_code ?? [];
   const dailyDescs   = data.daily?.description ?? [];
 
+  // Late in the evening the forecast can start tomorrow, so "Today" only
+  // labels a day that is today.
+  const today = new Date(clockTime).toDateString();
   const forecastDays: ForecastDay[] = dates.map((date, i) => {
     const weatherId = dailyIds[i] ?? 800;
     const condition = getOpenWeatherCondition(weatherId, "");
+    const day = new Date(date + "T00:00:00");
     return {
       date,
-      dayName: i === 0 ? "Today" : DAY_NAMES[new Date(date + "T00:00:00").getDay()],
+      dayName: i === 0 && day.toDateString() === today ? "Today" : DAY_NAMES[day.getDay()],
       high: Math.round(highs[i] ?? 0),
       low:  Math.round(lows[i]  ?? highs[i] ?? 0),
       precip: precips[i] ?? 0,

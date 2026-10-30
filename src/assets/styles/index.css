@@ -1583,11 +1583,21 @@
   transition: background var(--duration-fast) var(--ease-out);
 }
 
-.weather-forecast-day:hover,
+.weather-forecast-day:not(:disabled):hover,
 .weather-forecast-day:focus-visible,
-.weather-forecast-day[aria-expanded="true"] {
+.weather-forecast-day[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.1);
   outline: none;
+}
+
+.weather-forecast-day[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+/* Nothing to show another day on (no frosted card): the days are just a forecast. */
+.weather-forecast-day:disabled {
+  cursor: default;
 }
 
 .weather-forecast-name {
@@ -3733,7 +3743,7 @@ button.bookmark-more:hover {
   box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.35);
 }
 
-/* ===== Weather V2 (frosted-glass hourly card) ===== */
+/* ===== Weather V2 (the frosted weather card): its glass and moving backdrop ===== */
 /* Inspired by "Frosted weather card design" (project root) — animated flat
    backgrounds keyed to 5 conditions, sitting under a blurred glass overlay.
    Ported positional animations use `left`/`top` percentages (relative to the
@@ -3763,75 +3773,6 @@ button.bookmark-more:hover {
     rgba(130, 144, 140, 0.9) 100%
   );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.weather-v2-content {
-  padding: clamp(0.7rem, 5cqh, 1.4rem) clamp(0.8rem, 5cqw, 1.6rem);
-  gap: clamp(0.4rem, 2.4cqh, 0.9rem);
-  /* A soft shadow under all text, so it reads over the moving sky. */
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
-}
-
-/* The condition in bold, then a quieter line about the rest of the day. */
-.weather-v2-headline {
-  max-width: 92%;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  color: #fff;
-  font-size: clamp(0.9rem, 5.4cqh, 1.25rem);
-}
-
-.weather-v2-headline-tail {
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.weather-v2-headline-icon {
-  display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
-  vertical-align: -0.12em;
-  margin: 0 0.05em;
-  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.25));
-}
-
-.weather-v2-rule {
-  flex: 0 0 auto;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* A short card (one row, 2 x 1): the condition on one line, no rules, a
-   slimmer ribbon. */
-@container (max-height: 12rem) {
-  .weather-v2-content {
-    gap: 0.3rem;
-  }
-
-  .weather-v2-headline {
-    display: block;
-    flex: none;
-    max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    line-height: 1.3;
-    font-size: 0.875rem;
-  }
-
-  .weather-v2-headline-tail,
-  .weather-v2-rule {
-    display: none;
-  }
-
-  .weather-v2-ribbon {
-    min-height: 1.4rem;
-  }
 }
 
 /* --- Sunny --- */
@@ -3885,6 +3826,53 @@ button.bookmark-more:hover {
 @keyframes weather-v2-glow-core {
   0%, 100% { transform: scale(0.94); opacity: 0.7; }
   50% { transform: scale(1.18); opacity: 1; }
+}
+
+/* --- Night ---
+   A clear night is its own sky: deep blue, a soft moon and faint stars. Every
+   other condition keeps its own look, darkened, under a night-tinted glass. */
+
+.weather-v2-bg-night-base {
+  background: radial-gradient(130% 140% at 80% -10%, #2b3a5c 0%, #18223a 46%, #0c1220 100%);
+}
+
+.weather-v2-bg-night-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 28% 64%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 44% 18%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 58% 48%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 66% 80%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 22% 86%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 52% 32%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 36% 42%, rgba(255, 255, 255, 0.6), transparent);
+}
+
+.weather-v2-bg-night-moon {
+  position: absolute;
+  right: 6%;
+  top: -18%;
+  width: 46%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(232, 238, 255, 0.55) 0%, rgba(176, 196, 240, 0.22) 40%, rgba(150, 170, 230, 0) 72%);
+  animation: weather-v2-glow-pulse 9s ease-in-out infinite;
+}
+
+.weather-v2-card[data-night]:not([data-category="sunny"]) .weather-v2-bg-layer {
+  filter: brightness(0.5) saturate(0.75);
+}
+
+.weather-v2-card[data-night] .weather-v2-glass {
+  background: linear-gradient(
+    180deg,
+    rgba(36, 46, 70, 0.4) 0%,
+    rgba(32, 42, 64, 0.55) 30%,
+    rgba(28, 38, 58, 0.7) 60%,
+    rgba(24, 32, 50, 0.78) 100%
+  );
 }
 
 /* --- Cloudy --- */
@@ -3993,121 +3981,235 @@ button.bookmark-more:hover {
   100% { top: 110%; transform: translateX(-6px); opacity: 0; }
 }
 
-/* --- Temp row / ribbon / hour row --- */
+/* ===== The day card (frosted weather): a whole day as a blurred band ===== */
 
-.weather-v2-temp-row,
-.weather-v2-hour-row {
-  display: grid;
-  /* grid-template-columns is set inline per-render (column count varies with
-     hourSpan) — no fixed column count here. */
-  flex: 0 0 auto;
-  text-align: center;
+.day-card {
+  container-type: size;
 }
 
-.weather-v2-temp-row {
-  align-items: end;
-  color: rgba(255, 255, 255, 0.88);
+.day-card-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: clamp(0.55rem, 5cqh, 1.1rem) 0 clamp(0.4rem, 4cqh, 0.9rem);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.day-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0 clamp(0.75rem, 5cqw, 1.4rem);
+}
+
+.day-card-headline {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+  font-size: clamp(0.8rem, 7cqh, 1.15rem);
+  letter-spacing: -0.01em;
+}
+
+.day-card-day {
   font-weight: 500;
-  font-size: clamp(0.7rem, 2.8cqw, 0.95rem);
+  opacity: 0.8;
+}
+
+.day-card-range {
+  display: flex;
+  flex: none;
+  gap: 0.5em;
+  font-size: clamp(0.66rem, 5.5cqh, 0.85rem);
+  font-weight: 500;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-card-today {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1em 0.6em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: clamp(0.62rem, 5cqh, 0.8rem);
+  font-weight: 600;
+  text-shadow: none;
+  cursor: pointer;
+}
+
+.day-card-today:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.day-card-timeline {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: clamp(0.1rem, 1.5cqh, 0.35rem);
+}
+
+/* Temperatures above the band and hours below sit at their exact moment
+   across the card's full width, as the band does. */
+.day-card-temps,
+.day-card-hours {
+  position: relative;
+  height: 1.25em;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-card-temps span,
+.day-card-hours span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
   white-space: nowrap;
 }
 
-.weather-v2-temp-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
+.day-card-temps {
+  font-size: clamp(0.62rem, 5.2cqh, 0.82rem);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-.weather-v2-now-label {
-  font-size: clamp(0.56rem, 1.9cqw, 0.68rem);
-  font-weight: 650;
-  letter-spacing: 0.12em;
+.day-card-temps span[data-past] {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.day-card-temps .day-card-now-temp {
+  top: -0.2em;
+  font-size: 1.3em;
+  font-weight: 700;
   color: #fff;
 }
 
-.weather-v2-temp-cell-now .weather-v2-temp-value {
-  color: #fff;
-  font-weight: 600;
-  line-height: 1;
-  font-size: clamp(1.05rem, 4.6cqw, 1.6rem);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 20px rgba(255, 255, 255, 0.35);
+.day-card-hours {
+  font-size: clamp(0.56rem, 4.6cqh, 0.72rem);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
 }
 
-.weather-v2-ribbon {
+.day-card-band {
   position: relative;
-  flex: 1 1 auto;
-  min-height: clamp(2.5rem, 20cqh, 5rem);
+  height: clamp(1.7rem, 30cqh, 5rem);
 }
 
-.weather-v2-ribbon-blur {
+/* The band: one frosted bar, edge to edge of the card. The colour field and
+   its quiet texture both sit behind the same blur, with nothing on top. The
+   box reaches above and below the band so the blur fades out there; the
+   frost reaches past the card's sides (the card clips it) so the colour
+   runs solid to its edges. */
+.day-bar {
+  --day-bar-bleed: 28px;
+  position: absolute;
+  inset: -30% 0;
+}
+
+/* A faint, soft track behind the band, so night hours still read on dark glass. */
+.day-bar::before {
+  content: "";
+  position: absolute;
+  inset: 34% 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  filter: blur(3px);
+}
+
+.day-bar-frost {
+  position: absolute;
+  inset: 31% calc(-1 * var(--day-bar-bleed));
+  filter: blur(clamp(6px, 4.5cqh, 12px)) saturate(1.15) brightness(1.05);
+}
+
+.day-bar-frost canvas {
   position: absolute;
   inset: 0;
-  filter: blur(clamp(8px, 2.5cqw, 16px));
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
+  width: 100%;
+  height: 100%;
 }
 
-.weather-v2-ribbon-blob {
+.day-bar-texture {
+  opacity: 0.5;
+}
+
+/* Now: a bright line through the band. */
+.day-card-now {
   position: absolute;
-  top: 20%;
-  bottom: 20%;
-  border-radius: 999px;
-  animation: weather-v2-bar-breathe 6s ease-in-out infinite;
-}
-
-@keyframes weather-v2-bar-breathe {
-  0%, 100% { opacity: 0.9; }
-  50% { opacity: 1; }
-}
-
-.weather-v2-ribbon-marker {
-  position: absolute;
-  left: 50%;
-  top: -14%;
-  bottom: -14%;
+  top: -12%;
+  bottom: -12%;
   width: 2px;
   margin-left: -1px;
   border-radius: 2px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 20%, rgba(255, 255, 255, 0.9) 80%, rgba(255, 255, 255, 0) 100%);
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.8);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 22%, #fff 78%, rgba(255, 255, 255, 0) 100%);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
-.weather-v2-ribbon-dot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin-left: -7px;
-  margin-top: -7px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.28), 0 0 22px rgba(255, 255, 255, 0.9);
+/* Reading a moment: a softer line than now's, following the pointer. */
+.day-card-timeline {
+  cursor: crosshair;
+  touch-action: pan-y;
+  outline: none;
 }
 
-.weather-v2-hour-row {
-  align-items: center;
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 500;
-  font-size: clamp(0.62rem, 2.2cqw, 0.8rem);
-}
-
-.weather-v2-hour-cell {
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.weather-v2-hour-pill {
-  padding: 0.2em 0.7em 0.25em;
+.day-card-timeline:focus-visible .day-card-band {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
   border-radius: 999px;
-  background: #fff;
-  color: #20262a;
-  font-weight: 500;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+.day-card-scrub {
+  position: absolute;
+  top: -8%;
+  bottom: -8%;
+  width: 1.5px;
+  margin-left: -0.75px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.75) 25%, rgba(255, 255, 255, 0.75) 75%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+.day-card-head[data-scrubbing] .day-card-range {
+  opacity: 1;
+}
+
+.day-card-moment-temp {
+  font-weight: 700;
+}
+
+/* Bigger cards: the headline may wrap, and the timeline sits in the middle. */
+@container (min-height: 14rem) {
+  .day-card-head {
+    align-items: flex-start;
+  }
+
+  .day-card-headline {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+
+  .day-card-timeline {
+    justify-content: center;
+  }
+}
+
+/* The day-bar gallery's swatches (dev only): a slice of band on the card's glass. */
+.day-bar-swatch {
+  position: relative;
+  width: 9rem;
+  height: 2.6rem;
+  border-radius: 0.6rem;
+  background: #7d8a87;
+  overflow: hidden;
 }
 
 /* --- Loading / error states --- */
@@ -4129,14 +4231,5 @@ button.bookmark-more:hover {
   to { transform: rotate(360deg); }
 }
 
-.weather-v2-state-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #fff;
-}
 
-.weather-v2-state-hint {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.65);
-}
 
