@@ -97,8 +97,24 @@ export function describeIntent(intent: QueryIntent): string {
   }
 }
 
-/** Opens a result here, or in a new tab when ⌘/Ctrl or Shift is held. */
+/**
+ * `url` if it's a web address (http or https), else null. Search engine URLs
+ * come from settings, which can be imported or synced, so a `javascript:` one
+ * must never be followed.
+ */
+export function webUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Opens a result here, or in a new tab when ⌘/Ctrl or Shift is held. Anything but a web address is ignored. */
 export function openResult(url: string, newTab: boolean) {
-  if (newTab) window.open(url, "_blank", "noopener,noreferrer");
-  else window.location.assign(url);
+  const safe = webUrl(url);
+  if (!safe) return;
+  if (newTab) window.open(safe, "_blank", "noopener,noreferrer");
+  else window.location.assign(safe);
 }

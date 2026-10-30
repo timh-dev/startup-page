@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SEARCH_ENGINES } from "@/features/dashboard/searchEngines";
-import { asUrl, describeIntent, resolveQuery, safeCalculate } from "@/features/dashboard/searchQuery";
+import { afterEach, vi } from "vitest";
+import { asUrl, describeIntent, openResult, resolveQuery, safeCalculate, webUrl } from "@/features/dashboard/searchQuery";
 
 const engines = DEFAULT_SEARCH_ENGINES;
 
@@ -64,5 +65,25 @@ describe("describeIntent", () => {
   it("says what Enter will do", () => {
     expect(describeIntent({ kind: "url", url: "https://example.com" })).toBe("Open example.com");
     expect(describeIntent({ kind: "calc", result: "4" })).toBe("= 4");
+  });
+});
+
+describe("openResult", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("only follows web addresses", () => {
+    expect(webUrl("https://duckduckgo.com/?q=a%20b")).toBe("https://duckduckgo.com/?q=a%20b");
+    expect(webUrl("javascript:alert(1)")).toBeNull();
+    expect(webUrl("data:text/html,<b>x</b>")).toBeNull();
+    expect(webUrl("not a url")).toBeNull();
+  });
+
+  it("ignores an engine set to a javascript: address", () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const evil = [{ id: "x", name: "X", url: "javascript:alert(document.cookie)//", icon: "search" }];
+    const intent = resolveQuery("hello", evil);
+    expect(intent).toMatchObject({ kind: "search" });
+    openResult((intent as { url: string }).url, true);
+    expect(open).not.toHaveBeenCalled();
   });
 });
