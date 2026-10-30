@@ -571,9 +571,9 @@ export function resolveWeather(
   const shaderOpacity = condition === "Clear" && dayTime ? "opacity-[0.12]" : "opacity-[0.3]";
   const skyDarkness = getSkyDarkness(timePhase, condition);
   const horizonGlow = getHorizonGlow(timePhase);
-  const auroraIntensity = condition === "Clear" && coverage === "none" && !dayTime
-    ? getAuroraIntensity(clockTime)
-    : 0;
+  // The aurora comes out whenever it's dark, whatever the clouds: from
+  // sunset to sunrise, strongest around midnight.
+  const auroraIntensity = !dayTime ? Math.max(0.6, getAuroraIntensity(clockTime)) : 0;
   const showAurora = auroraIntensity > 0;
 
   // Dark text for bright daytime skies; light text at night and for dark-sky conditions

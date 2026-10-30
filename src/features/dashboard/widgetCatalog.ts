@@ -10,7 +10,7 @@ export const WIDGET_CATALOG: Record<WidgetType, { category: WidgetCategory; desc
   globe: { category: "Time & sky", description: "Day and night on a dotted Earth, with you pulsing on it." },
   timer: { category: "Time & sky", description: "A focus timer on a scrolling tape." },
   weather: { category: "Weather", description: "Conditions and a 5-day forecast over a live sky." },
-  weatherV2: { category: "Weather", description: "Now, today's high and low, and the next hours as a line with the chance of rain." },
+  weatherV2: { category: "Weather", description: "A larger frosted-glass forecast with hourly detail." },
   airQuality: { category: "Weather", description: "Air quality index and particulates where you are." },
   search: { category: "Links", description: "Search with your choice of engines." },
   bookmark: { category: "Links", description: "One of your bookmark folders." },

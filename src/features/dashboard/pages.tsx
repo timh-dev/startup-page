@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { HiLink } from "react-icons/hi2";
+import { HiChevronDown, HiChevronUp, HiLink } from "react-icons/hi2";
 
 import { useSettingsStore } from "@/features/settings/stores";
 import { useLayoutEditStore } from "@/features/dashboard/stores/layoutEditStore";
@@ -103,8 +103,8 @@ const svgMask = (d: string, box: Rect) =>
   )}")`;
 
 /**
- * The dashboard: cards placed freely on pages of 4 rows that snap as you
- * scroll. In edit mode, drag a card (or a joined group) anywhere, drag a
+ * The dashboard: cards placed freely on pages of rows, moved between with
+ * the arrows by the page dots. In edit mode, drag a card (or a joined group) anywhere, drag a
  * corner to resize, click the node between two touching cards to join them
  * into one shape, ✕ to remove, click to open the inspector. On narrow
  * screens it falls back to one flowing column of fewer columns.
@@ -335,10 +335,9 @@ export default function Index() {
       case "photo":
       case "video":
       case "weather":
+      case "weatherV2":
       case "iframe":
         return media();
-      case "weatherV2":
-        return tileClass("overflow-hidden");
       case "solarGraph":
       case "globe":
         return media("bg-black");
@@ -683,38 +682,6 @@ export default function Index() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base, joins, closePanel, columns, pageRows, commit, flow, removeWidget, select, setEditing, undo, widgets]);
 
-  // One scroll gesture turns exactly one page (snapping alone would pull a
-  // short trackpad swipe back). Cards that scroll themselves keep the wheel.
-  React.useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller || flow) return undefined;
-    let acc = 0;
-    let lockedUntil = 0;
-    const scrollsItself = (el: HTMLElement | null, dy: number) => {
-      for (let node = el; node && node !== scroller; node = node.parentElement) {
-        const style = getComputedStyle(node);
-        if (!/(auto|scroll)/.test(style.overflowY) || node.scrollHeight <= node.clientHeight + 1) continue;
-        if (dy > 0 ? node.scrollTop + node.clientHeight < node.scrollHeight - 1 : node.scrollTop > 0) return true;
-      }
-      return false;
-    };
-    const onWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) < Math.abs(event.deltaX) || event.ctrlKey) return;
-      if (scrollsItself(event.target as HTMLElement, event.deltaY)) return;
-      event.preventDefault();
-      const now = performance.now();
-      if (now < lockedUntil) return;
-      acc += event.deltaY;
-      if (Math.abs(acc) < 30) return;
-      const current = Math.round(scroller.scrollTop / pageH);
-      const target = Math.max(0, Math.min(Math.round(scroller.scrollHeight / pageH) - 1, current + Math.sign(acc)));
-      acc = 0;
-      lockedUntil = now + 650;
-      if (target !== current) scroller.scrollTo({ top: target * pageH, behavior: "smooth" });
-    };
-    scroller.addEventListener("wheel", onWheel, { passive: false });
-    return () => scroller.removeEventListener("wheel", onWheel);
-  }, [flow, pageH]);
 
   // The URL follows the pager (#/resources on the Vault page, #/bookmarks on
   // Bookmarks), and the nav, shortcuts and links scroll it.
@@ -751,6 +718,13 @@ export default function Index() {
     if (target !== null && target !== current) scroller.scrollTo({ top: target * pageH, behavior: instant ? "auto" : "smooth" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.key, flow]);
+
+  // Pages change only from the arrows and dots beside them (and the page
+  // shortcuts); scrolling inside the page doesn't turn it.
+  const goToScreen = (screen: number) => {
+    const target = Math.max(0, Math.min(screens - 1, screen));
+    scrollerRef.current?.scrollTo({ top: target * pageH, behavior: "smooth" });
+  };
 
   const onPagerScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const screen = Math.round(event.currentTarget.scrollTop / pageH);
@@ -1067,9 +1041,6 @@ export default function Index() {
       {editBar}
       <div ref={scrollerRef} className="dashboard-scroller" onScroll={onPagerScroll} onPointerDown={deselect}>
         <div className="dashboard-pages" style={{ height: gridHeight }} onPointerDown={deselect}>
-          {Array.from({ length: screens }, (_, p) => (
-            <div key={p} className="dashboard-page-snap" style={{ top: p * pageH, height: pageH }} />
-          ))}
           <div style={{ position: "absolute", top: 0, left: Math.max(pad.side, (viewport.width - panelOffset - gridWidth) / 2), transition: "left var(--duration-base) var(--ease-out)" }}>
             {grid}
           </div>
@@ -1082,13 +1053,23 @@ export default function Index() {
               aria-label={SPECIAL_LABELS[kind]}
             >
               {specialPage(kind)}
-              {editing && <div className="dashboard-special-veil">{SPECIAL_LABELS[kind]} page · scroll past to add cards on the next page</div>}
+              {editing && <div className="dashboard-special-veil">{SPECIAL_LABELS[kind]} page · the arrows move past it to more card pages</div>}
             </section>
           ))}
         </div>
       </div>
       {screens > 1 && (
         <nav className="page-dots" aria-label="Pages" style={{ right: panelOffset + 0.9 * rem }}>
+          <button
+            type="button"
+            className="page-arrow"
+            onClick={() => goToScreen(page - 1)}
+            disabled={page <= 0}
+            aria-label="Previous page"
+            title="Previous page"
+          >
+            <HiChevronUp className="size-4" />
+          </button>
           {Array.from({ length: screens }, (_, p) => {
             const kind = cardPageAt(p) === null ? specials[p - 1] : null;
             return (
@@ -1100,10 +1081,20 @@ export default function Index() {
                 aria-current={page === p ? "page" : undefined}
                 aria-label={kind ? SPECIAL_LABELS[kind] : `Cards, page ${(cardPageAt(p) ?? 0) + 1}`}
                 title={kind ? SPECIAL_LABELS[kind] : `Cards ${(cardPageAt(p) ?? 0) + 1}`}
-                onClick={() => scrollerRef.current?.scrollTo({ top: p * pageH, behavior: "smooth" })}
+                onClick={() => goToScreen(p)}
               />
             );
           })}
+          <button
+            type="button"
+            className="page-arrow"
+            onClick={() => goToScreen(page + 1)}
+            disabled={page >= screens - 1}
+            aria-label="Next page"
+            title="Next page"
+          >
+            <HiChevronDown className="size-4" />
+          </button>
         </nav>
       )}
       {ghostCard}

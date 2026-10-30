@@ -1,7 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { KBarProvider, useRegisterActions } from "kbar";
-import { HiOutlineArchiveBox, HiOutlineBookmark, HiOutlineHome, HiOutlineSquares2X2 } from "react-icons/hi2";
 
 import { isBuiltInPalette } from "@/lib/theme-palettes";
 import { useSettingsStore } from "@/features/settings/stores";
@@ -124,11 +123,9 @@ function AppLayoutInner() {
   const isDashboard = !isResources && !isBookmarks;
 
   const editingLayout = useLayoutEditStore((state) => state.editing);
-  const toggleLayoutEditing = useLayoutEditStore((state) => state.toggleEditing);
   const setLayoutEditing = useLayoutEditStore((state) => state.setEditing);
 
-  // Leaving the dashboard should exit edit mode so the toggle (which only shows
-  // on the dashboard) can't get stranded in the "on" state.
+  // Leaving the card pages (for the Vault or Bookmarks) ends edit mode.
   React.useEffect(() => {
     if (!isDashboard && editingLayout) {
       setLayoutEditing(false);
@@ -182,38 +179,11 @@ function AppLayoutInner() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigate, isDashboard, vaultEnabled, bookmarksEnabled]);
 
-  const handleWheel = React.useCallback(
-    (event: React.WheelEvent) => {
-      if (Math.abs(event.deltaX) < 72 || Math.abs(event.deltaX) < Math.abs(event.deltaY) * 1.35) {
-        return;
-      }
-      const target = event.target as HTMLElement;
-      if (target?.closest?.("input, textarea, select, [contenteditable='true']")) {
-        return;
-      }
 
-      if (event.deltaX > 0) {
-        if (isResources) {
-          navigate("/");
-        } else if (!isBookmarks && bookmarksEnabled) {
-          navigate("/bookmarks");
-        }
-        return;
-      }
-
-      if (isBookmarks) {
-        navigate("/");
-      } else if (!isResources && vaultEnabled) {
-        navigate("/resources");
-      }
-    },
-    [navigate, isResources, isBookmarks, vaultEnabled, bookmarksEnabled],
-  );
 
   return (
     <section
       className="relative min-h-screen overflow-x-hidden text-foreground"
-      onWheel={handleWheel}
     >
       <ThemeSync />
       {isClerkAvailable && <AuthBridge />}
@@ -222,18 +192,6 @@ function AppLayoutInner() {
       <SidePanel />
       <header className="app-header">
         <div className="app-toolbar surface-glass">
-          {isDashboard && (
-            <button
-              type="button"
-              onClick={toggleLayoutEditing}
-              className="toolbar-button"
-              title={editingLayout ? "Done editing (E)" : "Edit the dashboard (E)"}
-              aria-label="Edit dashboard layout"
-              aria-pressed={editingLayout}
-            >
-              <HiOutlineSquares2X2 />
-            </button>
-          )}
           <Toggle />
           {isClerkAvailable && <AccountButton />}
           <SettingsButton />

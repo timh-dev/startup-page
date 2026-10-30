@@ -1285,41 +1285,6 @@
   container-type: size;
 }
 
-.globe-caption {
-  position: absolute;
-  top: clamp(0.7rem, 6cqh, 1.1rem);
-  left: clamp(0.8rem, 6cqw, 1.2rem);
-  z-index: 1;
-  color: rgb(255 255 255 / 0.92);
-  pointer-events: none;
-}
-
-.globe-caption[data-view="limb"] {
-  top: auto;
-  bottom: clamp(0.7rem, 6cqh, 1.1rem);
-}
-
-/* Set like the map: monospaced capitals, ruled, no softness. */
-.globe-caption-place {
-  padding-bottom: 0.3rem;
-  border-bottom: 1px solid rgb(255 255 255 / 0.35);
-  font-family: var(--font-mono);
-  font-size: clamp(0.7rem, 5cqw, 0.85rem);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.globe-caption-time {
-  margin-top: 0.3rem;
-  font-family: var(--font-mono);
-  font-size: clamp(0.6rem, 3.8cqw, 0.7rem);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgb(255 255 255 / 0.65);
-}
-
 /* Globe: a clock button on hover that opens the dashboard debugger. */
 .globe-debug-toggle {
   position: absolute;
@@ -1518,12 +1483,12 @@ select.debug-input,
 
 /* --- Pages: 4 rows each, snapping as you scroll ------------------------------ */
 
+/* Pages don't scroll by wheel or touch: the arrows by the page dots move
+   between them (programmatic scrolling still works under overflow: hidden). */
 .dashboard-scroller {
   position: fixed;
   inset: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
+  overflow: hidden;
   overscroll-behavior: contain;
   scrollbar-width: none;
 }
@@ -1536,22 +1501,41 @@ select.debug-input,
   position: relative;
 }
 
-.dashboard-page-snap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  scroll-snap-align: start;
-  pointer-events: none;
-}
 
 .page-dots {
   position: fixed;
   top: 50%;
   z-index: 30;
   display: grid;
+  justify-items: center;
   gap: 0.5rem;
   translate: 0 -50%;
   transition: right var(--duration-base) var(--ease-out);
+}
+
+.page-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0.15rem 0;
+  border-radius: 9999px;
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--card) 70%, transparent);
+  box-shadow: 0 0 0 var(--hairline-width) var(--hairline), 0 2px 6px rgb(0 0 0 / 0.08);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: background-color var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+
+.page-arrow:hover:not(:disabled) {
+  background: var(--card);
+}
+
+.page-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .page-dot {
@@ -3191,238 +3175,6 @@ h3.bm-folder-title {
   background-size: 180px 180px;
   mix-blend-mode: overlay;
   opacity: 0.28;
-}
-
-/* ---- Forecast card (weather/components/WeatherFrostedCard) ----
-   The card surface tinted by the weather; the temperature line in the
-   weather's colour, rain chances as bars under it. */
-.forecast {
-  --forecast-tint: oklch(0.78 0.03 240);
-  --forecast-line: oklch(0.55 0.06 240);
-  --forecast-rain: oklch(0.6 0.13 245);
-  container-type: size;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: clamp(0.7rem, 6cqh, 1.1rem) clamp(0.85rem, 5cqw, 1.25rem) clamp(0.45rem, 4cqh, 0.75rem);
-  background: linear-gradient(165deg, color-mix(in oklab, var(--forecast-tint) 32%, var(--card)), var(--card) 78%);
-  color: var(--card-foreground);
-}
-
-.dark .forecast {
-  background: linear-gradient(165deg, color-mix(in oklab, var(--forecast-tint) 16%, var(--card)), var(--card) 78%);
-}
-
-.forecast[data-tone="sunny"] { --forecast-tint: oklch(0.86 0.13 80); --forecast-line: oklch(0.66 0.16 58); }
-.forecast[data-tone="night"] { --forecast-tint: oklch(0.5 0.09 275); --forecast-line: oklch(0.6 0.12 275); }
-.forecast[data-tone="windy"] { --forecast-tint: oklch(0.8 0.07 185); --forecast-line: oklch(0.56 0.1 190); }
-.forecast[data-tone="rainy"] { --forecast-tint: oklch(0.72 0.08 245); --forecast-line: oklch(0.52 0.13 250); }
-.forecast[data-tone="snowy"] { --forecast-tint: oklch(0.92 0.035 230); --forecast-line: oklch(0.6 0.08 232); }
-
-.dark .forecast[data-tone] {
-  --forecast-line: color-mix(in oklab, var(--forecast-tint) 70%, white);
-}
-
-.forecast-loading {
-  animation: forecast-pulse 1.4s ease-in-out infinite alternate;
-}
-
-@keyframes forecast-pulse {
-  to {
-    opacity: 0.7;
-  }
-}
-
-.forecast-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.forecast-now {
-  min-width: 0;
-}
-
-.forecast-eyebrow {
-  overflow: hidden;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted-foreground);
-}
-
-.forecast-reading {
-  display: flex;
-  align-items: baseline;
-  gap: 0.55rem;
-  min-width: 0;
-}
-
-.forecast-temp {
-  font-size: clamp(1.8rem, 20cqh, 3.1rem);
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: -0.03em;
-}
-
-.forecast-condition {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15rem;
-  min-width: 0;
-  font-size: 0.8125rem;
-  font-weight: 550;
-  color: color-mix(in oklab, var(--card-foreground) 80%, transparent);
-}
-
-.forecast-condition-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.forecast-icon {
-  flex: none;
-  width: 1.5em;
-  height: 1.5em;
-  color: var(--forecast-line);
-}
-
-.forecast-hilo {
-  display: flex;
-  flex: none;
-  gap: 0.55rem;
-  padding-top: 0.15rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--muted-foreground);
-}
-
-.forecast-summary {
-  margin-top: 0.35rem;
-  font-size: 0.75rem;
-  line-height: 1.35;
-  color: var(--muted-foreground);
-}
-
-.forecast-chart {
-  position: relative;
-  flex: 1;
-  min-height: 2.25rem;
-  margin-top: 0.5rem;
-}
-
-.forecast-plot {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.forecast-line {
-  fill: none;
-  stroke: var(--forecast-line);
-  stroke-width: 2;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.forecast-rain {
-  fill: var(--forecast-rain);
-  opacity: 0.4;
-}
-
-.forecast-point {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
-  border-radius: 9999px;
-  background: var(--card);
-  box-shadow: 0 0 0 2px var(--forecast-line);
-}
-
-.forecast-point[data-first] {
-  width: 8px;
-  height: 8px;
-  margin: -4px 0 0 -4px;
-  background: var(--forecast-line);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--forecast-line) 25%, transparent);
-}
-
-.forecast-point-value {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.6875rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.forecast-point[data-first] .forecast-point-value {
-  left: 0;
-  transform: none;
-}
-
-.forecast-point[data-last] .forecast-point-value {
-  left: auto;
-  right: 0;
-  transform: none;
-}
-
-.forecast-hours {
-  position: relative;
-  flex: none;
-  height: 1rem;
-  margin-top: 0.3rem;
-  font-size: 0.625rem;
-  font-weight: 500;
-  color: var(--muted-foreground);
-}
-
-.forecast-hours span {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-
-.forecast-hours span[data-first] {
-  transform: none;
-  margin-left: -2px;
-  font-weight: 700;
-  color: var(--card-foreground);
-}
-
-.forecast-hours span[data-last] {
-  transform: translateX(-100%);
-}
-
-/* One row tall (2 x 1): no summary, a smaller reading. */
-@container (max-height: 12rem) {
-  .forecast-summary {
-    display: none;
-  }
-
-  .forecast-temp {
-    font-size: clamp(1.5rem, 26cqh, 2.2rem);
-  }
-
-  .forecast-chart {
-    margin-top: 0.25rem;
-  }
-}
-
-@container (max-height: 8.5rem) {
-  .forecast-eyebrow {
-    display: none;
-  }
 }
 
 /* A card off screen keeps still: its CSS animations pause until it's back. */

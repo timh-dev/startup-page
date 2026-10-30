@@ -148,7 +148,7 @@ export const weatherWidget = defineWidget<WeatherConfig>({
 
 export const weatherV2Widget = defineWidget<WeatherSourceConfig>({
   type: "weatherV2",
-  label: "Forecast",
+  label: "Weather (Frosted)",
   icon: HiOutlineSparkles,
   defaultSize: "wide",
   allowedSizes: ["wide", "large", "feature"],

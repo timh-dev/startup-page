@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { ForecastDay, WeatherData } from "@/features/weather/types/weather";
 import { debugNowMs, useDebugStore } from "@/lib/debug";
-import { isReplaying, onReplayChange, replayNow } from "@/lib/motion";
 
 export interface SelectedWeatherDay {
   day: ForecastDay;
@@ -86,19 +85,3 @@ useDebugStore.subscribe((next, prev) => {
   if (next.timeOffsetMs !== prev.timeOffsetMs || next.location !== prev.location) useWeatherStore.getState().tickClock();
 });
 
-// During the day replay, the weather sky's time of day follows it (a few
-// updates a second: the cards re-resolve their colours on each).
-let replayTimer = 0;
-function followReplay() {
-  window.clearInterval(replayTimer);
-  if (!isReplaying()) return;
-  replayTimer = window.setInterval(() => {
-    const at = replayNow();
-    useWeatherStore.setState({ clockTime: at ? at.getTime() : debugNowMs() });
-    if (!at) window.clearInterval(replayTimer);
-  }, 125);
-}
-if (typeof window !== "undefined") {
-  onReplayChange(followReplay);
-  followReplay();
-}

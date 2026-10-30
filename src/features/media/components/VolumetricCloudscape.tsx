@@ -4,7 +4,7 @@ import { createAdaptiveResolution } from "@/lib/adaptive-resolution";
 import { getFlashEnvelope } from "@/features/weather/lightning";
 import { ambientFrameMs } from "@/lib/power";
 import { debugNow, debugTimeZone, wallClock } from "@/lib/debug";
-import { motionTime, replayNow } from "@/lib/motion";
+import { motionTime } from "@/lib/motion";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -915,8 +915,8 @@ export default function VolumetricCloudscape({
       if (flash < 0.01 && now - lastFrameTime < ambientFrameMs(CLOUD_FRAME_MS)) return;
       lastFrameTime = now;
 
-      // During the day replay the sky follows the replayed hour.
-      const d = wallClock(replayNow() ?? debugNow(), debugTimeZone());
+      // The sky shows the time now (it doesn't replay the day on load).
+      const d = wallClock(debugNow(), debugTimeZone());
       const hourNow = p.hour ?? d.hours + d.minutes / 60 + d.seconds / 3600;
       const coverageValue = getCoverageValue(p.coverage);
       // Default density follows coverage when not supplied (legacy callers)

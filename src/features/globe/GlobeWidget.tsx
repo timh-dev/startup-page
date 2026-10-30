@@ -11,7 +11,6 @@ import { readSettings } from "@/lib/settings";
 import { useSettingsStore } from "@/features/settings/stores";
 import type { GlobeView } from "./framing";
 import { createGlobeRenderer, type GlobeRenderer } from "./renderer";
-import { sunElevation } from "./sun";
 
 // New York until the browser shares a location, like the solar chart.
 const FALLBACK = { latitude: 40.7128, longitude: -74.006 };
@@ -24,12 +23,6 @@ const FRAME_MS = 1000 / 30;
 function zonePlace() {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   return zone.includes("/") ? zone.split("/").pop()!.replace(/_/g, " ") : "Here";
-}
-
-function daylightLabel(elevation: number) {
-  if (elevation > 0) return "Day";
-  if (elevation > -6) return "Twilight";
-  return "Night";
 }
 
 /**
@@ -52,14 +45,12 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
   const openDebugger = useDebugStore((state) => state.setPanelOpen);
   // The replayed moment while the day replays (shared with the solar chart
   // and weather sky); null once it reaches now.
-  const [sweepTime, setSweepTime] = useState<Date | null>(null);
   const replayingRef = useRef(false);
   // Pulse clock (on the shared animation clock), so the ring never jumps.
   const pulseStartRef = useRef(motionTime());
 
   const latitude = debugPlace?.latitude ?? savedLatitude ?? located?.latitude ?? FALLBACK.latitude;
   const longitude = debugPlace?.longitude ?? savedLongitude ?? located?.longitude ?? FALLBACK.longitude;
-  const timeZone = debugPlace?.timeZone;
   const sceneRef = useRef({ view, latitude, longitude });
   sceneRef.current = { view, latitude, longitude };
 
@@ -148,13 +139,11 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
         replayingRef.current = true;
         renderer.renderScene({ ...sceneRef.current, now: at });
         renderer.renderFrame(0, false);
-        setSweepTime(at);
         return;
       }
       if (replayingRef.current) {
         // Landed on now: hand over to the live view, first ripple at once.
         replayingRef.current = false;
-        setSweepTime(null);
         pulseStartRef.current = motionTime();
         renderScene();
         return;
@@ -185,10 +174,6 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
     renderer.renderFrame(motionTime() - pulseStartRef.current, !prefersReducedMotion());
   }, [view, latitude, longitude, now]);
 
-  // The caption follows the replay, then the clock, in the place's time zone.
-  const shown = sweepTime ?? now;
-  const elevation = sunElevation(latitude, longitude, shown);
-  const time = shown.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone });
   const place = debugPlace?.label ?? zonePlace();
 
   return (
@@ -201,14 +186,6 @@ export default function GlobeWidget({ view }: { view: GlobeView }) {
           aria-label={`Globe showing day and night now, with ${place} highlighted`}
         />
       )}
-      {/* Over dark space: top-left beside the whole globe, bottom-left under
-          the limb (where poster II sets its type). */}
-      <div className="globe-caption" data-view={view}>
-        <p className="globe-caption-place">{place}</p>
-        <p className="globe-caption-time numeric">
-          {time} · {daylightLabel(elevation)}
-        </p>
-      </div>
       {/* Opens the dashboard debugger (time and place for every card). */}
       <button
         type="button"

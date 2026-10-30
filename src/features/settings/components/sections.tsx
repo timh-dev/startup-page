@@ -7,6 +7,7 @@ import { useSidePanelStore } from "@/components/layout/sidePanelStore";
 import { useCredentialsStore, type CredentialName } from "@/lib/credentials";
 import { useDebugStore } from "@/lib/debug";
 import { DEFAULT_COLUMNS, MAX_COLUMNS, MAX_ROWS, MIN_COLUMNS, MIN_ROWS, PAGE_ROWS, reflowRows } from "@/features/dashboard/layout/grid";
+import { useLayoutEditStore } from "@/features/dashboard/stores/layoutEditStore";
 import { RangeControl, SegmentedControl } from "./controls";
 import { setUiValue, type SettingsSectionProps } from "./appearance/types";
 
@@ -156,8 +157,24 @@ export function DashboardSettings({ settings, updateSettings }: SettingsSectionP
       return { ...prev, widgets, layout: { ...(prev.layout || {}), rows: to } };
     });
 
+  // Settings opens with editing on; this turns it off or back on. Either way
+  // it ends when the panel closes, unless it was on before Settings opened.
+  const editing = useLayoutEditStore((state) => state.editing);
+  const setEditing = (on: boolean) => {
+    const store = useLayoutEditStore.getState();
+    if (on) store.startEditingForSettings();
+    else store.setEditing(false);
+  };
+
   return (
     <>
+      <Card>
+        <CardContent className="settings-rows">
+          <Row label="Edit layout" description="Drag cards to move them, drag a corner to resize, click one to change it, and add cards in empty spots.">
+            <Switch checked={editing} onCheckedChange={setEditing} aria-label="Edit layout" />
+          </Row>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Grid</CardTitle>
